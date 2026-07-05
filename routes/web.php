@@ -9,10 +9,10 @@ use App\Http\Controllers\ValueChainJobdeskController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EbitdaValueController;
 
-Route::inertia('/', 'welcome')->name('home');
+// Route::inertia('/', 'welcome')->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+// Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::resource('organizations', OrganizationController::class)
         ->except(['create', 'edit', 'show']);
@@ -33,6 +33,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('calculations.index');
     Route::resource('ebitda-values', EbitdaValueController::class)
         ->except(['create', 'edit', 'show']);
-});
+// });
 
 require __DIR__.'/settings.php';
