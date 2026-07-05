@@ -57,16 +57,17 @@ function OrganizationTreeList({
     nodes,
     depth = 0,
 }: {
-    nodes: OrganizationNode[];
+    nodes?: OrganizationNode[];
     depth?: number;
 }) {
+    const safeNodes = nodes ?? [];
     const [openNodeId, setOpenNodeId] = useState<number | null>(
-        depth === 0 && nodes.length > 0 ? nodes[0].id : null,
+        depth === 0 && safeNodes.length > 0 ? safeNodes[0].id : null,
     );
 
     return (
         <div className={depth === 0 ? 'space-y-3' : 'space-y-2'}>
-            {nodes.map((node) => (
+            {safeNodes.map((node) => (
                 <OrganizationTreeItem
                     key={node.id}
                     node={node}
@@ -92,7 +93,8 @@ function OrganizationTreeItem({
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
 }) {
-    const hasChildren = node.children.length > 0;
+    const children = node.children ?? [];
+    const hasChildren = children.length > 0;
 
     return (
         <Collapsible open={isOpen} onOpenChange={onOpenChange}>
@@ -154,7 +156,7 @@ function OrganizationTreeItem({
                                         variant="outline"
                                         className="border-border text-muted-foreground"
                                     >
-                                        {node.children.length} child
+                                        {children.length} child
                                     </Badge>
                                 )}
                             </div>
@@ -179,7 +181,7 @@ function OrganizationTreeItem({
                 {hasChildren && (
                     <CollapsibleContent className="mt-2 pl-5">
                         <OrganizationTreeList
-                            nodes={node.children}
+                            nodes={children}
                             depth={depth + 1}
                         />
                     </CollapsibleContent>

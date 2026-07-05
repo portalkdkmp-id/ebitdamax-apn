@@ -15,24 +15,13 @@ class OrganizationController extends Controller
     public function index(): Response
     {
         $organizations = Organization::query()
-            ->with('parent')
+            ->active()
+            ->root()
+            ->with('childrenRecursive')
             ->ordered()
             ->get()
-            ->map(fn (Organization $organization) => [
-                'id' => $organization->id,
-                'parent_id' => $organization->parent_id,
-                'parent_name' => $organization->parent?->name,
-                'code' => $organization->code,
-                'name' => $organization->name,
-                'slug' => $organization->slug,
-                'level' => $organization->level,
-                'node_type' => $organization->node_type,
-                'directorate_group' => $organization->directorate_group,
-                'is_revenue_center' => $organization->is_revenue_center,
-                'is_cost_center' => $organization->is_cost_center,
-                'is_active' => $organization->is_active,
-                'sort_order' => $organization->sort_order,
-            ]);
+            ->map(fn (Organization $organization): array => $this->transformOrganizationTree($organization))
+            ->values();
 
         $parents = Organization::query()
             ->active()
@@ -44,6 +33,7 @@ class OrganizationController extends Controller
             'active_nodes' => Organization::query()->where('is_active', true)->count(),
             'revenue_centers' => Organization::query()->where('is_revenue_center', true)->count(),
             'cost_centers' => Organization::query()->where('is_cost_center', true)->count(),
+            'max_depth' => (int) Organization::query()->max('depth'),
         ];
 
         return Inertia::render('Organizations/Index', [
@@ -89,13 +79,57 @@ class OrganizationController extends Controller
             : null;
 
         $depth = $parent ? $parent->depth + 1 : 0;
-        $path = $parent ? $parent->path . '/' . $payload['code'] : $payload['code'];
+        $path = $parent ? $parent->path.'/'.$payload['code'] : $payload['code'];
 
-        $payload['slug'] = Str::slug($payload['code'] . '-' . $payload['name']);
+        $payload['slug'] = Str::slug($payload['code'].'-'.$payload['name']);
         $payload['depth'] = $depth;
         $payload['path'] = $path;
         $payload['sort_order'] = $payload['sort_order'] ?? 0;
 
         return $payload;
+    }
+
+    /**
+     * @return array{
+     *     id: int,
+     *     parent_id: int|null,
+     *     code: string,
+     *     name: string,
+     *     slug: string,
+     *     level: string|null,
+     *     node_type: string|null,
+     *     directorate_group: string|null,
+     *     is_revenue_center: bool,
+     *     is_cost_center: bool,
+     *     is_active: bool,
+     *     depth: int,
+     *     path: string|null,
+     *     sort_order: int,
+     *     children: array<int, array<string, mixed>>
+     * }
+     */
+    private function transformOrganizationTree(Organization $organization): array
+    {
+        return [
+            'id' => $organization->id,
+            'parent_id' => $organization->parent_id,
+            'code' => $organization->code,
+            'name' => $organization->name,
+            'slug' => $organization->slug,
+            'level' => $organization->level,
+            'node_type' => $organization->node_type,
+            'directorate_group' => $organization->directorate_group,
+            'is_revenue_center' => $organization->is_revenue_center,
+            'is_cost_center' => $organization->is_cost_center,
+            'is_active' => $organization->is_active,
+            'depth' => $organization->depth,
+            'path' => $organization->path,
+            'sort_order' => $organization->sort_order,
+            'children' => $organization->childrenRecursive
+                ->filter(fn (Organization $child): bool => $child->is_active)
+                ->map(fn (Organization $child): array => $this->transformOrganizationTree($child))
+                ->values()
+                ->all(),
+        ];
     }
 }

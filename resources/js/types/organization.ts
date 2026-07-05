@@ -10,7 +10,7 @@ export type OrganizationNode = {
   is_cost_center: boolean;
   depth: number;
   path: string | null;
-  children: OrganizationNode[];
+  children?: OrganizationNode[];
 };
 
 export type OrganizationSummary = {
