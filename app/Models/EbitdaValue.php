@@ -8,8 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class EbitdaValue extends Model
 {
     public const SCENARIO_TARGET_TAHUNAN = 'target_tahunan';
+
     public const SCENARIO_TARGET_HARIAN = 'target_harian';
+
     public const SCENARIO_PLAN_HARIAN = 'plan_harian';
+
     public const SCENARIO_AKTUAL_HARIAN = 'aktual_harian';
 
     protected $fillable = [
@@ -27,6 +30,11 @@ class EbitdaValue extends Model
         'ebitda',
         'ebitda_margin',
         'raw_payload',
+        'classification',
+        'man_cost',
+        'method_cost',
+        'material_cost',
+        'machine_cost',
     ];
 
     protected $casts = [
@@ -39,6 +47,10 @@ class EbitdaValue extends Model
         'ebitda' => 'decimal:2',
         'ebitda_margin' => 'decimal:4',
         'raw_payload' => 'array',
+        'man_cost' => 'decimal:2',
+        'method_cost' => 'decimal:2',
+        'material_cost' => 'decimal:2',
+        'machine_cost' => 'decimal:2',
     ];
 
     public function organization(): BelongsTo

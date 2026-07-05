@@ -107,4 +107,9 @@ class Organization extends Model
     {
         return $this->hasOne(OrganizationProfile::class);
     }
+
+    public function calculation(): HasOne
+    {
+        return $this->hasOne(OrganizationCalculation::class);
+    }
 }

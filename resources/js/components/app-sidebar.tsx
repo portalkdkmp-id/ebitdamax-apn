@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import {
+    Calculator,
     ChartColumn,
     ClipboardList,
     FileSpreadsheet,
@@ -19,6 +20,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as calculationsIndex } from '@/routes/calculations';
 import { index as ebitdaTreeIndex } from '@/routes/ebitda-tree';
 import { index as importExcelIndex } from '@/routes/import-excel';
 import { index as organizationsIndex } from '@/routes/organizations';
@@ -45,6 +47,11 @@ const mainNavItems: NavItem[] = [
         title: 'Value Chain & Jobdesc',
         href: valueChainJobdeskIndex(),
         icon: ClipboardList,
+    },
+    {
+        title: 'Kalkulasi',
+        href: calculationsIndex(),
+        icon: Calculator,
     },
     {
         title: 'Import Excel',

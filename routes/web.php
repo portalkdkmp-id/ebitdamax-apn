@@ -3,16 +3,19 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EbitdaTreeController;
 use App\Http\Controllers\ExcelImportController;
+use App\Http\Controllers\OrganizationCalculationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\ValueChainJobdeskController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\EbitdaValueController;
 
 Route::inertia('/', 'welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::get('/organizations', [OrganizationController::class, 'index'])->name('organizations.index');
+    Route::resource('organizations', OrganizationController::class)
+        ->except(['create', 'edit', 'show']);
 
     Route::get('/ebitda-tree', [EbitdaTreeController::class, 'index'])->name('ebitda-tree.index');
 
@@ -26,6 +29,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('dashboard.directorates.show');
     Route::get('/value-chain-jobdesk', [ValueChainJobdeskController::class, 'index'])
         ->name('value-chain-jobdesk.index');
+    Route::get('/kalkulasi', [OrganizationCalculationController::class, 'index'])
+        ->name('calculations.index');
+    Route::resource('ebitda-values', EbitdaValueController::class)
+        ->except(['create', 'edit', 'show']);
 });
 
 require __DIR__.'/settings.php';

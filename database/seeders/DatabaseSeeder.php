@@ -11,6 +11,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             OrganizationSeeder::class,
             OrganizationProfileSeeder::class,
+            OrganizationCalculationSeeder::class,
+            EbitdaValueSeeder::class,
         ]);
     }
 }
