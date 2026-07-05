@@ -10,6 +10,7 @@ use App\Services\ValueChainJobdeskExcelParser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -18,6 +19,9 @@ class ExcelImportController extends Controller
     public function index(): Response
     {
         $imports = ExcelImport::query()
+            ->with(['errors' => function ($query) {
+                $query->latest();
+            }])
             ->latest()
             ->limit(10)
             ->get();
@@ -40,7 +44,14 @@ class ExcelImportController extends Controller
         $file = $validated['file'];
         $year = (int) $validated['year'];
 
-        $path = $file->store('imports/ebitdamax');
+        $disk = 'local';
+        $path = $file->store('imports/ebitdamax', $disk);
+
+        if (! is_string($path)) {
+            return back()->withErrors([
+                'file' => 'Upload gagal: file tidak bisa disimpan di storage aplikasi.',
+            ]);
+        }
 
         $excelImport = ExcelImport::query()->create([
             'filename' => $path,
@@ -50,7 +61,7 @@ class ExcelImportController extends Controller
         ]);
 
         try {
-            $parsed = $parser->parse(storage_path('app/'.$path), $year);
+            $parsed = $parser->parse(Storage::disk($disk)->path($path), $year);
 
             DB::transaction(function () use ($parsed, $excelImport) {
                 foreach ($parsed['records'] as $record) {

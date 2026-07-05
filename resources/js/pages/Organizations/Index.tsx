@@ -13,16 +13,11 @@ import {
     Trash2,
 } from 'lucide-react';
 import type { ElementType, FormEvent } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import {
     Dialog,
     DialogContent,
@@ -72,6 +67,10 @@ type OrganizationFormData = {
     is_cost_center: boolean;
     is_active: boolean;
     sort_order: string;
+};
+
+type OrganizationTableNode = OrganizationNode & {
+    children: OrganizationTableNode[];
 };
 
 function createDefaultForm(): OrganizationFormData {
@@ -200,65 +199,114 @@ function OrganizationBadges({ node }: { node: OrganizationNode }) {
     );
 }
 
-function OrganizationTreeList({
+function buildOrganizationTableTree(rows: OrganizationNode[]) {
+    const nodesById = new Map<number, OrganizationTableNode>();
+
+    rows.forEach((row) => {
+        nodesById.set(row.id, {
+            ...row,
+            children: [],
+        });
+    });
+
+    const roots: OrganizationTableNode[] = [];
+
+    rows.forEach((row) => {
+        const node = nodesById.get(row.id);
+
+        if (!node) {
+            return;
+        }
+
+        if (row.parent_id && nodesById.has(row.parent_id)) {
+            nodesById.get(row.parent_id)?.children.push(node);
+
+            return;
+        }
+
+        roots.push(node);
+    });
+
+    return roots;
+}
+
+function OrganizationTableTreeRows({
     nodes,
     depth = 0,
+    onDetail,
+    onEdit,
+    onDelete,
 }: {
-    nodes?: OrganizationNode[];
+    nodes: OrganizationTableNode[];
     depth?: number;
+    onDetail: (item: OrganizationNode) => void;
+    onEdit: (item: OrganizationNode) => void;
+    onDelete: (item: OrganizationNode) => void;
 }) {
-    const safeNodes = nodes ?? [];
     const [openNodeId, setOpenNodeId] = useState<number | null>(
-        depth === 0 && safeNodes.length > 0 ? safeNodes[0].id : null,
+        depth === 0 && nodes.length > 0 ? nodes[0].id : null,
     );
 
     return (
-        <div className={depth === 0 ? 'space-y-3' : 'space-y-2'}>
-            {safeNodes.map((node) => (
-                <OrganizationTreeItem
-                    key={node.id}
-                    node={node}
-                    depth={depth}
-                    isOpen={openNodeId === node.id}
-                    onOpenChange={(isOpen) =>
-                        setOpenNodeId(isOpen ? node.id : null)
-                    }
-                />
-            ))}
-        </div>
+        <>
+            {nodes.map((node) => {
+                const isOpen = openNodeId === node.id;
+
+                return (
+                    <OrganizationTableRow
+                        key={node.id}
+                        node={node}
+                        depth={depth}
+                        isOpen={isOpen}
+                        onOpenChange={(open) =>
+                            setOpenNodeId(open ? node.id : null)
+                        }
+                        onDetail={onDetail}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                    />
+                );
+            })}
+        </>
     );
 }
 
-function OrganizationTreeItem({
+function OrganizationTableRow({
     node,
     depth,
     isOpen,
     onOpenChange,
+    onDetail,
+    onEdit,
+    onDelete,
 }: {
-    node: OrganizationNode;
+    node: OrganizationTableNode;
     depth: number;
     isOpen: boolean;
-    onOpenChange: (isOpen: boolean) => void;
+    onOpenChange: (open: boolean) => void;
+    onDetail: (item: OrganizationNode) => void;
+    onEdit: (item: OrganizationNode) => void;
+    onDelete: (item: OrganizationNode) => void;
 }) {
-    const children = node.children ?? [];
-    const hasChildren = children.length > 0;
+    const hasChildren = node.children.length > 0;
 
     return (
-        <Collapsible open={isOpen} onOpenChange={onOpenChange}>
-            <div
-                className="relative"
-                style={{ paddingLeft: depth > 0 ? `${depth * 18}px` : 0 }}
-            >
-                {depth > 0 && (
-                    <div className="absolute top-0 bottom-0 left-0 border-l border-border" />
-                )}
-
-                <CollapsibleTrigger asChild disabled={!hasChildren}>
-                    <button
-                        type="button"
-                        className="group flex w-full items-start gap-3 rounded-lg border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:bg-primary/5 hover:shadow-md disabled:cursor-default disabled:hover:border-border disabled:hover:bg-card disabled:hover:shadow-sm"
+        <>
+            <TableRow className="align-top">
+                <TableCell className="p-4">
+                    <div
+                        className="flex items-start gap-3"
+                        style={{
+                            paddingLeft: depth > 0 ? `${depth * 22}px` : 0,
+                        }}
                     >
-                        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                        <button
+                            type="button"
+                            disabled={!hasChildren}
+                            aria-expanded={hasChildren ? isOpen : undefined}
+                            onClick={() => onOpenChange(!isOpen)}
+                            className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary transition hover:bg-primary/15 disabled:cursor-default disabled:bg-muted disabled:text-muted-foreground"
+                        >
                             {hasChildren ? (
                                 isOpen ? (
                                     <ChevronDown className="size-4" />
@@ -266,45 +314,84 @@ function OrganizationTreeItem({
                                     <ChevronRight className="size-4" />
                                 )
                             ) : (
-                                <span className="size-1.5 rounded-full bg-primary" />
+                                <span className="size-1.5 rounded-full bg-current" />
                             )}
-                        </div>
+                        </button>
 
-                        <div className="min-w-0 flex-1 space-y-2">
+                        <div className="min-w-0 flex-1">
                             <OrganizationBadges node={node} />
-
-                            <h3 className="text-base leading-snug font-semibold text-foreground">
+                            <p className="mt-2 font-medium text-foreground">
                                 {node.name}
-                            </h3>
-
+                            </p>
                             {node.directorate_group && (
-                                <p className="text-sm text-muted-foreground">
-                                    Group: {node.directorate_group}
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    {node.directorate_group}
+                                </p>
+                            )}
+                            {hasChildren && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    {node.children.length} child
                                 </p>
                             )}
                         </div>
+                    </div>
+                </TableCell>
+                <TableCell className="p-4 text-muted-foreground">
+                    {node.parent_name ?? 'Root'}
+                </TableCell>
+                <TableCell className="p-4 text-muted-foreground">
+                    {node.node_type ?? '-'}
+                </TableCell>
+                <TableCell className="p-4 text-right">
+                    {node.sort_order}
+                </TableCell>
+                <TableCell className="p-4">
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onDetail(node)}
+                        >
+                            <Eye className="size-4" />
+                            Detail
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => onEdit(node)}
+                        >
+                            <Pencil className="size-4" />
+                            Edit
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => onDelete(node)}
+                            disabled={!node.is_active}
+                        >
+                            <Trash2 className="size-4" />
+                            Hapus
+                        </Button>
+                    </div>
+                </TableCell>
+            </TableRow>
 
-                        <div className="hidden text-right text-xs text-muted-foreground sm:block">
-                            {hasChildren ? `${children.length} child` : 'Leaf'}
-                        </div>
-                    </button>
-                </CollapsibleTrigger>
-
-                {hasChildren && (
-                    <CollapsibleContent className="mt-2 pl-5">
-                        <OrganizationTreeList
-                            nodes={children}
-                            depth={depth + 1}
-                        />
-                    </CollapsibleContent>
-                )}
-            </div>
-        </Collapsible>
+            {isOpen && hasChildren && (
+                <OrganizationTableTreeRows
+                    nodes={node.children}
+                    depth={depth + 1}
+                    onDetail={onDetail}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                />
+            )}
+        </>
     );
 }
 
 function OrganizationsIndex({
-    organizations,
     organizationRows,
     parents,
     summary,
@@ -319,6 +406,10 @@ function OrganizationsIndex({
         search: filters.search ?? '',
         status: filters.status ?? 'active',
     });
+    const organizationTableTree = useMemo(
+        () => buildOrganizationTableTree(organizationRows),
+        [organizationRows],
+    );
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
         useForm<OrganizationFormData>(createDefaultForm());
@@ -517,73 +608,13 @@ function OrganizationsIndex({
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {organizationRows.map((item) => (
-                                        <TableRow key={item.id}>
-                                            <TableCell className="p-4">
-                                                <OrganizationBadges
-                                                    node={item}
-                                                />
-                                                <p className="mt-2 font-medium text-foreground">
-                                                    {item.name}
-                                                </p>
-                                                {item.directorate_group && (
-                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                        {
-                                                            item.directorate_group
-                                                        }
-                                                    </p>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="p-4 text-muted-foreground">
-                                                {item.parent_name ?? 'Root'}
-                                            </TableCell>
-                                            <TableCell className="p-4 text-muted-foreground">
-                                                {item.node_type ?? '-'}
-                                            </TableCell>
-                                            <TableCell className="p-4 text-right">
-                                                {item.sort_order}
-                                            </TableCell>
-                                            <TableCell className="p-4">
-                                                <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            setDetailItem(item)
-                                                        }
-                                                    >
-                                                        <Eye className="size-4" />
-                                                        Detail
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            openEditForm(item)
-                                                        }
-                                                    >
-                                                        <Pencil className="size-4" />
-                                                        Edit
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        variant="destructive"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            destroy(item)
-                                                        }
-                                                        disabled={
-                                                            !item.is_active
-                                                        }
-                                                    >
-                                                        <Trash2 className="size-4" />
-                                                        Hapus
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    <OrganizationTableTreeRows
+                                        key={`${filters.search}-${filters.status}-${organizationRows.length}`}
+                                        nodes={organizationTableTree}
+                                        onDetail={setDetailItem}
+                                        onEdit={openEditForm}
+                                        onDelete={destroy}
+                                    />
 
                                     {organizationRows.length === 0 && (
                                         <TableRow>
@@ -600,6 +631,7 @@ function OrganizationsIndex({
                         </CardContent>
                     </Card>
 
+                    {/*
                     <Card className="rounded-lg border bg-card shadow-sm">
                         <CardHeader className="border-b">
                             <CardTitle className="text-foreground">
@@ -610,6 +642,7 @@ function OrganizationsIndex({
                             <OrganizationTreeList nodes={organizations} />
                         </CardContent>
                     </Card>
+                    */}
                 </div>
             </main>
 

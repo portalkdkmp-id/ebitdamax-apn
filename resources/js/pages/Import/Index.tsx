@@ -1,5 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
 import { UploadCloud } from 'lucide-react';
+import { useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,16 @@ type ExcelImport = {
     success_rows: number;
     failed_rows: number;
     created_at: string;
+    errors?: ImportErrorLog[];
+};
+
+type ImportErrorLog = {
+    id: number;
+    row_number: number | null;
+    sheet_name: string | null;
+    message: string;
+    payload: Record<string, unknown> | null;
+    created_at: string;
 };
 
 type Props = {
@@ -41,12 +52,78 @@ export default function ImportIndex({ imports }: Props) {
             year: new Date().getFullYear(),
         });
 
+    useEffect(() => {
+        const importsWithErrors = imports.filter(
+            (item) =>
+                ['failed', 'completed_with_errors'].includes(item.status) ||
+                (item.errors?.length ?? 0) > 0,
+        );
+
+        if (importsWithErrors.length === 0) {
+            return;
+        }
+
+        console.groupCollapsed(
+            `[EBITDAMAX Import] ${importsWithErrors.length} import memiliki error`,
+        );
+
+        importsWithErrors.forEach((item) => {
+            console.groupCollapsed(
+                `[Import #${item.id}] ${item.original_filename} - ${item.status}`,
+            );
+            console.error('[EBITDAMAX Import] Ringkasan', {
+                id: item.id,
+                file: item.original_filename,
+                status: item.status,
+                successRows: item.success_rows,
+                failedRows: item.failed_rows,
+                totalRows: item.total_rows,
+                createdAt: item.created_at,
+            });
+
+            if ((item.errors?.length ?? 0) > 0) {
+                console.table(
+                    item.errors?.map((error) => ({
+                        id: error.id,
+                        sheet: error.sheet_name ?? '-',
+                        row: error.row_number ?? '-',
+                        message: error.message,
+                        createdAt: error.created_at,
+                    })),
+                );
+
+                item.errors?.forEach((error) => {
+                    if (error.payload) {
+                        console.log(
+                            `[Import Error #${error.id}] payload`,
+                            error.payload,
+                        );
+                    }
+                });
+            } else {
+                console.warn(
+                    '[EBITDAMAX Import] Tidak ada detail error log untuk import ini.',
+                );
+            }
+
+            console.groupEnd();
+        });
+
+        console.groupEnd();
+    }, [imports]);
+
     const submit = (event: FormEvent) => {
         event.preventDefault();
 
         post(storeImport.url(), {
             forceFormData: true,
             onSuccess: () => reset('file'),
+            onError: (formErrors) => {
+                console.error(
+                    '[EBITDAMAX Import] Upload/import gagal sebelum selesai diproses',
+                    formErrors,
+                );
+            },
         });
     };
 
