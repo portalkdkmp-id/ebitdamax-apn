@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency, formatPercent } from '@/lib/formatters';
 import {
     destroy as destroyCalculation,
     index as calculationsIndex,
@@ -127,6 +127,26 @@ function FieldError({ message }: { message?: string }) {
     }
 
     return <p className="text-xs text-destructive">{message}</p>;
+}
+
+function sourceLabel(valueSource: CalculationItem['value_source']) {
+    if (valueSource === 'calculated_from_children') {
+        return 'Nilai dashboard: roll-up';
+    }
+
+    if (valueSource === 'excel') {
+        return 'Nilai dashboard: input';
+    }
+
+    return 'Nilai dashboard: kosong';
+}
+
+function SourceValueHint({ value }: { value: string }) {
+    return (
+        <div className="mt-1 text-xs text-muted-foreground">
+            Nilai input: {value}
+        </div>
+    );
 }
 
 function TextField({
@@ -290,6 +310,19 @@ function OrganizationBadges({ item }: { item: CalculationItem }) {
                     className="bg-primary/10 text-primary"
                 >
                     Cost Center
+                </Badge>
+            )}
+
+            <Badge
+                variant="outline"
+                className="border-border bg-background text-muted-foreground"
+            >
+                Nilai input
+            </Badge>
+
+            {item.value_source === 'calculated_from_children' && (
+                <Badge className="bg-primary text-primary-foreground">
+                    Roll-up dashboard
                 </Badge>
             )}
         </div>
@@ -627,6 +660,9 @@ export default function CalculationIndex({
                                                 Scenario
                                             </th>
                                             <th className="p-4 text-right">
+                                                Revenue
+                                            </th>
+                                            <th className="p-4 text-right">
                                                 Man
                                             </th>
                                             <th className="p-4 text-right">
@@ -700,6 +736,21 @@ export default function CalculationIndex({
 
                                                 <td className="p-4 text-right">
                                                     {formatCurrency(
+                                                        item.resolved_value
+                                                            .revenue,
+                                                    )}
+                                                    {item.value_source ===
+                                                        'calculated_from_children' && (
+                                                        <SourceValueHint
+                                                            value={formatCurrency(
+                                                                item.revenue,
+                                                            )}
+                                                        />
+                                                    )}
+                                                </td>
+
+                                                <td className="p-4 text-right">
+                                                    {formatCurrency(
                                                         item.man_cost,
                                                     )}
                                                 </td>
@@ -724,24 +775,60 @@ export default function CalculationIndex({
 
                                                 <td className="p-4 text-right font-semibold text-foreground">
                                                     {formatCurrency(
-                                                        item.total_cost,
+                                                        item.resolved_value.toc,
+                                                    )}
+                                                    {item.value_source ===
+                                                        'calculated_from_children' && (
+                                                        <SourceValueHint
+                                                            value={formatCurrency(
+                                                                item.total_cost,
+                                                            )}
+                                                        />
                                                     )}
                                                 </td>
 
                                                 <td className="p-4 text-right">
                                                     {formatCurrency(
-                                                        item.doc_variable,
+                                                        item.resolved_value
+                                                            .doc_variable,
+                                                    )}
+                                                    {item.value_source ===
+                                                        'calculated_from_children' && (
+                                                        <SourceValueHint
+                                                            value={formatCurrency(
+                                                                item.doc_variable,
+                                                            )}
+                                                        />
                                                     )}
                                                 </td>
 
                                                 <td className="p-4 text-right">
                                                     {formatCurrency(
-                                                        item.doc_fixed,
+                                                        item.resolved_value
+                                                            .doc_fixed,
+                                                    )}
+                                                    {item.value_source ===
+                                                        'calculated_from_children' && (
+                                                        <SourceValueHint
+                                                            value={formatCurrency(
+                                                                item.doc_fixed,
+                                                            )}
+                                                        />
                                                     )}
                                                 </td>
 
                                                 <td className="p-4 text-right">
-                                                    {formatCurrency(item.ioc)}
+                                                    {formatCurrency(
+                                                        item.resolved_value.ioc,
+                                                    )}
+                                                    {item.value_source ===
+                                                        'calculated_from_children' && (
+                                                        <SourceValueHint
+                                                            value={formatCurrency(
+                                                                item.ioc,
+                                                            )}
+                                                        />
+                                                    )}
                                                 </td>
 
                                                 <td className="p-4">
@@ -790,7 +877,7 @@ export default function CalculationIndex({
                                         {calculations.length === 0 && (
                                             <tr>
                                                 <td
-                                                    colSpan={12}
+                                                    colSpan={13}
                                                     className="p-8 text-center text-muted-foreground"
                                                 >
                                                     Data kalkulasi belum
@@ -816,10 +903,21 @@ export default function CalculationIndex({
                                     : 'Tambah Kalkulasi'}
                             </DialogTitle>
                             <DialogDescription>
-                                Kelola 4M, DOC-V, DOC-F, dan IOC. Nilai TOC,
-                                EBITDA, dan margin dihitung otomatis.
+                                Form ini mengubah source row. Nilai TOC, EBITDA,
+                                dan margin dihitung otomatis dari revenue,
+                                DOC-V, DOC-F, dan IOC.
                             </DialogDescription>
                         </DialogHeader>
+
+                        {selectedItem?.value_source ===
+                            'calculated_from_children' && (
+                            <div className="rounded-lg border border-primary/25 bg-primary/5 p-4 text-sm text-foreground">
+                                Baris ini tampil di dashboard sebagai roll-up
+                                dari child organisasi. Perubahan source row ini
+                                tersimpan, namun nilai dashboard parent tetap
+                                mengikuti agregasi child.
+                            </div>
+                        )}
 
                         <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2 md:col-span-2">
@@ -845,9 +943,7 @@ export default function CalculationIndex({
                                         </option>
                                     ))}
                                 </select>
-                                <FieldError
-                                    message={errors.organization_id}
-                                />
+                                <FieldError message={errors.organization_id} />
                             </div>
 
                             <TextField
@@ -910,9 +1006,7 @@ export default function CalculationIndex({
                                 label="Man Cost"
                                 type="number"
                                 value={data.man_cost}
-                                onChange={(value) =>
-                                    setData('man_cost', value)
-                                }
+                                onChange={(value) => setData('man_cost', value)}
                                 error={errors.man_cost}
                             />
 
@@ -1071,12 +1165,62 @@ export default function CalculationIndex({
                                                     '-'}
                                             </span>
                                         </p>
+                                        <p>
+                                            Mode:{' '}
+                                            <span className="font-medium text-foreground">
+                                                {sourceLabel(
+                                                    selectedCalculation.value_source,
+                                                )}
+                                            </span>
+                                        </p>
                                     </div>
                                 </section>
 
+                                {selectedCalculation.value_source ===
+                                    'calculated_from_children' && (
+                                    <section className="rounded-lg border bg-card p-5 shadow-sm">
+                                        <h3 className="text-base font-semibold text-foreground">
+                                            Nilai Dashboard Roll-up
+                                        </h3>
+
+                                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                                            <DetailRow
+                                                label="Revenue"
+                                                value={formatCurrency(
+                                                    selectedCalculation
+                                                        .resolved_value.revenue,
+                                                )}
+                                            />
+                                            <DetailRow
+                                                label="TOC"
+                                                value={formatCurrency(
+                                                    selectedCalculation
+                                                        .resolved_value.toc,
+                                                )}
+                                            />
+                                            <DetailRow
+                                                label="EBITDA"
+                                                value={formatCurrency(
+                                                    selectedCalculation
+                                                        .resolved_value.ebitda,
+                                                )}
+                                                highlight
+                                            />
+                                            <DetailRow
+                                                label="Margin"
+                                                value={formatPercent(
+                                                    selectedCalculation
+                                                        .resolved_value
+                                                        .ebitda_margin,
+                                                )}
+                                            />
+                                        </div>
+                                    </section>
+                                )}
+
                                 <section className="rounded-lg border bg-card p-5 shadow-sm">
                                     <h3 className="text-base font-semibold text-foreground">
-                                        Breakdown 4M
+                                        Breakdown 4M Source Row
                                     </h3>
 
                                     <div className="mt-4 space-y-4">
@@ -1115,7 +1259,8 @@ export default function CalculationIndex({
 
                                 <section className="rounded-lg border bg-card p-5 shadow-sm">
                                     <h3 className="text-base font-semibold text-foreground">
-                                        Breakdown DOC-V, DOC-F, dan IOC
+                                        Breakdown DOC-V, DOC-F, dan IOC Source
+                                        Row
                                     </h3>
 
                                     <div className="mt-4 space-y-4">

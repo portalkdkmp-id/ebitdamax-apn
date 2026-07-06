@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import CostBreakdownChart from '@/components/dashboard/CostBreakdownChart';
 import DashboardFilter from '@/components/dashboard/DashboardFilter';
 import DashboardKpiCards from '@/components/dashboard/DashboardKpiCards';
@@ -7,118 +7,11 @@ import EbitdaByDirectorateChart from '@/components/dashboard/EbitdaByDirectorate
 import MarginRankingChart from '@/components/dashboard/MarginRankingChart';
 import NegativeEbitdaAlertTable from '@/components/dashboard/NegativeEbitdaAlertTable';
 import RevenueByDirectorateChart from '@/components/dashboard/RevenueByDirectorateChart';
+import EbitdaTreeFlow from '@/components/ebitda-tree/EbitdaTreeFlow';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatCurrency, formatPercent } from '@/lib/formatters';
-import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { show as showDirectorate } from '@/routes/dashboard/directorates';
 import type { DirectorateDashboardProps } from '@/types/dashboard';
-import type { EbitdaTreeNode } from '@/types/ebitda-tree';
-
-function CostValueCell({
-    node,
-    field,
-}: {
-    node: EbitdaTreeNode;
-    field: 'doc_variable' | 'doc_fixed' | 'ioc';
-}) {
-    const isOverrun = node.cost_alert.components.some(
-        (component) => component.key === field,
-    );
-
-    return (
-        <td
-            className={cn(
-                'p-3 text-right',
-                isOverrun && 'bg-destructive/5 font-bold text-destructive',
-            )}
-        >
-            {formatCurrency(node.value[field])}
-        </td>
-    );
-}
-
-function TreeRow({
-    node,
-    depth = 0,
-}: {
-    node: EbitdaTreeNode;
-    depth?: number;
-}) {
-    return (
-        <>
-            <tr
-                className={cn(
-                    'border-b transition-colors hover:bg-muted/40',
-                    node.cost_alert.has_overrun &&
-                        'bg-destructive/5 hover:bg-destructive/10',
-                )}
-            >
-                <td
-                    className="p-3"
-                    style={{ paddingLeft: `${12 + depth * 24}px` }}
-                >
-                    <div className="flex items-center gap-2">
-                        <Badge className="bg-primary text-primary-foreground">
-                            {node.code}
-                        </Badge>
-                        {node.cost_alert.has_overrun && (
-                            <Badge
-                                className={cn(
-                                    'gap-1 text-white',
-                                    node.cost_alert.severity === 'danger'
-                                        ? 'bg-black hover:bg-black/90'
-                                        : 'bg-destructive hover:bg-destructive/90',
-                                )}
-                            >
-                                <AlertTriangle className="size-3" />
-                                Area pemborosan
-                            </Badge>
-                        )}
-                        <span className="font-medium text-foreground">
-                            {node.name}
-                        </span>
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                        {node.level ?? '-'} •{' '}
-                        {node.is_revenue_center
-                            ? 'Revenue Center'
-                            : 'Cost Center'}
-                    </div>
-                </td>
-
-                <td className="p-3 text-right">
-                    {formatCurrency(node.value.revenue)}
-                </td>
-                <CostValueCell node={node} field="doc_variable" />
-                <CostValueCell node={node} field="doc_fixed" />
-                <CostValueCell node={node} field="ioc" />
-                <td className="p-3 text-right">
-                    {formatCurrency(node.value.toc)}
-                </td>
-
-                <td
-                    className={`p-3 text-right font-semibold ${
-                        node.value.ebitda < 0
-                            ? 'text-destructive'
-                            : 'text-primary'
-                    }`}
-                >
-                    {formatCurrency(node.value.ebitda)}
-                </td>
-
-                <td className="p-3 text-right">
-                    {formatPercent(node.value.ebitda_margin)}
-                </td>
-            </tr>
-
-            {node.children.map((child) => (
-                <TreeRow key={child.id} node={child} depth={depth + 1} />
-            ))}
-        </>
-    );
-}
 
 export default function DirectorateDashboard({
     year,
@@ -197,50 +90,22 @@ export default function DirectorateDashboard({
 
                     <NegativeEbitdaAlertTable data={alerts.negative_ebitda} />
 
-                    <Card className="border bg-card shadow-sm">
-                        <CardHeader>
-                            <CardTitle className="text-foreground">
-                                Breakdown Pohon EBITDA Direktorat
-                            </CardTitle>
-                        </CardHeader>
+                    <div className="rounded-lg border bg-card p-6 shadow-sm">
+                        <p className="text-sm font-medium tracking-wide text-primary uppercase">
+                            Breakdown Pohon EBITDA Direktorat
+                        </p>
+                        <h2 className="mt-1 text-xl font-bold text-foreground">
+                            {directorate.code} - {directorate.name}
+                        </h2>
+                        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+                            Diagram ini menampilkan struktur child organisasi
+                            dari direktorat yang dipilih beserta Revenue, DOC-V,
+                            DOC-F, IOC, TOC, EBITDA, Margin, dan indikasi area
+                            pemborosan.
+                        </p>
+                    </div>
 
-                        <CardContent>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-muted/40 text-left text-muted-foreground">
-                                            <th className="p-3">Unit</th>
-                                            <th className="p-3 text-right">
-                                                Revenue
-                                            </th>
-                                            <th className="p-3 text-right">
-                                                DOC-V
-                                            </th>
-                                            <th className="p-3 text-right">
-                                                DOC-F
-                                            </th>
-                                            <th className="p-3 text-right">
-                                                IOC
-                                            </th>
-                                            <th className="p-3 text-right">
-                                                TOC
-                                            </th>
-                                            <th className="p-3 text-right">
-                                                EBITDA
-                                            </th>
-                                            <th className="p-3 text-right">
-                                                Margin
-                                            </th>
-                                        </tr>
-                                    </thead>
-
-                                    <tbody>
-                                        <TreeRow node={tree} />
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <EbitdaTreeFlow tree={tree} />
                 </div>
             </div>
         </>

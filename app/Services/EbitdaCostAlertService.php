@@ -9,11 +9,13 @@ class EbitdaCostAlertService
      * @return array{
      *     has_overrun: bool,
      *     severity: 'none'|'warning'|'danger',
+     *     benchmark_toc: float,
+     *     benchmark_label: string,
      *     components: array<int, array{
      *         key: string,
      *         label: string,
      *         value: float,
-     *         toc: float,
+     *         benchmark_toc: float,
      *         overrun_amount: float,
      *         overrun_ratio: float|null
      *     }>,
@@ -25,10 +27,10 @@ class EbitdaCostAlertService
      *     message: string
      * }
      */
-    public function analyze(array $value): array
+    public function analyze(array $value, ?float $benchmarkToc = null, string $benchmarkLabel = 'TOC'): array
     {
-        $toc = (float) ($value['toc'] ?? 0);
-        $comparisonToc = max($toc, 0.0);
+        $benchmarkToc = $benchmarkToc ?? (float) ($value['toc'] ?? 0);
+        $comparisonToc = max($benchmarkToc, 0.0);
 
         $components = [
             [
@@ -59,7 +61,7 @@ class EbitdaCostAlertService
                 'key' => $component['key'],
                 'label' => $component['label'],
                 'value' => $component['value'],
-                'toc' => $toc,
+                'benchmark_toc' => $benchmarkToc,
                 'overrun_amount' => $component['value'] - $comparisonToc,
                 'overrun_ratio' => $comparisonToc > 0
                     ? round(($component['value'] / $comparisonToc) * 100, 2)
@@ -78,6 +80,8 @@ class EbitdaCostAlertService
             return [
                 'has_overrun' => false,
                 'severity' => 'none',
+                'benchmark_toc' => $benchmarkToc,
+                'benchmark_label' => $benchmarkLabel,
                 'components' => [],
                 'largest_component' => null,
                 'largest_component_label' => null,
@@ -98,29 +102,31 @@ class EbitdaCostAlertService
         return [
             'has_overrun' => true,
             'severity' => $severity,
+            'benchmark_toc' => $benchmarkToc,
+            'benchmark_label' => $benchmarkLabel,
             'components' => $overrunComponents,
             'largest_component' => $largestComponent['key'],
             'largest_component_label' => $largestComponent['label'],
             'largest_cost_value' => $largestComponent['value'],
             'overrun_amount' => $largestComponent['overrun_amount'],
             'overrun_ratio' => $largestComponent['overrun_ratio'],
-            'message' => $this->buildMessage($largestComponent, $toc),
+            'message' => $this->buildMessage($largestComponent, $benchmarkToc, $benchmarkLabel),
         ];
     }
 
     /**
      * @param  array{label: string, value: float, overrun_amount: float, overrun_ratio: float|null}  $component
      */
-    private function buildMessage(array $component, float $toc): string
+    private function buildMessage(array $component, float $benchmarkToc, string $benchmarkLabel): string
     {
-        if ($toc <= 0) {
-            return "{$component['label']} memiliki cost, sementara TOC belum terisi. Periksa alokasi biaya dan nilai TOC.";
+        if ($benchmarkToc <= 0) {
+            return "{$component['label']} memiliki cost, sementara {$benchmarkLabel} belum terisi. Periksa alokasi biaya dan nilai TOC parent.";
         }
 
         $ratio = $component['overrun_ratio'] !== null
             ? number_format($component['overrun_ratio'], 2, ',', '.').'%'
             : 'N/A';
 
-        return "{$component['label']} melebihi TOC ({$ratio} dari TOC). Indikasi area pemborosan perlu ditinjau.";
+        return "{$component['label']} melebihi {$benchmarkLabel} ({$ratio} dari {$benchmarkLabel}). Indikasi area pemborosan perlu ditinjau.";
     }
 }

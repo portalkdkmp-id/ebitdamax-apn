@@ -1,3 +1,5 @@
+import type { EbitdaValue } from './ebitda';
+
 export type CalculationItem = {
     id: number;
     organization_id: number;
@@ -13,6 +15,8 @@ export type CalculationItem = {
     is_cost_center: boolean | null;
 
     source_sheet: string | null;
+    value_source: 'excel' | 'calculated_from_children' | 'empty';
+    resolved_value: EbitdaValue;
     classification: string | null;
     revenue: number;
 

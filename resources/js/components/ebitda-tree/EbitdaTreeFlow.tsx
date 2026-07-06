@@ -408,6 +408,18 @@ function TreeCanvas({ tree }: Props) {
                                     <p className="mt-2">
                                         {selectedNode.cost_alert.message}
                                     </p>
+                                    <p className="mt-2 text-xs opacity-80">
+                                        Patokan:{' '}
+                                        {
+                                            selectedNode.cost_alert
+                                                .benchmark_label
+                                        }{' '}
+                                        ={' '}
+                                        {formatCurrency(
+                                            selectedNode.cost_alert
+                                                .benchmark_toc,
+                                        )}
+                                    </p>
                                     <div className="mt-3 space-y-2">
                                         {selectedNode.cost_alert.components.map(
                                             (component) => (
@@ -437,7 +449,7 @@ function TreeCanvas({ tree }: Props) {
                                         ? 'Nilai ini berasal langsung dari hasil import Excel.'
                                         : selectedNode.value_source ===
                                             'calculated_from_children'
-                                          ? 'Nilai ini dihitung dari agregasi child node karena tidak ada nilai exact dari Excel.'
+                                          ? 'Nilai parent ini dihitung dari agregasi child node.'
                                           : 'Node ini belum memiliki nilai dari Excel.'}
                                 </p>
                             </div>

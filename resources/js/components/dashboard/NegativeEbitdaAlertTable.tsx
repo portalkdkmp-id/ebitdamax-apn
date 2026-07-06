@@ -50,7 +50,7 @@ export default function NegativeEbitdaAlertTable({ data }: Props) {
                         <thead>
                             <tr className="border-b bg-muted/40 text-left text-muted-foreground">
                                 <th className="p-3">Unit</th>
-                                <th className="p-3 text-right">TOC</th>
+                                <th className="p-3 text-right">TOC Parent</th>
                                 <th className="p-3 text-right">DOC-V</th>
                                 <th className="p-3 text-right">DOC-F</th>
                                 <th className="p-3 text-right">IOC</th>
@@ -86,7 +86,10 @@ export default function NegativeEbitdaAlertTable({ data }: Props) {
                                     </td>
 
                                     <td className="p-3 text-right">
-                                        {formatCurrency(item.toc)}
+                                        {formatCurrency(item.benchmark_toc)}
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                            {item.benchmark_label}
+                                        </div>
                                     </td>
 
                                     <CostCell
@@ -110,8 +113,8 @@ export default function NegativeEbitdaAlertTable({ data }: Props) {
                                         </Badge>
                                         {item.overrun_ratio !== null && (
                                             <div className="mt-1 text-xs text-muted-foreground">
-                                                {item.overrun_ratio.toFixed(2)}
-                                                % dari TOC
+                                                {item.overrun_ratio.toFixed(2)}%
+                                                dari TOC
                                             </div>
                                         )}
                                     </td>

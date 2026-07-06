@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateEbitdaValueRequest;
 use App\Models\EbitdaValue;
 use App\Models\Organization;
 use App\Services\EbitdaFormulaService;
+use App\Services\EbitdaOrganizationValueService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,6 +15,8 @@ use Inertia\Response;
 
 class EbitdaValueController extends Controller
 {
+    public function __construct(private EbitdaOrganizationValueService $organizationValueService) {}
+
     public function index(Request $request): Response
     {
         $search = trim((string) $request->input('search', ''));
@@ -100,6 +103,13 @@ class EbitdaValueController extends Controller
     private function transformEbitdaValue(EbitdaValue $value): array
     {
         $organization = $value->organization;
+        $rawValue = $this->organizationValueService->valueFromRow($value);
+        $resolvedValue = $organization
+            ? $this->organizationValueService->resolve($organization, (int) $value->year, (string) $value->scenario)
+            : [
+                'source' => 'empty',
+                'value' => $rawValue,
+            ];
 
         return [
             'id' => $value->id,
@@ -108,14 +118,16 @@ class EbitdaValueController extends Controller
             'year' => $value->year,
             'scenario' => $value->scenario,
             'source_sheet' => $value->source_sheet,
+            'value_source' => $resolvedValue['source'],
+            'resolved_value' => $resolvedValue['value'],
             'classification' => $value->classification,
-            'revenue' => (float) $value->revenue,
-            'doc_variable' => (float) $value->doc_variable,
-            'doc_fixed' => (float) $value->doc_fixed,
-            'ioc' => (float) $value->ioc,
-            'toc' => (float) $value->toc,
-            'ebitda' => (float) $value->ebitda,
-            'ebitda_margin' => $value->ebitda_margin !== null ? (float) $value->ebitda_margin : null,
+            'revenue' => (float) $rawValue['revenue'],
+            'doc_variable' => (float) $rawValue['doc_variable'],
+            'doc_fixed' => (float) $rawValue['doc_fixed'],
+            'ioc' => (float) $rawValue['ioc'],
+            'toc' => (float) $rawValue['toc'],
+            'ebitda' => (float) $rawValue['ebitda'],
+            'ebitda_margin' => $rawValue['ebitda_margin'],
             'man_cost' => (float) $value->man_cost,
             'method_cost' => (float) $value->method_cost,
             'material_cost' => (float) $value->material_cost,

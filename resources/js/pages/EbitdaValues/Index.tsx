@@ -131,6 +131,26 @@ function FieldError({ message }: { message?: string }) {
     return <p className="text-xs text-destructive">{message}</p>;
 }
 
+function sourceLabel(valueSource: EbitdaValueItem['value_source']) {
+    if (valueSource === 'calculated_from_children') {
+        return 'Nilai dashboard: roll-up';
+    }
+
+    if (valueSource === 'excel') {
+        return 'Nilai dashboard: input';
+    }
+
+    return 'Nilai dashboard: kosong';
+}
+
+function SourceValueHint({ value }: { value: string }) {
+    return (
+        <div className="mt-1 text-xs text-muted-foreground">
+            Nilai input: {value}
+        </div>
+    );
+}
+
 function TextField({
     label,
     value,
@@ -268,7 +288,11 @@ export default function EbitdaValuesIndex({
     };
 
     const destroy = (item: EbitdaValueItem) => {
-        if (!confirm(`Yakin ingin menghapus data EBITDA ${item.organization?.code ?? ''}?`)) {
+        if (
+            !confirm(
+                `Yakin ingin menghapus data EBITDA ${item.organization?.code ?? ''}?`,
+            )
+        ) {
             return;
         }
 
@@ -469,6 +493,18 @@ export default function EbitdaValuesIndex({
                                                             }
                                                         </Badge>
                                                     )}
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-border bg-background text-muted-foreground"
+                                                    >
+                                                        Nilai input
+                                                    </Badge>
+                                                    {item.value_source ===
+                                                        'calculated_from_children' && (
+                                                        <Badge className="bg-primary text-primary-foreground">
+                                                            Roll-up dashboard
+                                                        </Badge>
+                                                    )}
                                                 </div>
                                                 <p className="mt-2 font-medium text-foreground">
                                                     {item.organization?.name ??
@@ -483,17 +519,56 @@ export default function EbitdaValuesIndex({
                                                 {item.year} / {item.scenario}
                                             </TableCell>
                                             <TableCell className="p-4 text-right">
-                                                {formatCurrency(item.revenue)}
+                                                {formatCurrency(
+                                                    item.resolved_value.revenue,
+                                                )}
+                                                {item.value_source ===
+                                                    'calculated_from_children' && (
+                                                    <SourceValueHint
+                                                        value={formatCurrency(
+                                                            item.revenue,
+                                                        )}
+                                                    />
+                                                )}
                                             </TableCell>
                                             <TableCell className="p-4 text-right">
-                                                {formatCurrency(item.toc)}
+                                                {formatCurrency(
+                                                    item.resolved_value.toc,
+                                                )}
+                                                {item.value_source ===
+                                                    'calculated_from_children' && (
+                                                    <SourceValueHint
+                                                        value={formatCurrency(
+                                                            item.toc,
+                                                        )}
+                                                    />
+                                                )}
                                             </TableCell>
                                             <TableCell className="p-4 text-right font-semibold text-primary">
-                                                {formatCurrency(item.ebitda)}
+                                                {formatCurrency(
+                                                    item.resolved_value.ebitda,
+                                                )}
+                                                {item.value_source ===
+                                                    'calculated_from_children' && (
+                                                    <SourceValueHint
+                                                        value={formatCurrency(
+                                                            item.ebitda,
+                                                        )}
+                                                    />
+                                                )}
                                             </TableCell>
                                             <TableCell className="p-4 text-right">
                                                 {formatPercent(
-                                                    item.ebitda_margin,
+                                                    item.resolved_value
+                                                        .ebitda_margin,
+                                                )}
+                                                {item.value_source ===
+                                                    'calculated_from_children' && (
+                                                    <SourceValueHint
+                                                        value={formatPercent(
+                                                            item.ebitda_margin,
+                                                        )}
+                                                    />
                                                 )}
                                             </TableCell>
                                             <TableCell className="p-4">
@@ -567,10 +642,14 @@ export default function EbitdaValuesIndex({
                                             disabled={!link.url}
                                             onClick={() => {
                                                 if (link.url) {
-                                                    router.get(link.url, {}, {
-                                                        preserveScroll: true,
-                                                        preserveState: true,
-                                                    });
+                                                    router.get(
+                                                        link.url,
+                                                        {},
+                                                        {
+                                                            preserveScroll: true,
+                                                            preserveState: true,
+                                                        },
+                                                    );
                                                 }
                                             }}
                                         >
@@ -598,10 +677,21 @@ export default function EbitdaValuesIndex({
                                     : 'Tambah EBITDA Value'}
                             </DialogTitle>
                             <DialogDescription>
-                                TOC, EBITDA, dan margin dihitung otomatis dari
-                                nilai revenue, DOC-V, DOC-F, dan IOC.
+                                Form ini mengubah source row. TOC, EBITDA, dan
+                                margin dihitung otomatis dari revenue, DOC-V,
+                                DOC-F, dan IOC.
                             </DialogDescription>
                         </DialogHeader>
+
+                        {selectedItem?.value_source ===
+                            'calculated_from_children' && (
+                            <div className="rounded-lg border border-primary/25 bg-primary/5 p-4 text-sm text-foreground">
+                                Baris ini tampil di dashboard sebagai roll-up
+                                dari child organisasi. Perubahan source row ini
+                                tersimpan, namun nilai dashboard parent tetap
+                                mengikuti agregasi child.
+                            </div>
+                        )}
 
                         <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2 md:col-span-2">
@@ -627,9 +717,7 @@ export default function EbitdaValuesIndex({
                                         </option>
                                     ))}
                                 </select>
-                                <FieldError
-                                    message={errors.organization_id}
-                                />
+                                <FieldError message={errors.organization_id} />
                             </div>
 
                             <TextField
@@ -720,9 +808,7 @@ export default function EbitdaValuesIndex({
                                 label="Man Cost"
                                 type="number"
                                 value={data.man_cost}
-                                onChange={(value) =>
-                                    setData('man_cost', value)
-                                }
+                                onChange={(value) => setData('man_cost', value)}
                                 error={errors.man_cost}
                             />
 
@@ -830,11 +916,23 @@ export default function EbitdaValuesIndex({
                                             {detailItem.year} /{' '}
                                             {detailItem.scenario}
                                         </Badge>
+                                        <Badge
+                                            variant="outline"
+                                            className="border-border bg-background text-muted-foreground"
+                                        >
+                                            {sourceLabel(
+                                                detailItem.value_source,
+                                            )}
+                                        </Badge>
                                     </div>
                                     <h2 className="mt-3 text-xl font-semibold text-foreground">
                                         {detailItem.organization?.name ?? '-'}
                                     </h2>
                                 </section>
+
+                                <p className="text-sm font-semibold text-foreground">
+                                    Source Row
+                                </p>
 
                                 <div className="grid gap-3 md:grid-cols-4">
                                     <DetailMetric
@@ -861,6 +959,47 @@ export default function EbitdaValuesIndex({
                                         )}
                                     />
                                 </div>
+
+                                {detailItem.value_source ===
+                                    'calculated_from_children' && (
+                                    <>
+                                        <p className="text-sm font-semibold text-foreground">
+                                            Nilai Dashboard Roll-up
+                                        </p>
+
+                                        <div className="grid gap-3 md:grid-cols-4">
+                                            <DetailMetric
+                                                label="Revenue"
+                                                value={formatCurrency(
+                                                    detailItem.resolved_value
+                                                        .revenue,
+                                                )}
+                                            />
+                                            <DetailMetric
+                                                label="TOC"
+                                                value={formatCurrency(
+                                                    detailItem.resolved_value
+                                                        .toc,
+                                                )}
+                                            />
+                                            <DetailMetric
+                                                label="EBITDA"
+                                                value={formatCurrency(
+                                                    detailItem.resolved_value
+                                                        .ebitda,
+                                                )}
+                                                highlight
+                                            />
+                                            <DetailMetric
+                                                label="Margin"
+                                                value={formatPercent(
+                                                    detailItem.resolved_value
+                                                        .ebitda_margin,
+                                                )}
+                                            />
+                                        </div>
+                                    </>
+                                )}
 
                                 <div className="grid gap-3 md:grid-cols-3">
                                     <DetailMetric
