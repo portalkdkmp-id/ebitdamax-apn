@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class MonitoringDashboardService
 {
-    private const CACHE_TTL_SECONDS = 300;
+    private const CACHE_TTL_SECONDS = 30;
 
     public function summary(): array
     {

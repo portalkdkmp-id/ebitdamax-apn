@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePoll } from '@inertiajs/react';
 import {
     AlertTriangle,
     Building2,
@@ -207,6 +207,8 @@ export default function MonitoringIndex({
     pemetaan_lahan: pemetaanLahan,
     sdm,
 }: MonitoringDashboardProps) {
+    usePoll(30000);
+
     const lahan = pemetaanLahan.data?.stats;
 
     return (
