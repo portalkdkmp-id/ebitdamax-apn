@@ -11,6 +11,7 @@ import {
     ShieldCheck,
     Users,
 } from 'lucide-react';
+import IndicatorBarChart from '@/components/monitoring/IndicatorBarChart';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -271,6 +272,31 @@ export default function MonitoringIndex({
                             </div>
                         )}
                         {sarpras.status === 'ok' && sarpras.data && (
+                            <IndicatorBarChart
+                                title="Perbandingan Indikator Sarpras"
+                                data={[
+                                    {
+                                        label: 'Sarpras Esensial Lengkap',
+                                        value: sarpras.data.data
+                                            .jumlah_koperasi_sarpras_mandatory_lengkap,
+                                        tone: 'success',
+                                    },
+                                    {
+                                        label: 'Sarpras Sekunder Lengkap',
+                                        value: sarpras.data.data
+                                            .jumlah_koperasi_sarpras_secondary_lengkap,
+                                        tone: 'default',
+                                    },
+                                    {
+                                        label: 'Sarpras Lengkap Semua',
+                                        value: sarpras.data.data
+                                            .jumlah_koperasi_sarpras_lengkap_semua,
+                                        tone: 'default',
+                                    },
+                                ]}
+                            />
+                        )}
+                        {sarpras.status === 'ok' && sarpras.data && (
                             <p className="text-xs text-muted-foreground">
                                 Esensial: sarpras wajib operasional (saat ini{' '}
                                 {sarpras.data.meta.mandatory_requirement_count}{' '}
@@ -397,6 +423,67 @@ export default function MonitoringIndex({
                                         />
                                     </div>
                                 </div>
+
+                                <IndicatorBarChart
+                                    title="Perbandingan Seluruh Indikator Lahan"
+                                    data={[
+                                        {
+                                            label: 'Lahan Diajukan',
+                                            value: lahan.total,
+                                            tone: 'default',
+                                        },
+                                        {
+                                            label: 'Sedang Diverifikasi',
+                                            value: lahan.sedang_diverifikasi,
+                                            tone: 'warning',
+                                        },
+                                        {
+                                            label: 'Terverifikasi',
+                                            value: lahan.terverifikasi,
+                                            tone: 'success',
+                                        },
+                                        {
+                                            label: 'Terverifikasi Belum Bangun',
+                                            value: lahan.terverifikasi_belum_bangun,
+                                            tone: 'default',
+                                        },
+                                        {
+                                            label: 'Mulai Dibangun',
+                                            value: lahan.mulai_dibangun,
+                                            tone: 'warning',
+                                        },
+                                        {
+                                            label: 'Pembangunan 100%',
+                                            value: lahan.done_pembangunan,
+                                            tone: 'success',
+                                        },
+                                        {
+                                            label: 'Dipertimbangkan / Catatan',
+                                            value: lahan.dipertimbangkan_catatan,
+                                            tone: 'default',
+                                        },
+                                        {
+                                            label: 'Diberikan Catatan',
+                                            value: lahan.catatan,
+                                            tone: 'default',
+                                        },
+                                        {
+                                            label: 'Perlu Verifikasi Lanjutan',
+                                            value: lahan.perlu_verifikasi_lanjutan,
+                                            tone: 'warning',
+                                        },
+                                        {
+                                            label: 'Luas Lahan < 15x20',
+                                            value: lahan.luaslahan_15_20,
+                                            tone: 'warning',
+                                        },
+                                        {
+                                            label: 'Lahan LP2B',
+                                            value: lahan.lp2b,
+                                            tone: 'danger',
+                                        },
+                                    ]}
+                                />
                             </div>
                         )}
                     </section>
