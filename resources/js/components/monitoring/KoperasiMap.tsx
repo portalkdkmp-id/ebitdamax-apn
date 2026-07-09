@@ -718,6 +718,9 @@ export default function KoperasiMap() {
         const pane = map.createPane('koperasiPointsPane');
         pane.style.zIndex = '610';
         pane.style.pointerEvents = 'none';
+        // Transisi CSS transform selama animasi zoom; transform-nya
+        // sendiri didorong manual lewat listener zoomanim di bawah.
+        L.DomUtil.addClass(pane, 'leaflet-zoom-animated');
 
         const canvas = L.DomUtil.create(
             'canvas',
@@ -990,6 +993,33 @@ export default function KoperasiMap() {
         map.on('moveend zoomend resize', draw);
         map.on('click', onClick);
 
+        // Setara Map._latLngToNewLayerPoint internal Leaflet, disusun ulang
+        // dari method publik (project, getSize) agar tidak bergantung API
+        // privat.
+        const latLngToNewLayerPointPublic = (
+            latlng: L.LatLng,
+            zoom: number,
+            center: L.LatLng,
+        ): L.Point => {
+            const viewHalf = map.getSize().divideBy(2);
+            const topLeft = map.project(center, zoom).subtract(viewHalf);
+
+            return map.project(latlng, zoom).subtract(topLeft);
+        };
+
+        const onZoomAnim = (e: L.ZoomAnimEvent) => {
+            const topLeftLatLng = map.layerPointToLatLng(lastTopLeft);
+            const scale = map.getZoomScale(e.zoom);
+            const newTopLeft = latLngToNewLayerPointPublic(
+                topLeftLatLng,
+                e.zoom,
+                e.center,
+            );
+
+            L.DomUtil.setTransform(canvas, newTopLeft, scale);
+        };
+        map.on('zoomanim', onZoomAnim);
+
         // ResizeObserver mendeteksi perubahan ukuran container secara akurat
         // (misal saat masuk/keluar mode fullscreen), lalu memanggil
         // invalidateSize() supaya Leaflet memuat ulang tile untuk area yang
@@ -1028,6 +1058,7 @@ export default function KoperasiMap() {
         return () => {
             map.off('moveend zoomend resize', draw);
             map.off('click', onClick);
+            map.off('zoomanim', onZoomAnim);
             resizeObserver.disconnect();
 
             if (resizeFrame !== null) {
