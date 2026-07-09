@@ -141,13 +141,14 @@ export default function KoperasiMap() {
             center: [-2.5, 118],
             zoom: 5,
             scrollWheelZoom: false,
+            preferCanvas: true,
         });
         mapRef.current = map;
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors',
-            maxZoom: 18,
-        }).addTo(map);
+        L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            { attribution: 'Tiles &copy; Esri', maxZoom: 19 },
+        ).addTo(map);
 
         const clusterGroup = L.markerClusterGroup({
             chunkedLoading: true,
