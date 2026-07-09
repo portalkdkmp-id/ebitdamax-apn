@@ -1,19 +1,10 @@
-import { Head, router, useForm } from '@inertiajs/react';
-import { Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { Plus, Save, Search, Trash2, Users } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Table,
     TableBody,
@@ -30,14 +21,122 @@ import {
 } from '@/routes/sdm-data';
 import type { SdmDataPageProps, SdmEntry } from '@/types/monitoring';
 
-type SdmFormData = {
-    nama_koperasi: string;
-    jumlah_karyawan: string;
-    catatan: string;
-};
+function SdmRow({ entry }: { entry: SdmEntry }) {
+    const [jumlahKaryawan, setJumlahKaryawan] = useState(
+        String(entry.jumlah_karyawan),
+    );
+    const [saving, setSaving] = useState(false);
+    const dirty = jumlahKaryawan !== String(entry.jumlah_karyawan);
 
-function emptyForm(): SdmFormData {
-    return { nama_koperasi: '', jumlah_karyawan: '0', catatan: '' };
+    const save = () => {
+        setSaving(true);
+        router.put(
+            update.url(entry.id),
+            {
+                nama_koperasi: entry.nama_koperasi,
+                jumlah_karyawan: jumlahKaryawan,
+                catatan: entry.catatan ?? '',
+            },
+            {
+                preserveScroll: true,
+                onFinish: () => setSaving(false),
+            },
+        );
+    };
+
+    const remove = () => {
+        if (!confirm(`Hapus data SDM untuk ${entry.nama_koperasi}?`)) {
+            return;
+        }
+
+        router.delete(destroy.url(entry.id), { preserveScroll: true });
+    };
+
+    return (
+        <TableRow>
+            <TableCell className="font-medium">{entry.nama_koperasi}</TableCell>
+            <TableCell className="w-40">
+                <Input
+                    type="number"
+                    min={0}
+                    value={jumlahKaryawan}
+                    onChange={(e) => setJumlahKaryawan(e.target.value)}
+                    className="text-right"
+                />
+            </TableCell>
+            <TableCell className="w-40 text-right">
+                <div className="flex justify-end gap-1">
+                    <Button
+                        size="sm"
+                        variant={dirty ? 'default' : 'outline'}
+                        disabled={!dirty || saving}
+                        onClick={save}
+                    >
+                        <Save className="mr-1 h-4 w-4" />
+                        Simpan
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={remove}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                </div>
+            </TableCell>
+        </TableRow>
+    );
+}
+
+function AddSdmRow() {
+    const [namaKoperasi, setNamaKoperasi] = useState('');
+    const [jumlahKaryawan, setJumlahKaryawan] = useState('0');
+    const [error, setError] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
+
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        setSaving(true);
+        setError(null);
+
+        router.post(
+            store.url(),
+            { nama_koperasi: namaKoperasi, jumlah_karyawan: jumlahKaryawan },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setNamaKoperasi('');
+                    setJumlahKaryawan('0');
+                },
+                onError: (errors) => setError(errors.nama_koperasi ?? null),
+                onFinish: () => setSaving(false),
+            },
+        );
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-wrap items-start gap-3">
+            <div className="min-w-[220px] flex-1">
+                <Input
+                    value={namaKoperasi}
+                    onChange={(e) => setNamaKoperasi(e.target.value)}
+                    placeholder="Nama koperasi baru"
+                    required
+                />
+                {error && (
+                    <p className="mt-1 text-sm text-destructive">{error}</p>
+                )}
+            </div>
+            <Input
+                type="number"
+                min={0}
+                value={jumlahKaryawan}
+                onChange={(e) => setJumlahKaryawan(e.target.value)}
+                className="w-40"
+                required
+            />
+            <Button type="submit" disabled={saving}>
+                <Plus className="mr-1 h-4 w-4" />
+                Tambah
+            </Button>
+        </form>
+    );
 }
 
 export default function SdmDataIndex({
@@ -46,49 +145,6 @@ export default function SdmDataIndex({
     filters,
 }: SdmDataPageProps) {
     const [search, setSearch] = useState(filters.search);
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [editing, setEditing] = useState<SdmEntry | null>(null);
-
-    const form = useForm<SdmFormData>(emptyForm());
-
-    const openCreate = () => {
-        setEditing(null);
-        form.setData(emptyForm());
-        setDialogOpen(true);
-    };
-
-    const openEdit = (entry: SdmEntry) => {
-        setEditing(entry);
-        form.setData({
-            nama_koperasi: entry.nama_koperasi,
-            jumlah_karyawan: String(entry.jumlah_karyawan),
-            catatan: entry.catatan ?? '',
-        });
-        setDialogOpen(true);
-    };
-
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-
-        const onSuccess = () => setDialogOpen(false);
-
-        if (editing) {
-            form.put(update.url(editing.id), {
-                onSuccess,
-                preserveScroll: true,
-            });
-        } else {
-            form.post(store.url(), { onSuccess, preserveScroll: true });
-        }
-    };
-
-    const remove = (entry: SdmEntry) => {
-        if (!confirm(`Hapus data SDM untuk ${entry.nama_koperasi}?`)) {
-            return;
-        }
-
-        router.delete(destroy.url(entry.id), { preserveScroll: true });
-    };
 
     const submitSearch = (event: FormEvent) => {
         event.preventDefault();
@@ -110,8 +166,8 @@ export default function SdmDataIndex({
                         </h1>
                         <p className="mt-2 max-w-4xl text-muted-foreground">
                             Jumlah karyawan yang sudah ditambahkan dan
-                            ditempatkan per KDKMP. Data ini diisi manual oleh
-                            tim HC.
+                            ditempatkan per KDKMP. Data diinput manual oleh tim
+                            HC.
                         </p>
                     </div>
 
@@ -154,41 +210,34 @@ export default function SdmDataIndex({
 
                     <Card>
                         <CardContent className="space-y-4 p-5">
-                            <div className="flex flex-wrap items-center gap-3">
-                                <form
-                                    onSubmit={submitSearch}
-                                    className="flex flex-1 items-center gap-2"
-                                >
-                                    <div className="relative max-w-sm flex-1">
-                                        <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                        <Input
-                                            value={search}
-                                            onChange={(e) =>
-                                                setSearch(e.target.value)
-                                            }
-                                            placeholder="Cari nama koperasi..."
-                                            className="pl-8"
-                                        />
-                                    </div>
-                                    <Button type="submit" variant="outline">
-                                        Cari
-                                    </Button>
-                                </form>
-                                <Button onClick={openCreate}>
-                                    <Plus className="mr-1 h-4 w-4" />
-                                    Tambah Data
+                            <form
+                                onSubmit={submitSearch}
+                                className="flex max-w-sm items-center gap-2"
+                            >
+                                <div className="relative flex-1">
+                                    <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        value={search}
+                                        onChange={(e) =>
+                                            setSearch(e.target.value)
+                                        }
+                                        placeholder="Cari nama koperasi..."
+                                        className="pl-8"
+                                    />
+                                </div>
+                                <Button type="submit" variant="outline">
+                                    Cari
                                 </Button>
-                            </div>
+                            </form>
+
+                            <AddSdmRow />
 
                             <Table>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Nama Koperasi</TableHead>
+                                        <TableHead>Jumlah Karyawan</TableHead>
                                         <TableHead className="text-right">
-                                            Jumlah Karyawan
-                                        </TableHead>
-                                        <TableHead>Catatan</TableHead>
-                                        <TableHead className="w-24 text-right">
                                             Aksi
                                         </TableHead>
                                     </TableRow>
@@ -197,7 +246,7 @@ export default function SdmDataIndex({
                                     {entries.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={4}
+                                                colSpan={3}
                                                 className="text-center text-muted-foreground"
                                             >
                                                 Belum ada data.
@@ -205,39 +254,7 @@ export default function SdmDataIndex({
                                         </TableRow>
                                     )}
                                     {entries.map((entry) => (
-                                        <TableRow key={entry.id}>
-                                            <TableCell className="font-medium">
-                                                {entry.nama_koperasi}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {entry.jumlah_karyawan.toLocaleString(
-                                                    'id-ID',
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {entry.catatan ?? '-'}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    onClick={() =>
-                                                        openEdit(entry)
-                                                    }
-                                                >
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    onClick={() =>
-                                                        remove(entry)
-                                                    }
-                                                >
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
+                                        <SdmRow key={entry.id} entry={entry} />
                                     ))}
                                 </TableBody>
                             </Table>
@@ -245,96 +262,6 @@ export default function SdmDataIndex({
                     </Card>
                 </div>
             </div>
-
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogContent>
-                    <form onSubmit={submit}>
-                        <DialogHeader>
-                            <DialogTitle>
-                                {editing ? 'Edit Data SDM' : 'Tambah Data SDM'}
-                            </DialogTitle>
-                            <DialogDescription>
-                                Isi jumlah karyawan yang sudah ditempatkan di
-                                KDKMP ini.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="nama_koperasi">
-                                    Nama Koperasi
-                                </Label>
-                                <Input
-                                    id="nama_koperasi"
-                                    value={form.data.nama_koperasi}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'nama_koperasi',
-                                            e.target.value,
-                                        )
-                                    }
-                                    required
-                                />
-                                {form.errors.nama_koperasi && (
-                                    <p className="text-sm text-destructive">
-                                        {form.errors.nama_koperasi}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="jumlah_karyawan">
-                                    Jumlah Karyawan
-                                </Label>
-                                <Input
-                                    id="jumlah_karyawan"
-                                    type="number"
-                                    min={0}
-                                    value={form.data.jumlah_karyawan}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'jumlah_karyawan',
-                                            e.target.value,
-                                        )
-                                    }
-                                    required
-                                />
-                                {form.errors.jumlah_karyawan && (
-                                    <p className="text-sm text-destructive">
-                                        {form.errors.jumlah_karyawan}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="catatan">
-                                    Catatan (opsional)
-                                </Label>
-                                <Input
-                                    id="catatan"
-                                    value={form.data.catatan}
-                                    onChange={(e) =>
-                                        form.setData('catatan', e.target.value)
-                                    }
-                                />
-                            </div>
-                        </div>
-
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setDialogOpen(false)}
-                            >
-                                Batal
-                            </Button>
-                            <Button type="submit" disabled={form.processing}>
-                                Simpan
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
         </>
     );
 }

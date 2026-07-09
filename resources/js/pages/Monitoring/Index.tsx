@@ -121,6 +121,30 @@ function StatCard({
     );
 }
 
+function ComingSoonCard({
+    title,
+    icon: Icon,
+}: {
+    title: string;
+    icon: React.ElementType;
+}) {
+    return (
+        <Card className="border-l-4 border-dashed border-l-muted-foreground/40 bg-card">
+            <CardContent className="flex items-center justify-between p-5">
+                <div>
+                    <p className="text-sm text-muted-foreground">{title}</p>
+                    <Badge variant="outline" className="mt-2 text-xs">
+                        Coming soon
+                    </Badge>
+                </div>
+                <div className="rounded-full bg-muted-foreground/10 p-3 text-muted-foreground">
+                    <Icon className="h-5 w-5" />
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 function SectionUnavailable({ label }: { label: string }) {
     return (
         <Card className="border-l-4 border-dashed border-l-amber-500">
@@ -243,9 +267,9 @@ export default function MonitoringIndex({
                         {sarpras.status === 'error' || !sarpras.data ? (
                             <SectionUnavailable label="sarpras" />
                         ) : (
-                            <div className="grid gap-4 md:grid-cols-3">
+                            <div className="grid gap-4 md:grid-cols-2">
                                 <StatCard
-                                    title="KDKMP Sarpras Esensial Lengkap"
+                                    title="Jumlah KDKMP Sarpras Esensial Lengkap"
                                     value={
                                         sarpras.data.data
                                             .jumlah_koperasi_sarpras_mandatory_lengkap
@@ -254,16 +278,7 @@ export default function MonitoringIndex({
                                     tone="success"
                                 />
                                 <StatCard
-                                    title="KDKMP Sarpras Sekunder Lengkap"
-                                    value={
-                                        sarpras.data.data
-                                            .jumlah_koperasi_sarpras_secondary_lengkap
-                                    }
-                                    icon={Building2}
-                                    tone="default"
-                                />
-                                <StatCard
-                                    title="KDKMP Sarpras Lengkap Semua"
+                                    title="Jumlah KDKMP Sudah Lengkap Sarprasnya"
                                     value={
                                         sarpras.data.data
                                             .jumlah_koperasi_sarpras_lengkap_semua
@@ -284,12 +299,6 @@ export default function MonitoringIndex({
                                         tone: 'success',
                                     },
                                     {
-                                        label: 'Sarpras Sekunder Lengkap',
-                                        value: sarpras.data.data
-                                            .jumlah_koperasi_sarpras_secondary_lengkap,
-                                        tone: 'default',
-                                    },
-                                    {
                                         label: 'Sarpras Lengkap Semua',
                                         value: sarpras.data.data
                                             .jumlah_koperasi_sarpras_lengkap_semua,
@@ -302,10 +311,8 @@ export default function MonitoringIndex({
                             <p className="text-xs text-muted-foreground">
                                 Esensial: sarpras wajib operasional (saat ini{' '}
                                 {sarpras.data.meta.mandatory_requirement_count}{' '}
-                                jenis). Sekunder: sarpras tambahan (saat ini{' '}
-                                {sarpras.data.meta.secondary_requirement_count}{' '}
-                                jenis). Jumlah jenis mengikuti master data
-                                sarpras terkini. Status dianggap selesai:{' '}
+                                jenis, mengikuti master data sarpras terkini).
+                                Status dianggap selesai:{' '}
                                 {sarpras.data.meta.completed_statuses.join(
                                     ', ',
                                 )}
@@ -335,7 +342,7 @@ export default function MonitoringIndex({
                                             tone: 'default',
                                         },
                                         {
-                                            label: 'Mulai dibangun',
+                                            label: 'Pembangunan',
                                             value: lahan.mulai_dibangun,
                                             tone: 'warning',
                                         },
@@ -358,86 +365,46 @@ export default function MonitoringIndex({
                                     ]}
                                 />
 
-                                <div>
-                                    <p className="mb-2 text-sm font-medium text-muted-foreground">
-                                        Status verifikasi
-                                    </p>
-                                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                        <StatCard
-                                            title="Lahan Diajukan"
-                                            value={lahan.total}
-                                            icon={FileWarning}
-                                            tone="default"
-                                        />
-                                        <StatCard
-                                            title="Sedang Diverifikasi"
-                                            value={lahan.sedang_diverifikasi}
-                                            icon={Clock}
-                                            tone="warning"
-                                        />
-                                        <StatCard
-                                            title="Terverifikasi"
-                                            value={lahan.terverifikasi}
-                                            icon={CheckCircle2}
-                                            tone="success"
-                                        />
-                                        <StatCard
-                                            title="Dipertimbangkan / Catatan"
-                                            value={
-                                                lahan.dipertimbangkan_catatan
-                                            }
-                                            icon={AlertTriangle}
-                                            tone="default"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <p className="mb-2 text-sm font-medium text-muted-foreground">
-                                        Detail lain
-                                    </p>
-                                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                        <StatCard
-                                            title="Diberikan Catatan"
-                                            value={lahan.catatan}
-                                            icon={AlertTriangle}
-                                            tone="default"
-                                        />
-                                        <StatCard
-                                            title="Perlu Verifikasi Lanjutan"
-                                            value={
-                                                lahan.perlu_verifikasi_lanjutan
-                                            }
-                                            icon={Clock}
-                                            tone="warning"
-                                        />
-                                        <StatCard
-                                            title="Luas Lahan < 15x20"
-                                            value={lahan.luaslahan_15_20}
-                                            icon={AlertTriangle}
-                                            tone="warning"
-                                        />
-                                        <StatCard
-                                            title="Lahan LP2B"
-                                            value={lahan.lp2b}
-                                            icon={AlertTriangle}
-                                            tone="danger"
-                                        />
-                                    </div>
+                                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                                    <StatCard
+                                        title="Lahan yang Diajukan"
+                                        value={lahan.total}
+                                        icon={FileWarning}
+                                        tone="default"
+                                    />
+                                    <StatCard
+                                        title="Terverifikasi"
+                                        value={lahan.terverifikasi}
+                                        icon={CheckCircle2}
+                                        tone="success"
+                                    />
+                                    <StatCard
+                                        title="Terverifikasi Belum Bangun"
+                                        value={lahan.terverifikasi_belum_bangun}
+                                        icon={Clock}
+                                        tone="default"
+                                    />
+                                    <StatCard
+                                        title="Pembangunan"
+                                        value={lahan.mulai_dibangun}
+                                        icon={Construction}
+                                        tone="warning"
+                                    />
+                                    <StatCard
+                                        title="Pembangunan 100%"
+                                        value={lahan.done_pembangunan}
+                                        icon={CheckCircle2}
+                                        tone="success"
+                                    />
                                 </div>
 
                                 <IndicatorBarChart
-                                    title="Perbandingan Seluruh Indikator Lahan"
+                                    title="Perbandingan Indikator Pemetaan Lahan"
                                     data={[
                                         {
-                                            label: 'Lahan Diajukan',
+                                            label: 'Lahan yang Diajukan',
                                             value: lahan.total,
                                             tone: 'default',
-                                        },
-                                        {
-                                            label: 'Sedang Diverifikasi',
-                                            value: lahan.sedang_diverifikasi,
-                                            tone: 'warning',
                                         },
                                         {
                                             label: 'Terverifikasi',
@@ -450,7 +417,7 @@ export default function MonitoringIndex({
                                             tone: 'default',
                                         },
                                         {
-                                            label: 'Mulai Dibangun',
+                                            label: 'Pembangunan',
                                             value: lahan.mulai_dibangun,
                                             tone: 'warning',
                                         },
@@ -458,31 +425,6 @@ export default function MonitoringIndex({
                                             label: 'Pembangunan 100%',
                                             value: lahan.done_pembangunan,
                                             tone: 'success',
-                                        },
-                                        {
-                                            label: 'Dipertimbangkan / Catatan',
-                                            value: lahan.dipertimbangkan_catatan,
-                                            tone: 'default',
-                                        },
-                                        {
-                                            label: 'Diberikan Catatan',
-                                            value: lahan.catatan,
-                                            tone: 'default',
-                                        },
-                                        {
-                                            label: 'Perlu Verifikasi Lanjutan',
-                                            value: lahan.perlu_verifikasi_lanjutan,
-                                            tone: 'warning',
-                                        },
-                                        {
-                                            label: 'Luas Lahan < 15x20',
-                                            value: lahan.luaslahan_15_20,
-                                            tone: 'warning',
-                                        },
-                                        {
-                                            label: 'Lahan LP2B',
-                                            value: lahan.lp2b,
-                                            tone: 'danger',
                                         },
                                     ]}
                                 />
@@ -510,13 +452,13 @@ export default function MonitoringIndex({
                         />
                         <div className="grid gap-4 md:grid-cols-2">
                             <StatCard
-                                title="KDKMP Sudah Ditambahkan Karyawan"
+                                title="Jumlah KDKMP Sudah Ditambahkan Karyawan"
                                 value={sdm.jumlah_kdkmp_ditambahkan}
                                 icon={Building2}
                                 tone="success"
                             />
                             <StatCard
-                                title="Total Karyawan Ditempatkan"
+                                title="Jumlah Karyawan Ditempatkan di KDKMP"
                                 value={sdm.total_karyawan}
                                 icon={Users}
                                 tone="default"
@@ -541,12 +483,20 @@ export default function MonitoringIndex({
                                 </Badge>
                             }
                         />
-                        <Card className="border-l-4 border-dashed border-l-muted-foreground/40">
-                            <CardContent className="p-5 text-sm text-muted-foreground">
-                                PO, penerimaan barang, dan penjualan per KDKMP,
-                                dalam proses pembuatan.
-                            </CardContent>
-                        </Card>
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <ComingSoonCard
+                                title="KDKMP Sudah Dibuatkan PO"
+                                icon={Construction}
+                            />
+                            <ComingSoonCard
+                                title="KDKMP Sudah Melakukan Penerimaan Barang"
+                                icon={Construction}
+                            />
+                            <ComingSoonCard
+                                title="KDKMP Sudah Melakukan Penjualan"
+                                icon={Construction}
+                            />
+                        </div>
                     </section>
                 </div>
             </div>
