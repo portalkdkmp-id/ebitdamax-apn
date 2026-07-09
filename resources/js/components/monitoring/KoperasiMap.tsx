@@ -140,7 +140,7 @@ export default function KoperasiMap() {
         const map = L.map(containerRef.current, {
             center: [-2.5, 118],
             zoom: 5,
-            scrollWheelZoom: false,
+            scrollWheelZoom: true,
             preferCanvas: true,
         });
         mapRef.current = map;
