@@ -20,6 +20,11 @@ class MonitoringDashboardController extends Controller
 
     public function mapPoints(): JsonResponse
     {
-        return response()->json($this->monitoringService->mapPoints());
+        return response()
+            ->json($this->monitoringService->mapPoints())
+            ->header(
+                'Cache-Control',
+                'private, max-age='.MonitoringDashboardService::MAP_POINTS_CACHE_TTL_SECONDS,
+            );
     }
 }

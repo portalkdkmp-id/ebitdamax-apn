@@ -15,7 +15,7 @@ class MonitoringDashboardService
 {
     private const CACHE_TTL_SECONDS = 600;
 
-    private const MAP_POINTS_CACHE_TTL_SECONDS = 900;
+    public const MAP_POINTS_CACHE_TTL_SECONDS = 900;
 
     public function summary(): array
     {

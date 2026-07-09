@@ -3,11 +3,14 @@ import 'leaflet/dist/leaflet.css';
 import {
     AlertTriangle,
     Camera,
+    Check,
+    ChevronDown,
     Loader2,
     Maximize2,
     Minimize2,
+    Search,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -41,7 +44,11 @@ function drawShape(
     ctx: CanvasRenderingContext2D,
     tier: MarkerTier,
     color: string,
+    offsetX = 0,
+    offsetY = 0,
 ) {
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
     ctx.fillStyle = color;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1.5;
@@ -101,34 +108,8 @@ function drawShape(
             break;
         }
     }
-}
 
-// Setiap kombinasi tier dan warna dirender sekali menjadi bitmap, kemudian
-// digunakan berulang melalui drawImage() saat menggambar titik pada canvas.
-// Pendekatan ini jauh lebih efisien dibandingkan membuat elemen DOM per titik.
-function buildSpriteAtlas(): Map<string, HTMLCanvasElement> {
-    const atlas = new Map<string, HTMLCanvasElement>();
-
-    const tiers: MarkerTier[] = ['status', 'sarpras', 'sdm', 'odoo'];
-    const colors = Object.keys(COLOR_HEX) as MarkerColor[];
-
-    for (const tier of tiers) {
-        for (const color of colors) {
-            const sprite = document.createElement('canvas');
-            sprite.width = SPRITE_SIZE;
-            sprite.height = SPRITE_SIZE;
-
-            const ctx = sprite.getContext('2d');
-
-            if (ctx) {
-                drawShape(ctx, tier, COLOR_HEX[color]);
-            }
-
-            atlas.set(`${tier}_${color}`, sprite);
-        }
-    }
-
-    return atlas;
+    ctx.restore();
 }
 
 function shapeSvg(tier: MarkerTier, color: string): string {
@@ -227,6 +208,145 @@ function LegendGroup({
 const HIT_TEST_RADIUS_PX = 9;
 const ALL = 'all';
 
+// Batas jumlah opsi yang dirender di dalam dropdown. Daftar kecamatan bisa
+// mencapai ribuan entri; merender semuanya sekaligus membebani React setiap
+// kali komponen dirender ulang. Sisanya dapat dicari lewat kotak pencarian.
+const DROPDOWN_RENDER_LIMIT = 200;
+
+const SearchableFilterSelect = memo(function SearchableFilterSelect({
+    value,
+    options,
+    allLabel,
+    widthClass,
+    onChange,
+}: {
+    value: string;
+    options: string[];
+    allLabel: string;
+    widthClass: string;
+    onChange: (value: string) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState('');
+    const rootRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+
+        const onPointerDown = (event: PointerEvent) => {
+            if (!rootRef.current?.contains(event.target as Node)) {
+                setOpen(false);
+            }
+        };
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setOpen(false);
+            }
+        };
+
+        document.addEventListener('pointerdown', onPointerDown);
+        document.addEventListener('keydown', onKeyDown);
+
+        return () => {
+            document.removeEventListener('pointerdown', onPointerDown);
+            document.removeEventListener('keydown', onKeyDown);
+        };
+    }, [open]);
+
+    const normalizedQuery = query.trim().toLowerCase();
+    const filtered = normalizedQuery
+        ? options.filter((option) =>
+              option.toLowerCase().includes(normalizedQuery),
+          )
+        : options;
+    const shown = filtered.slice(0, DROPDOWN_RENDER_LIMIT);
+    const hiddenCount = filtered.length - shown.length;
+
+    const select = (next: string) => {
+        onChange(next);
+        setOpen(false);
+        setQuery('');
+    };
+
+    return (
+        <div ref={rootRef} className={`relative ${widthClass}`}>
+            <button
+                type="button"
+                onClick={() => setOpen((prev) => !prev)}
+                className="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 text-sm whitespace-nowrap shadow-xs transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+                <span
+                    className={
+                        value === ALL
+                            ? 'truncate text-muted-foreground'
+                            : 'truncate'
+                    }
+                >
+                    {value === ALL ? allLabel : value}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+            </button>
+
+            {open && (
+                <div className="absolute top-full left-0 z-[1200] mt-1 w-64 rounded-md border bg-popover text-popover-foreground shadow-md">
+                    <div className="flex items-center gap-2 border-b px-2">
+                        <Search className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                        <input
+                            autoFocus
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder="Cari..."
+                            className="h-8 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                        />
+                    </div>
+                    <div className="max-h-64 overflow-y-auto p-1">
+                        <button
+                            type="button"
+                            onClick={() => select(ALL)}
+                            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                        >
+                            <span className="w-3.5 shrink-0">
+                                {value === ALL && (
+                                    <Check className="h-3.5 w-3.5" />
+                                )}
+                            </span>
+                            {allLabel}
+                        </button>
+                        {shown.map((option) => (
+                            <button
+                                key={option}
+                                type="button"
+                                onClick={() => select(option)}
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                            >
+                                <span className="w-3.5 shrink-0">
+                                    {value === option && (
+                                        <Check className="h-3.5 w-3.5" />
+                                    )}
+                                </span>
+                                <span className="truncate">{option}</span>
+                            </button>
+                        ))}
+                        {hiddenCount > 0 && (
+                            <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                                +{hiddenCount.toLocaleString('id-ID')} opsi
+                                lainnya, persempit lewat pencarian
+                            </p>
+                        )}
+                        {filtered.length === 0 && (
+                            <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                                Tidak ada hasil
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+});
+
 type DrawnPoint = { x: number; y: number; index: number };
 
 type Filters = {
@@ -278,6 +398,237 @@ function uniqueSorted(values: Array<string | null>): string[] {
     ).sort((a, b) => a.localeCompare(b));
 }
 
+// --- Sprite atlas: 24 kombinasi tier x warna digambar sekali ke satu bitmap
+// grid, lalu di-upload sebagai satu texture WebGL. Setiap titik hanya perlu
+// menyimpan index sel di atlas (bukan bitmap terpisah).
+const ATLAS_TIERS: MarkerTier[] = ['status', 'sarpras', 'sdm', 'odoo'];
+const ATLAS_COLORS = Object.keys(COLOR_HEX) as MarkerColor[];
+const ATLAS_COLS = ATLAS_COLORS.length;
+const ATLAS_ROWS = ATLAS_TIERS.length;
+const ATLAS_CELL = 32;
+
+const SPRITE_INDEX = new Map<string, number>();
+ATLAS_TIERS.forEach((tier, row) => {
+    ATLAS_COLORS.forEach((color, col) => {
+        SPRITE_INDEX.set(`${tier}_${color}`, row * ATLAS_COLS + col);
+    });
+});
+
+function buildSpriteAtlasCanvas(): HTMLCanvasElement {
+    const atlas = document.createElement('canvas');
+    atlas.width = ATLAS_COLS * ATLAS_CELL;
+    atlas.height = ATLAS_ROWS * ATLAS_CELL;
+    const ctx = atlas.getContext('2d');
+
+    if (!ctx) {
+        return atlas;
+    }
+
+    const margin = (ATLAS_CELL - SPRITE_SIZE) / 2;
+
+    ATLAS_TIERS.forEach((tier, row) => {
+        ATLAS_COLORS.forEach((color, col) => {
+            drawShape(
+                ctx,
+                tier,
+                COLOR_HEX[color],
+                col * ATLAS_CELL + margin,
+                row * ATLAS_CELL + margin,
+            );
+        });
+    });
+
+    return atlas;
+}
+
+// a_worldPos disimpan dalam koordinat dunia pada zoom referensi 0 (hasil
+// map.project(latlng, 0)), diupload ke GPU sekali saat data/filter berubah.
+// Transformasi pan/zoom dilakukan di GPU lewat u_scale (2^zoom saat ini) dan
+// u_origin, yang di-update tiap moveend/zoomend tanpa perlu menghitung ulang
+// atau mengunggah ulang posisi 36 ribu titik di CPU.
+const VERTEX_SHADER_SRC = `
+    attribute vec2 a_worldPos;
+    attribute float a_texIndex;
+    uniform vec2 u_resolution;
+    uniform float u_pointSize;
+    uniform float u_scale;
+    uniform vec2 u_origin;
+    varying float v_texIndex;
+
+    void main() {
+        vec2 screenPixel = a_worldPos * u_scale - u_origin;
+        vec2 zeroToOne = screenPixel / u_resolution;
+        vec2 clipSpace = zeroToOne * 2.0 - 1.0;
+        gl_Position = vec4(clipSpace * vec2(1.0, -1.0), 0.0, 1.0);
+        gl_PointSize = u_pointSize;
+        v_texIndex = a_texIndex;
+    }
+`;
+
+const FRAGMENT_SHADER_SRC = `
+    precision mediump float;
+    varying float v_texIndex;
+    uniform sampler2D u_atlas;
+    uniform float u_cols;
+    uniform float u_rows;
+
+    void main() {
+        float col = mod(v_texIndex, u_cols);
+        float row = floor(v_texIndex / u_cols);
+        vec2 cellSize = vec2(1.0 / u_cols, 1.0 / u_rows);
+        vec2 uv = (gl_PointCoord + vec2(col, row)) * cellSize;
+        vec4 texColor = texture2D(u_atlas, uv);
+        if (texColor.a < 0.05) {
+            discard;
+        }
+        gl_FragColor = texColor;
+    }
+`;
+
+function compileShader(
+    gl: WebGLRenderingContext,
+    type: number,
+    source: string,
+): WebGLShader | null {
+    const shader = gl.createShader(type);
+
+    if (!shader) {
+        return null;
+    }
+
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        gl.deleteShader(shader);
+
+        return null;
+    }
+
+    return shader;
+}
+
+type GLState = {
+    gl: WebGLRenderingContext;
+    program: WebGLProgram;
+    worldPosBuffer: WebGLBuffer;
+    texIndexBuffer: WebGLBuffer;
+    worldPosLoc: number;
+    texIndexLoc: number;
+    resolutionLoc: WebGLUniformLocation;
+    pointSizeLoc: WebGLUniformLocation;
+    scaleLoc: WebGLUniformLocation;
+    originLoc: WebGLUniformLocation;
+    maxPointSize: number;
+    /** Jumlah titik yang saat ini ada di worldPosBuffer/texIndexBuffer. */
+    renderCount: number;
+};
+
+function initWebGL(
+    canvas: HTMLCanvasElement,
+    atlasCanvas: HTMLCanvasElement,
+): GLState | null {
+    const gl = (canvas.getContext('webgl', {
+        premultipliedAlpha: true,
+        preserveDrawingBuffer: true,
+    }) ??
+        canvas.getContext('experimental-webgl', {
+            premultipliedAlpha: true,
+            preserveDrawingBuffer: true,
+        })) as WebGLRenderingContext | null;
+
+    if (!gl) {
+        return null;
+    }
+
+    const vertexShader = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER_SRC);
+    const fragmentShader = compileShader(
+        gl,
+        gl.FRAGMENT_SHADER,
+        FRAGMENT_SHADER_SRC,
+    );
+
+    if (!vertexShader || !fragmentShader) {
+        return null;
+    }
+
+    const program = gl.createProgram();
+
+    if (!program) {
+        return null;
+    }
+
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        return null;
+    }
+
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    // Tidak di-flip: baris atlas (canvas, atas ke bawah) diupload apa adanya
+    // sehingga tier index 0..3 pada shader selaras langsung dengan koordinat
+    // V=0..1 tanpa perlu pembalikan tambahan.
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        atlasCanvas,
+    );
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const worldPosBuffer = gl.createBuffer();
+    const texIndexBuffer = gl.createBuffer();
+
+    if (!worldPosBuffer || !texIndexBuffer) {
+        return null;
+    }
+
+    const resolutionLoc = gl.getUniformLocation(program, 'u_resolution');
+    const pointSizeLoc = gl.getUniformLocation(program, 'u_pointSize');
+    const scaleLoc = gl.getUniformLocation(program, 'u_scale');
+    const originLoc = gl.getUniformLocation(program, 'u_origin');
+    const atlasLoc = gl.getUniformLocation(program, 'u_atlas');
+    const colsLoc = gl.getUniformLocation(program, 'u_cols');
+    const rowsLoc = gl.getUniformLocation(program, 'u_rows');
+
+    if (!resolutionLoc || !pointSizeLoc || !scaleLoc || !originLoc) {
+        return null;
+    }
+
+    gl.useProgram(program);
+    gl.uniform1i(atlasLoc, 0);
+    gl.uniform1f(colsLoc, ATLAS_COLS);
+    gl.uniform1f(rowsLoc, ATLAS_ROWS);
+
+    const pointSizeRange = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE) as
+        Float32Array | number[];
+    const maxPointSize = pointSizeRange ? pointSizeRange[1] : 64;
+
+    return {
+        gl,
+        program,
+        worldPosBuffer,
+        texIndexBuffer,
+        worldPosLoc: gl.getAttribLocation(program, 'a_worldPos'),
+        texIndexLoc: gl.getAttribLocation(program, 'a_texIndex'),
+        resolutionLoc,
+        pointSizeLoc,
+        scaleLoc,
+        originLoc,
+        maxPointSize,
+        renderCount: 0,
+    };
+}
+
 export default function KoperasiMap() {
     const containerRef = useRef<HTMLDivElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
@@ -285,6 +636,7 @@ export default function KoperasiMap() {
     const allPointsRef = useRef<MapPointTuple[]>([]);
     const filtersRef = useRef<Filters>(DEFAULT_FILTERS);
     const drawRef = useRef<() => void>(() => {});
+    const rebuildBufferRef = useRef<() => void>(() => {});
     const fitToFilterRef = useRef<() => void>(() => {});
 
     const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading');
@@ -296,6 +648,7 @@ export default function KoperasiMap() {
     const [isCapturing, setIsCapturing] = useState(false);
     const [captureError, setCaptureError] = useState(false);
     const [allPoints, setAllPoints] = useState<MapPointTuple[]>([]);
+    const [glUnsupported, setGlUnsupported] = useState(false);
 
     const provinsiOptions = useMemo(
         () => uniqueSorted(allPoints.map((p) => p[FIELD.provinsi])),
@@ -350,7 +703,14 @@ export default function KoperasiMap() {
 
         L.tileLayer(
             'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-            { attribution: 'Tiles &copy; Esri', maxZoom: 19 },
+            {
+                attribution: 'Tiles &copy; Esri',
+                maxZoom: 19,
+                // ArcGIS mengizinkan CORS (Access-Control-Allow-Origin: *),
+                // ini diperlukan supaya tile bisa di-composite ke canvas
+                // export saat screenshot tanpa canvas jadi "tainted".
+                crossOrigin: true,
+            },
         ).addTo(map);
 
         // Pane khusus agar canvas titik berada di atas tile namun tetap di
@@ -367,42 +727,177 @@ export default function KoperasiMap() {
         canvas.style.position = 'absolute';
         canvas.style.top = '0';
         canvas.style.left = '0';
-        const ctx = canvas.getContext('2d');
-        const spriteAtlas = buildSpriteAtlas();
+
+        const atlasCanvas = buildSpriteAtlasCanvas();
+        const glState = initWebGL(canvas, atlasCanvas);
+
+        if (!glState) {
+            setGlUnsupported(true);
+
+            return;
+        }
 
         let drawnPoints: DrawnPoint[] = [];
         let lastTopLeft = L.point(0, 0);
         let popup: L.Popup | null = null;
 
-        // Canvas berada di dalam pane khusus yang otomatis ikut ditransformasi
-        // oleh Leaflet saat drag, sama seperti tilePane dan markerPane. Oleh
-        // karena itu titik digambar menggunakan koordinat layerPoint (bukan
-        // containerPoint), relatif terhadap sudut kiri-atas canvas. Posisi
-        // dan ukuran canvas direset setiap kali draw() dipanggil, mengikuti
-        // origin viewport saat itu.
-        const draw = () => {
-            const points = allPointsRef.current;
+        // Posisi dunia (world position, zoom referensi 0) diupload ke GPU
+        // sekali setiap kali data atau filter provinsi/kab-kota/kecamatan/
+        // status berubah - BUKAN setiap pan/zoom. Index array ini dipetakan
+        // ke allPointsRef supaya bisa ditelusuri balik saat hit-test klik.
+        let bufferedIndices: number[] = [];
 
-            if (!ctx || points.length === 0) {
+        const rebuildBuffer = () => {
+            const points = allPointsRef.current;
+            const activeFilters = filtersRef.current;
+            const n = points.length;
+            // Array biasa (bukan map.project() 36 ribu kali) - proyeksi
+            // dihitung manual (rumus Spherical Mercator EPSG:3857 di zoom
+            // 0) langsung ke typed array, jauh lebih cepat karena tanpa
+            // overhead pemanggilan fungsi/alokasi objek Leaflet per titik.
+            const worldPositions = new Float32Array(n * 2);
+            const texIndices = new Float32Array(n);
+            const indices: number[] = [];
+            let count = 0;
+            const DEG2RAD = Math.PI / 180;
+            const MAX_LAT = 85.0511287798;
+
+            for (let i = 0; i < n; i++) {
+                const point = points[i];
+
+                if (!matchesFilters(point, activeFilters)) {
+                    continue;
+                }
+
+                const lat = Math.max(
+                    Math.min(point[FIELD.lat], MAX_LAT),
+                    -MAX_LAT,
+                );
+                const lng = point[FIELD.lng];
+                const sinLat = Math.sin(lat * DEG2RAD);
+                const worldX = 128 * (1 + lng / 180);
+                const worldY =
+                    128 -
+                    (64 * Math.log((1 + sinLat) / (1 - sinLat))) / Math.PI;
+                const spriteIndex = SPRITE_INDEX.get(
+                    `${point[FIELD.tier]}_${point[FIELD.color]}`,
+                );
+
+                worldPositions[count * 2] = worldX;
+                worldPositions[count * 2 + 1] = worldY;
+                texIndices[count] = spriteIndex ?? 0;
+                indices.push(i);
+                count++;
+            }
+
+            const { gl } = glState;
+            gl.bindBuffer(gl.ARRAY_BUFFER, glState.worldPosBuffer);
+            gl.bufferData(
+                gl.ARRAY_BUFFER,
+                worldPositions.subarray(0, count * 2),
+                gl.STATIC_DRAW,
+            );
+            gl.bindBuffer(gl.ARRAY_BUFFER, glState.texIndexBuffer);
+            gl.bufferData(
+                gl.ARRAY_BUFFER,
+                texIndices.subarray(0, count),
+                gl.STATIC_DRAW,
+            );
+
+            glState.renderCount = count;
+            bufferedIndices = indices;
+        };
+
+        // Canvas berada di dalam pane khusus yang otomatis ikut ditransformasi
+        // oleh Leaflet saat drag, sama seperti tilePane dan markerPane.
+        // Ukuran dan posisi canvas direset tiap kali dipanggil, mengikuti
+        // origin viewport saat itu. Transformasi pan/zoom titik sepenuhnya
+        // dilakukan GPU lewat uniform u_scale/u_origin (lihat vertex
+        // shader) - fungsi ini tidak lagi melakukan loop atas seluruh titik.
+        const render = () => {
+            if (glState.renderCount === 0) {
                 return;
             }
 
             const size = map.getSize();
-            canvas.width = size.x;
-            canvas.height = size.y;
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvas.width = Math.round(size.x * dpr);
+            canvas.height = Math.round(size.y * dpr);
+            canvas.style.width = `${size.x}px`;
+            canvas.style.height = `${size.y}px`;
 
             const topLeft = map.containerPointToLayerPoint([0, 0]);
             lastTopLeft = topLeft;
             L.DomUtil.setPosition(canvas, topLeft);
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Selesaikan transformasi affine (world -> canvas-local pixel)
+            // pakai satu titik referensi (pusat viewport saat ini), lalu
+            // biarkan GPU menerapkannya ke seluruh titik lain via u_scale
+            // dan u_origin.
+            const zoomScale = Math.pow(2, map.getZoom());
+            const refLatLng = map.getCenter();
+            const refWorld = map.project(refLatLng, 0);
+            const refCanvasLocal = map
+                .latLngToLayerPoint(refLatLng)
+                .subtract(topLeft);
 
+            const scale = zoomScale * dpr;
+            const originX = (refWorld.x * zoomScale - refCanvasLocal.x) * dpr;
+            const originY = (refWorld.y * zoomScale - refCanvasLocal.y) * dpr;
+
+            const { gl } = glState;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.useProgram(glState.program);
+
+            gl.uniform2f(glState.resolutionLoc, canvas.width, canvas.height);
+            gl.uniform1f(
+                glState.pointSizeLoc,
+                Math.min(SPRITE_SIZE * dpr, glState.maxPointSize),
+            );
+            gl.uniform1f(glState.scaleLoc, scale);
+            gl.uniform2f(glState.originLoc, originX, originY);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, glState.worldPosBuffer);
+            gl.enableVertexAttribArray(glState.worldPosLoc);
+            gl.vertexAttribPointer(
+                glState.worldPosLoc,
+                2,
+                gl.FLOAT,
+                false,
+                0,
+                0,
+            );
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, glState.texIndexBuffer);
+            gl.enableVertexAttribArray(glState.texIndexLoc);
+            gl.vertexAttribPointer(
+                glState.texIndexLoc,
+                1,
+                gl.FLOAT,
+                false,
+                0,
+                0,
+            );
+
+            gl.drawArrays(gl.POINTS, 0, glState.renderCount);
+        };
+
+        // Dipakai buat hit-test klik dan angka "menampilkan X dari Y titik"
+        // di UI - scan O(n) ini terpisah dari render() (yang sekarang O(1)
+        // per pan/zoom), jadi tetap dijalankan tiap moveend tapi tidak lagi
+        // memblokir/menunda gambar ulang titik di GPU.
+        const refreshVisibleForUI = () => {
             const bounds = map.getBounds().pad(0.15);
             const nextDrawn: DrawnPoint[] = [];
-            const activeFilters = filtersRef.current;
+            const topLeft = lastTopLeft;
 
-            for (let i = 0; i < points.length; i++) {
-                const point = points[i];
+            for (const i of bufferedIndices) {
+                const point = allPointsRef.current[i];
                 const lat = point[FIELD.lat];
                 const lng = point[FIELD.lng];
 
@@ -410,29 +905,29 @@ export default function KoperasiMap() {
                     continue;
                 }
 
-                if (!matchesFilters(point, activeFilters)) {
-                    continue;
-                }
-
                 const layerPoint = map.latLngToLayerPoint([lat, lng]);
-                const x = layerPoint.x - topLeft.x;
-                const y = layerPoint.y - topLeft.y;
-
-                const sprite = spriteAtlas.get(
-                    `${point[FIELD.tier]}_${point[FIELD.color]}`,
-                );
-
-                if (sprite) {
-                    ctx.drawImage(sprite, x - SPRITE_RADIUS, y - SPRITE_RADIUS);
-                }
-
-                nextDrawn.push({ x, y, index: i });
+                nextDrawn.push({
+                    x: layerPoint.x - topLeft.x,
+                    y: layerPoint.y - topLeft.y,
+                    index: i,
+                });
             }
 
             drawnPoints = nextDrawn;
             setVisibleCount(nextDrawn.length);
         };
+
+        const draw = () => {
+            render();
+            refreshVisibleForUI();
+        };
         drawRef.current = draw;
+        rebuildBufferRef.current = rebuildBuffer;
+
+        const rebuildBufferAndDraw = () => {
+            rebuildBuffer();
+            draw();
+        };
 
         const fitToFilter = () => {
             const points = allPointsRef.current;
@@ -443,6 +938,7 @@ export default function KoperasiMap() {
 
             if (matched.length === 0) {
                 map.setView([-2.5, 118], 5);
+                draw();
 
                 return;
             }
@@ -453,6 +949,7 @@ export default function KoperasiMap() {
                 ),
             );
             map.fitBounds(bounds, { padding: [24, 24], maxZoom: 12 });
+            draw();
         };
         fitToFilterRef.current = fitToFilter;
 
@@ -524,7 +1021,7 @@ export default function KoperasiMap() {
                 setPointCount(body.points.length);
                 setFetchedAt(body.fetched_at);
                 setStatus('ok');
-                draw();
+                rebuildBufferAndDraw();
             })
             .catch(() => setStatus('error'));
 
@@ -551,6 +1048,8 @@ export default function KoperasiMap() {
             filtersRef.current = next;
 
             requestAnimationFrame(() => {
+                rebuildBufferRef.current();
+
                 if ('tier' in patch && Object.keys(patch).length === 1) {
                     drawRef.current();
                 } else {
@@ -566,7 +1065,9 @@ export default function KoperasiMap() {
         setFilters(DEFAULT_FILTERS);
         filtersRef.current = DEFAULT_FILTERS;
         requestAnimationFrame(() => {
+            rebuildBufferRef.current();
             mapRef.current?.setView([-2.5, 118], 5);
+            drawRef.current();
         });
     };
 
@@ -676,17 +1177,15 @@ export default function KoperasiMap() {
         >
             <CardContent className="space-y-4 p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-muted-foreground">
-                        Peta Sebaran KDKMP
+                    <p className="text-sm text-muted-foreground">
                         {status === 'ok' && (
-                            <span className="ml-2 text-xs text-muted-foreground">
-                                (menampilkan{' '}
+                            <>
+                                Menampilkan{' '}
                                 {visibleCount.toLocaleString('id-ID')} dari{' '}
                                 {pointCount.toLocaleString('id-ID')} titik
                                 {fetchedAt &&
                                     `, update ${new Date(fetchedAt).toLocaleString('id-ID')}`}
-                                )
-                            </span>
+                            </>
                         )}
                     </p>
                     <div className="flex items-center gap-2">
@@ -700,6 +1199,12 @@ export default function KoperasiMap() {
                             <span className="flex items-center gap-1.5 text-xs text-destructive">
                                 <AlertTriangle className="h-3.5 w-3.5" />
                                 Gagal memuat data peta
+                            </span>
+                        )}
+                        {glUnsupported && (
+                            <span className="flex items-center gap-1.5 text-xs text-destructive">
+                                <AlertTriangle className="h-3.5 w-3.5" />
+                                WebGL tidak didukung browser ini
                             </span>
                         )}
                         {captureError && (
@@ -746,75 +1251,42 @@ export default function KoperasiMap() {
 
                 {status === 'ok' && (
                     <div className="flex flex-wrap items-center gap-2">
-                        <Select
+                        <SearchableFilterSelect
                             value={filters.provinsi}
-                            onValueChange={(value) =>
+                            options={provinsiOptions}
+                            allLabel="Semua Provinsi"
+                            widthClass="w-[160px]"
+                            onChange={(value) =>
                                 updateFilter({
                                     provinsi: value,
                                     kotaKabupaten: ALL,
                                     kecamatan: ALL,
                                 })
                             }
-                        >
-                            <SelectTrigger size="sm" className="w-[160px]">
-                                <SelectValue placeholder="Semua Provinsi" />
-                            </SelectTrigger>
-                            <SelectContent className="z-[1200]">
-                                <SelectItem value={ALL}>
-                                    Semua Provinsi
-                                </SelectItem>
-                                {provinsiOptions.map((option) => (
-                                    <SelectItem key={option} value={option}>
-                                        {option}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        />
 
-                        <Select
+                        <SearchableFilterSelect
                             value={filters.kotaKabupaten}
-                            onValueChange={(value) =>
+                            options={kotaKabupatenOptions}
+                            allLabel="Semua Kab/Kota"
+                            widthClass="w-[170px]"
+                            onChange={(value) =>
                                 updateFilter({
                                     kotaKabupaten: value,
                                     kecamatan: ALL,
                                 })
                             }
-                        >
-                            <SelectTrigger size="sm" className="w-[170px]">
-                                <SelectValue placeholder="Semua Kab/Kota" />
-                            </SelectTrigger>
-                            <SelectContent className="z-[1200]">
-                                <SelectItem value={ALL}>
-                                    Semua Kab/Kota
-                                </SelectItem>
-                                {kotaKabupatenOptions.map((option) => (
-                                    <SelectItem key={option} value={option}>
-                                        {option}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        />
 
-                        <Select
+                        <SearchableFilterSelect
                             value={filters.kecamatan}
-                            onValueChange={(value) =>
+                            options={kecamatanOptions}
+                            allLabel="Semua Kecamatan"
+                            widthClass="w-[160px]"
+                            onChange={(value) =>
                                 updateFilter({ kecamatan: value })
                             }
-                        >
-                            <SelectTrigger size="sm" className="w-[160px]">
-                                <SelectValue placeholder="Semua Kecamatan" />
-                            </SelectTrigger>
-                            <SelectContent className="z-[1200]">
-                                <SelectItem value={ALL}>
-                                    Semua Kecamatan
-                                </SelectItem>
-                                {kecamatanOptions.map((option) => (
-                                    <SelectItem key={option} value={option}>
-                                        {option}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        />
 
                         <Select
                             value={filters.tier}
@@ -867,7 +1339,10 @@ export default function KoperasiMap() {
                         tier="status"
                         title="Status verifikasi & pembangunan"
                         items={[
-                            { color: 'yellow', label: 'Sedang diverifikasi' },
+                            {
+                                color: 'yellow',
+                                label: 'Sedang diverifikasi',
+                            },
                             { color: 'orange', label: 'Dipertimbangkan' },
                             {
                                 color: 'red',
@@ -881,7 +1356,10 @@ export default function KoperasiMap() {
                         title="Pembangunan 100%, fokus sarpras"
                         items={[
                             { color: 'red', label: 'Sarpras < 6 jenis' },
-                            { color: 'yellow', label: 'Sarpras esensial 1' },
+                            {
+                                color: 'yellow',
+                                label: 'Sarpras esensial 1',
+                            },
                             { color: 'green', label: 'Sarpras esensial 2' },
                         ]}
                     />
@@ -891,7 +1369,10 @@ export default function KoperasiMap() {
                         items={[
                             { color: 'red', label: 'SDM belum ada' },
                             { color: 'yellow', label: 'SDM sebagian' },
-                            { color: 'green', label: 'SDM 6 orang (lengkap)' },
+                            {
+                                color: 'green',
+                                label: 'SDM 6 orang (lengkap)',
+                            },
                         ]}
                     />
                     <LegendGroup
