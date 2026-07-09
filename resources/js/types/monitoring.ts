@@ -83,40 +83,26 @@ export type MarkerColor =
     'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'gray';
 
 /**
- * Tuple posisional, urutan HARUS sama dengan
- * MonitoringDashboardService::MAP_POINT_FIELDS di backend:
- * [nik, nama_koperasi, provinsi, kota_kabupaten, kecamatan, kodim, lat, lng,
- *  validation_status, progress_percentage, completed_sarpras_count,
- *  sarpras_primary_lengkap, sarpras_secondary_lengkap, sarpras_lengkap,
- *  jumlah_karyawan, has_po, has_receipt, has_sales, marker_tier, marker_color]
+ * Metadata titik peta (JSON) - field numerik/enum-nya ada di payload biner
+ * terpisah (endpoint monitoring.map-points-binary), lihat
+ * decodeMapPointsBinary() di KoperasiMap.tsx. Field string dedup lewat
+ * tabel lookup (tables) untuk provinsi/kota-kabupaten/kecamatan/status
+ * verifikasi karena banyak titik berbagi nilai yang sama; nik/nama/kodim
+ * unik per titik jadi tetap dikirim sebagai array string.
  */
-export type MapPointTuple = [
-    string | null, // nik
-    string | null, // nama_koperasi
-    string | null, // provinsi
-    string | null, // kota_kabupaten
-    string | null, // kecamatan
-    string | null, // kodim
-    number, // lat
-    number, // lng
-    string | null, // validation_status
-    number, // progress_percentage
-    number, // completed_sarpras_count
-    boolean, // sarpras_primary_lengkap
-    boolean, // sarpras_secondary_lengkap
-    boolean, // sarpras_lengkap
-    number, // jumlah_karyawan
-    boolean, // has_po
-    boolean, // has_receipt
-    boolean, // has_sales
-    MarkerTier, // marker_tier
-    MarkerColor, // marker_color
-];
-
-export type MapPointsResponse = {
+export type MapPointsMetaResponse = {
     status: 'ok' | 'error';
-    points: MapPointTuple[];
     fetched_at: string | null;
+    count: number;
+    tables: {
+        provinsi: string[];
+        kotaKabupaten: string[];
+        kecamatan: string[];
+        validationStatus: string[];
+    };
+    nik: (string | null)[];
+    nama: (string | null)[];
+    kodim: (string | null)[];
 };
 
 export type SdmEntry = {

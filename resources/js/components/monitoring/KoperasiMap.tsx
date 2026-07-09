@@ -20,10 +20,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { mapPoints as mapPointsRoute } from '@/routes/monitoring';
+import {
+    mapPoints as mapPointsMetaRoute,
+    mapPointsBinary as mapPointsBinaryRoute,
+} from '@/routes/monitoring';
 import type {
-    MapPointsResponse,
-    MapPointTuple,
+    MapPointsMetaResponse,
     MarkerColor,
     MarkerTier,
 } from '@/types/monitoring';
@@ -125,47 +127,146 @@ function shapeSvg(tier: MarkerTier, color: string): string {
     }
 }
 
-const FIELD = {
-    nik: 0,
-    nama: 1,
-    provinsi: 2,
-    kotaKabupaten: 3,
-    kecamatan: 4,
-    kodim: 5,
-    lat: 6,
-    lng: 7,
-    validationStatus: 8,
-    progress: 9,
-    completedSarprasCount: 10,
-    sarprasPrimary: 11,
-    sarprasSecondary: 12,
-    sarprasLengkap: 13,
-    jumlahKaryawan: 14,
-    hasPo: 15,
+/**
+ * Bitmask kolom boolean pada byte flags payload biner. Harus selaras dengan
+ * FLAG_* di MonitoringDashboardService.php.
+ */
+const FLAG = {
+    sarprasPrimary: 1,
+    sarprasSecondary: 2,
+    sarprasLengkap: 4,
+    hasPo: 8,
     hasReceipt: 16,
-    hasSales: 17,
-    tier: 18,
-    color: 19,
+    hasSales: 32,
 } as const;
 
-function popupHtml(point: MapPointTuple): string {
+/**
+ * Structure-of-arrays hasil decode payload biner + metadata JSON. Field
+ * numerik/enum diakses lewat typed array per index titik; field string
+ * (provinsi/kota-kabupaten/kecamatan/status) diakses lewat tabel lookup
+ * karena dikirim dedup (index ke tabel, bukan string berulang).
+ */
+type MapPointsData = {
+    count: number;
+    lat: Float32Array;
+    lng: Float32Array;
+    provinsiIdx: Uint16Array;
+    kotaKabupatenIdx: Uint16Array;
+    kecamatanIdx: Uint16Array;
+    jumlahKaryawan: Uint16Array;
+    validationStatusIdx: Uint8Array;
+    progress: Uint8Array;
+    completedSarprasCount: Uint8Array;
+    flags: Uint8Array;
+    tierIdx: Uint8Array;
+    colorIdx: Uint8Array;
+    provinsiTable: string[];
+    kotaKabupatenTable: string[];
+    kecamatanTable: string[];
+    validationStatusTable: string[];
+    nik: (string | null)[];
+    nama: (string | null)[];
+    kodim: (string | null)[];
+    fetchedAt: string | null;
+};
+
+/**
+ * Urutan blok byte HARUS selaras dengan buildMapPointsPayload() di
+ * MonitoringDashboardService.php: lat/lng (f32) diikuti field u16, lalu
+ * field u8. Tiap blok typed array selalu mulai di offset kelipatan ukuran
+ * elemennya karena count*4 dan count*2 selalu genap, jadi aman langsung
+ * di-view tanpa padding manual.
+ */
+function decodeMapPointsBinary(
+    buffer: ArrayBuffer,
+    meta: MapPointsMetaResponse,
+): MapPointsData {
+    const count = meta.count;
+    let offset = 0;
+
+    const readF32 = (n: number) => {
+        const arr = new Float32Array(buffer, offset, n);
+        offset += n * 4;
+
+        return arr;
+    };
+    const readU16 = (n: number) => {
+        const arr = new Uint16Array(buffer, offset, n);
+        offset += n * 2;
+
+        return arr;
+    };
+    const readU8 = (n: number) => {
+        const arr = new Uint8Array(buffer, offset, n);
+        offset += n;
+
+        return arr;
+    };
+
+    const lat = readF32(count);
+    const lng = readF32(count);
+    const provinsiIdx = readU16(count);
+    const kotaKabupatenIdx = readU16(count);
+    const kecamatanIdx = readU16(count);
+    const jumlahKaryawan = readU16(count);
+    const validationStatusIdx = readU8(count);
+    const progress = readU8(count);
+    const completedSarprasCount = readU8(count);
+    const flags = readU8(count);
+    const tierIdx = readU8(count);
+    const colorIdx = readU8(count);
+
+    return {
+        count,
+        lat,
+        lng,
+        provinsiIdx,
+        kotaKabupatenIdx,
+        kecamatanIdx,
+        jumlahKaryawan,
+        validationStatusIdx,
+        progress,
+        completedSarprasCount,
+        flags,
+        tierIdx,
+        colorIdx,
+        provinsiTable: meta.tables.provinsi,
+        kotaKabupatenTable: meta.tables.kotaKabupaten,
+        kecamatanTable: meta.tables.kecamatan,
+        validationStatusTable: meta.tables.validationStatus,
+        nik: meta.nik,
+        nama: meta.nama,
+        kodim: meta.kodim,
+        fetchedAt: meta.fetched_at,
+    };
+}
+
+function popupHtml(data: MapPointsData, i: number): string {
     const yesNo = (value: boolean) => (value ? 'Ya' : 'Belum');
+    const flags = data.flags[i];
+
+    const nama = data.nama[i] ?? '-';
+    const kecamatan = data.kecamatanTable[data.kecamatanIdx[i]];
+    const kotaKabupaten = data.kotaKabupatenTable[data.kotaKabupatenIdx[i]];
+    const provinsi = data.provinsiTable[data.provinsiIdx[i]];
+    const validationStatus =
+        data.validationStatusTable[data.validationStatusIdx[i]] || '-';
 
     return `
         <div style="font-size:13px;line-height:1.5;min-width:220px">
-            <p style="font-weight:600;margin-bottom:2px">${point[FIELD.nama] ?? '-'}</p>
-            <p style="color:#6b7280;margin-bottom:6px">${[point[FIELD.kecamatan], point[FIELD.kotaKabupaten], point[FIELD.provinsi]].filter(Boolean).join(', ')}</p>
+            <p style="font-weight:600;margin-bottom:2px">${nama}</p>
+            <p style="color:#6b7280;margin-bottom:6px">${[kecamatan, kotaKabupaten, provinsi].filter(Boolean).join(', ')}</p>
             <table style="width:100%;border-collapse:collapse">
-                <tr><td style="color:#6b7280;padding:1px 0">Status verifikasi</td><td style="text-align:right;font-weight:500">${point[FIELD.validationStatus] ?? '-'}</td></tr>
-                <tr><td style="color:#6b7280;padding:1px 0">Progres pembangunan</td><td style="text-align:right;font-weight:500">${point[FIELD.progress]}%</td></tr>
-                <tr><td style="color:#6b7280;padding:1px 0">Sarpras lengkap</td><td style="text-align:right;font-weight:500">${point[FIELD.completedSarprasCount]} jenis</td></tr>
-                <tr><td style="color:#6b7280;padding:1px 0">Sarpras esensial 1</td><td style="text-align:right;font-weight:500">${yesNo(point[FIELD.sarprasPrimary])}</td></tr>
-                <tr><td style="color:#6b7280;padding:1px 0">Sarpras esensial 2</td><td style="text-align:right;font-weight:500">${yesNo(point[FIELD.sarprasSecondary])}</td></tr>
-                <tr><td style="color:#6b7280;padding:1px 0">Sarpras lengkap semua</td><td style="text-align:right;font-weight:500">${yesNo(point[FIELD.sarprasLengkap])}</td></tr>
-                <tr><td style="color:#6b7280;padding:1px 0">Jumlah karyawan</td><td style="text-align:right;font-weight:500">${point[FIELD.jumlahKaryawan]}</td></tr>
-                <tr><td style="color:#6b7280;padding:1px 0">Sudah PO</td><td style="text-align:right;font-weight:500">${yesNo(point[FIELD.hasPo])}</td></tr>
-                <tr><td style="color:#6b7280;padding:1px 0">Sudah penerimaan barang</td><td style="text-align:right;font-weight:500">${yesNo(point[FIELD.hasReceipt])}</td></tr>
-                <tr><td style="color:#6b7280;padding:1px 0">Sudah penjualan</td><td style="text-align:right;font-weight:500">${yesNo(point[FIELD.hasSales])}</td></tr>
+                <tr><td style="color:#6b7280;padding:1px 0">Status verifikasi</td><td style="text-align:right;font-weight:500">${validationStatus}</td></tr>
+                <tr><td style="color:#6b7280;padding:1px 0">Progres pembangunan</td><td style="text-align:right;font-weight:500">${data.progress[i]}%</td></tr>
+                <tr><td style="color:#6b7280;padding:1px 0">Sarpras lengkap</td><td style="text-align:right;font-weight:500">${data.completedSarprasCount[i]} jenis</td></tr>
+                <tr><td style="color:#6b7280;padding:1px 0">Sarpras esensial 1</td><td style="text-align:right;font-weight:500">${yesNo((flags & FLAG.sarprasPrimary) !== 0)}</td></tr>
+                <tr><td style="color:#6b7280;padding:1px 0">Sarpras esensial 2</td><td style="text-align:right;font-weight:500">${yesNo((flags & FLAG.sarprasSecondary) !== 0)}</td></tr>
+                <tr><td style="color:#6b7280;padding:1px 0">Sarpras lengkap semua</td><td style="text-align:right;font-weight:500">${yesNo((flags & FLAG.sarprasLengkap) !== 0)}</td></tr>
+                <tr><td style="color:#6b7280;padding:1px 0">Jumlah karyawan</td><td style="text-align:right;font-weight:500">${data.jumlahKaryawan[i]}</td></tr>
+                <tr><td style="color:#6b7280;padding:1px 0">Sudah PO</td><td style="text-align:right;font-weight:500">${yesNo((flags & FLAG.hasPo) !== 0)}</td></tr>
+                <tr><td style="color:#6b7280;padding:1px 0">Sudah penerimaan barang</td><td style="text-align:right;font-weight:500">${yesNo((flags & FLAG.hasReceipt) !== 0)}</td></tr>
+                <tr><td style="color:#6b7280;padding:1px 0">Sudah penjualan</td><td style="text-align:right;font-weight:500">${yesNo((flags & FLAG.hasSales) !== 0)}</td></tr>
             </table>
         </div>
     `;
@@ -363,39 +464,71 @@ const DEFAULT_FILTERS: Filters = {
     tier: ALL,
 };
 
-function matchesFilters(point: MapPointTuple, filters: Filters): boolean {
+/** Filter (string dari dropdown) diresolusi ke index tabel sekali per
+ * rebuildBuffer(), supaya loop titiknya cukup bandingkan angka, bukan
+ * string, per titik. -1 berarti filter itu tidak aktif ("semua"). */
+type ResolvedFilters = {
+    provinsiIdx: number;
+    kotaKabupatenIdx: number;
+    kecamatanIdx: number;
+    tierIdx: number;
+};
+
+function resolveFilters(
+    data: MapPointsData,
+    filters: Filters,
+): ResolvedFilters {
+    return {
+        provinsiIdx:
+            filters.provinsi === ALL
+                ? -1
+                : data.provinsiTable.indexOf(filters.provinsi),
+        kotaKabupatenIdx:
+            filters.kotaKabupaten === ALL
+                ? -1
+                : data.kotaKabupatenTable.indexOf(filters.kotaKabupaten),
+        kecamatanIdx:
+            filters.kecamatan === ALL
+                ? -1
+                : data.kecamatanTable.indexOf(filters.kecamatan),
+        tierIdx:
+            filters.tier === ALL
+                ? -1
+                : ATLAS_TIERS.indexOf(filters.tier as MarkerTier),
+    };
+}
+
+function pointMatches(
+    data: MapPointsData,
+    i: number,
+    resolved: ResolvedFilters,
+): boolean {
     if (
-        filters.provinsi !== ALL &&
-        point[FIELD.provinsi] !== filters.provinsi
+        resolved.provinsiIdx !== -1 &&
+        data.provinsiIdx[i] !== resolved.provinsiIdx
     ) {
         return false;
     }
 
     if (
-        filters.kotaKabupaten !== ALL &&
-        point[FIELD.kotaKabupaten] !== filters.kotaKabupaten
+        resolved.kotaKabupatenIdx !== -1 &&
+        data.kotaKabupatenIdx[i] !== resolved.kotaKabupatenIdx
     ) {
         return false;
     }
 
     if (
-        filters.kecamatan !== ALL &&
-        point[FIELD.kecamatan] !== filters.kecamatan
+        resolved.kecamatanIdx !== -1 &&
+        data.kecamatanIdx[i] !== resolved.kecamatanIdx
     ) {
         return false;
     }
 
-    if (filters.tier !== ALL && point[FIELD.tier] !== filters.tier) {
+    if (resolved.tierIdx !== -1 && data.tierIdx[i] !== resolved.tierIdx) {
         return false;
     }
 
     return true;
-}
-
-function uniqueSorted(values: Array<string | null>): string[] {
-    return Array.from(
-        new Set(values.filter((v): v is string => Boolean(v))),
-    ).sort((a, b) => a.localeCompare(b));
 }
 
 // --- Sprite atlas: 24 kombinasi tier x warna digambar sekali ke satu bitmap
@@ -406,13 +539,6 @@ const ATLAS_COLORS = Object.keys(COLOR_HEX) as MarkerColor[];
 const ATLAS_COLS = ATLAS_COLORS.length;
 const ATLAS_ROWS = ATLAS_TIERS.length;
 const ATLAS_CELL = 32;
-
-const SPRITE_INDEX = new Map<string, number>();
-ATLAS_TIERS.forEach((tier, row) => {
-    ATLAS_COLORS.forEach((color, col) => {
-        SPRITE_INDEX.set(`${tier}_${color}`, row * ATLAS_COLS + col);
-    });
-});
 
 function buildSpriteAtlasCanvas(): HTMLCanvasElement {
     const atlas = document.createElement('canvas');
@@ -633,7 +759,7 @@ export default function KoperasiMap() {
     const containerRef = useRef<HTMLDivElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<L.Map | null>(null);
-    const allPointsRef = useRef<MapPointTuple[]>([]);
+    const dataRef = useRef<MapPointsData | null>(null);
     const filtersRef = useRef<Filters>(DEFAULT_FILTERS);
     const drawRef = useRef<() => void>(() => {});
     const rebuildBufferRef = useRef<() => void>(() => {});
@@ -647,44 +773,81 @@ export default function KoperasiMap() {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isCapturing, setIsCapturing] = useState(false);
     const [captureError, setCaptureError] = useState(false);
-    const [allPoints, setAllPoints] = useState<MapPointTuple[]>([]);
+    const [data, setData] = useState<MapPointsData | null>(null);
     const [glUnsupported, setGlUnsupported] = useState(false);
 
-    const provinsiOptions = useMemo(
-        () => uniqueSorted(allPoints.map((p) => p[FIELD.provinsi])),
-        [allPoints],
-    );
+    const provinsiOptions = useMemo(() => {
+        if (!data) {
+            return [];
+        }
 
-    const kotaKabupatenOptions = useMemo(
-        () =>
-            uniqueSorted(
-                allPoints
-                    .filter(
-                        (p) =>
-                            filters.provinsi === ALL ||
-                            p[FIELD.provinsi] === filters.provinsi,
-                    )
-                    .map((p) => p[FIELD.kotaKabupaten]),
-            ),
-        [allPoints, filters.provinsi],
-    );
+        return [...data.provinsiTable].sort((a, b) => a.localeCompare(b));
+    }, [data]);
 
-    const kecamatanOptions = useMemo(
-        () =>
-            uniqueSorted(
-                allPoints
-                    .filter(
-                        (p) =>
-                            (filters.provinsi === ALL ||
-                                p[FIELD.provinsi] === filters.provinsi) &&
-                            (filters.kotaKabupaten === ALL ||
-                                p[FIELD.kotaKabupaten] ===
-                                    filters.kotaKabupaten),
-                    )
-                    .map((p) => p[FIELD.kecamatan]),
-            ),
-        [allPoints, filters.provinsi, filters.kotaKabupaten],
-    );
+    const kotaKabupatenOptions = useMemo(() => {
+        if (!data) {
+            return [];
+        }
+
+        const filterProvinsiIdx =
+            filters.provinsi === ALL
+                ? -1
+                : data.provinsiTable.indexOf(filters.provinsi);
+        const seen = new Set<number>();
+
+        for (let i = 0; i < data.count; i++) {
+            if (
+                filterProvinsiIdx !== -1 &&
+                data.provinsiIdx[i] !== filterProvinsiIdx
+            ) {
+                continue;
+            }
+
+            seen.add(data.kotaKabupatenIdx[i]);
+        }
+
+        return Array.from(seen)
+            .map((idx) => data.kotaKabupatenTable[idx])
+            .sort((a, b) => a.localeCompare(b));
+    }, [data, filters.provinsi]);
+
+    const kecamatanOptions = useMemo(() => {
+        if (!data) {
+            return [];
+        }
+
+        const filterProvinsiIdx =
+            filters.provinsi === ALL
+                ? -1
+                : data.provinsiTable.indexOf(filters.provinsi);
+        const filterKotaKabupatenIdx =
+            filters.kotaKabupaten === ALL
+                ? -1
+                : data.kotaKabupatenTable.indexOf(filters.kotaKabupaten);
+        const seen = new Set<number>();
+
+        for (let i = 0; i < data.count; i++) {
+            if (
+                filterProvinsiIdx !== -1 &&
+                data.provinsiIdx[i] !== filterProvinsiIdx
+            ) {
+                continue;
+            }
+
+            if (
+                filterKotaKabupatenIdx !== -1 &&
+                data.kotaKabupatenIdx[i] !== filterKotaKabupatenIdx
+            ) {
+                continue;
+            }
+
+            seen.add(data.kecamatanIdx[i]);
+        }
+
+        return Array.from(seen)
+            .map((idx) => data.kecamatanTable[idx])
+            .sort((a, b) => a.localeCompare(b));
+    }, [data, filters.provinsi, filters.kotaKabupaten]);
 
     useEffect(() => {
         const container = containerRef.current;
@@ -747,13 +910,18 @@ export default function KoperasiMap() {
         // Posisi dunia (world position, zoom referensi 0) diupload ke GPU
         // sekali setiap kali data atau filter provinsi/kab-kota/kecamatan/
         // status berubah - BUKAN setiap pan/zoom. Index array ini dipetakan
-        // ke allPointsRef supaya bisa ditelusuri balik saat hit-test klik.
+        // ke dataRef supaya bisa ditelusuri balik saat hit-test klik.
         let bufferedIndices: number[] = [];
 
         const rebuildBuffer = () => {
-            const points = allPointsRef.current;
-            const activeFilters = filtersRef.current;
-            const n = points.length;
+            const points = dataRef.current;
+
+            if (!points) {
+                return;
+            }
+
+            const resolved = resolveFilters(points, filtersRef.current);
+            const n = points.count;
             // Array biasa (bukan map.project() 36 ribu kali) - proyeksi
             // dihitung manual (rumus Spherical Mercator EPSG:3857 di zoom
             // 0) langsung ke typed array, jauh lebih cepat karena tanpa
@@ -766,29 +934,29 @@ export default function KoperasiMap() {
             const MAX_LAT = 85.0511287798;
 
             for (let i = 0; i < n; i++) {
-                const point = points[i];
-
-                if (!matchesFilters(point, activeFilters)) {
+                if (!pointMatches(points, i, resolved)) {
                     continue;
                 }
 
                 const lat = Math.max(
-                    Math.min(point[FIELD.lat], MAX_LAT),
+                    Math.min(points.lat[i], MAX_LAT),
                     -MAX_LAT,
                 );
-                const lng = point[FIELD.lng];
+                const lng = points.lng[i];
                 const sinLat = Math.sin(lat * DEG2RAD);
                 const worldX = 128 * (1 + lng / 180);
                 const worldY =
                     128 -
                     (64 * Math.log((1 + sinLat) / (1 - sinLat))) / Math.PI;
-                const spriteIndex = SPRITE_INDEX.get(
-                    `${point[FIELD.tier]}_${point[FIELD.color]}`,
-                );
+                // tierIdx/colorIdx sudah dalam urutan ATLAS_TIERS/ATLAS_COLORS
+                // dari backend, jadi index sel atlas tinggal aritmetika
+                // langsung tanpa lookup Map/string.
+                const spriteIndex =
+                    points.tierIdx[i] * ATLAS_COLS + points.colorIdx[i];
 
                 worldPositions[count * 2] = worldX;
                 worldPositions[count * 2 + 1] = worldY;
-                texIndices[count] = spriteIndex ?? 0;
+                texIndices[count] = spriteIndex;
                 indices.push(i);
                 count++;
             }
@@ -895,14 +1063,19 @@ export default function KoperasiMap() {
         // per pan/zoom), jadi tetap dijalankan tiap moveend tapi tidak lagi
         // memblokir/menunda gambar ulang titik di GPU.
         const refreshVisibleForUI = () => {
+            const points = dataRef.current;
+
+            if (!points) {
+                return;
+            }
+
             const bounds = map.getBounds().pad(0.15);
             const nextDrawn: DrawnPoint[] = [];
             const topLeft = lastTopLeft;
 
             for (const i of bufferedIndices) {
-                const point = allPointsRef.current[i];
-                const lat = point[FIELD.lat];
-                const lng = point[FIELD.lng];
+                const lat = points.lat[i];
+                const lng = points.lng[i];
 
                 if (!bounds.contains([lat, lng])) {
                     continue;
@@ -933,30 +1106,41 @@ export default function KoperasiMap() {
         };
 
         const fitToFilter = () => {
-            const points = allPointsRef.current;
-            const activeFilters = filtersRef.current;
-            const matched = points.filter((p) =>
-                matchesFilters(p, activeFilters),
-            );
+            const points = dataRef.current;
 
-            if (matched.length === 0) {
+            if (!points) {
+                return;
+            }
+
+            const resolved = resolveFilters(points, filtersRef.current);
+            const matchedLatLngs: [number, number][] = [];
+
+            for (let i = 0; i < points.count; i++) {
+                if (pointMatches(points, i, resolved)) {
+                    matchedLatLngs.push([points.lat[i], points.lng[i]]);
+                }
+            }
+
+            if (matchedLatLngs.length === 0) {
                 map.setView([-2.5, 118], 5);
                 draw();
 
                 return;
             }
 
-            const bounds = L.latLngBounds(
-                matched.map(
-                    (p) => [p[FIELD.lat], p[FIELD.lng]] as [number, number],
-                ),
-            );
+            const bounds = L.latLngBounds(matchedLatLngs);
             map.fitBounds(bounds, { padding: [24, 24], maxZoom: 12 });
             draw();
         };
         fitToFilterRef.current = fitToFilter;
 
         const onClick = (event: L.LeafletMouseEvent) => {
+            const points = dataRef.current;
+
+            if (!points) {
+                return;
+            }
+
             const clickLayerPoint = map.latLngToLayerPoint(event.latlng);
             const clickPoint = clickLayerPoint.subtract(lastTopLeft);
 
@@ -978,15 +1162,15 @@ export default function KoperasiMap() {
                 return;
             }
 
-            const point = allPointsRef.current[closest.index];
+            const i = closest.index;
 
             if (popup) {
                 map.closePopup(popup);
             }
 
             popup = L.popup()
-                .setLatLng([point[FIELD.lat], point[FIELD.lng]])
-                .setContent(popupHtml(point))
+                .setLatLng([points.lat[i], points.lng[i]])
+                .setContent(popupHtml(points, i))
                 .openOn(map);
         };
 
@@ -1037,19 +1221,30 @@ export default function KoperasiMap() {
         });
         resizeObserver.observe(container);
 
-        fetch(mapPointsRoute.url())
-            .then((response) => response.json() as Promise<MapPointsResponse>)
-            .then((body) => {
-                if (body.status !== 'ok') {
+        // Metadata (JSON, kecil) dan payload biner (angka mentah) di-fetch
+        // paralel - metadata berisi tabel string dedup + nik/nama/kodim per
+        // titik, payload biner berisi lat/lng dan field numerik/enum yang
+        // di-decode langsung ke typed array tanpa lewat JSON.parse.
+        Promise.all([
+            fetch(mapPointsMetaRoute.url()).then(
+                (response) => response.json() as Promise<MapPointsMetaResponse>,
+            ),
+            fetch(mapPointsBinaryRoute.url()).then((response) =>
+                response.arrayBuffer(),
+            ),
+        ])
+            .then(([meta, buffer]) => {
+                if (meta.status !== 'ok') {
                     setStatus('error');
 
                     return;
                 }
 
-                allPointsRef.current = body.points;
-                setAllPoints(body.points);
-                setPointCount(body.points.length);
-                setFetchedAt(body.fetched_at);
+                const decoded = decodeMapPointsBinary(buffer, meta);
+                dataRef.current = decoded;
+                setData(decoded);
+                setPointCount(decoded.count);
+                setFetchedAt(decoded.fetchedAt);
                 setStatus('ok');
                 rebuildBufferAndDraw();
             })

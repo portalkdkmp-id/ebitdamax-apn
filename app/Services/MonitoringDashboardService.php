@@ -6,7 +6,6 @@ use App\Models\KdkmpOperationalEntry;
 use App\Models\KoperasiSarprasStatusPoint;
 use App\Models\SdmKdkmpEntry;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -112,37 +111,88 @@ class MonitoringDashboardService
     }
 
     /**
-     * Urutan tuple `points` yang dikembalikan mapPoints(). Harus selaras dengan
-     * MapPointTuple di resources/js/types/monitoring.ts.
+     * Urutan tetap, dipakai untuk mengonversi marker_tier/marker_color ke
+     * index numerik pada payload biner. Harus selaras dengan ATLAS_TIERS
+     * dan ATLAS_COLORS di resources/js/components/monitoring/KoperasiMap.tsx.
      */
-    public const MAP_POINT_FIELDS = [
-        'nik', 'nama_koperasi', 'provinsi', 'kota_kabupaten', 'kecamatan', 'kodim',
-        'lat', 'lng', 'validation_status', 'progress_percentage', 'completed_sarpras_count',
-        'sarpras_primary_lengkap', 'sarpras_secondary_lengkap', 'sarpras_lengkap',
-        'jumlah_karyawan', 'has_po', 'has_receipt', 'has_sales', 'marker_tier', 'marker_color',
-    ];
+    private const MARKER_TIERS = ['status', 'sarpras', 'sdm', 'odoo'];
+
+    private const MARKER_COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'gray'];
+
+    /**
+     * Bitmask kolom boolean pada payload biner. Harus selaras dengan
+     * FLAG di resources/js/components/monitoring/KoperasiMap.tsx.
+     */
+    private const FLAG_SARPRAS_PRIMARY = 1;
+
+    private const FLAG_SARPRAS_SECONDARY = 2;
+
+    private const FLAG_SARPRAS_LENGKAP = 4;
+
+    private const FLAG_HAS_PO = 8;
+
+    private const FLAG_HAS_RECEIPT = 16;
+
+    private const FLAG_HAS_SALES = 32;
+
+    /**
+     * Metadata titik peta (JSON) - field string dan tabel lookup provinsi/
+     * kota-kabupaten/kecamatan/status verifikasi. Field numerik/enum ada di
+     * mapPointsBinary() sebagai payload biner terpisah supaya tidak
+     * melewati JSON.parse untuk data yang dominan angka.
+     *
+     * @return array{status: 'ok'|'error', fetched_at: string|null, count: int, tables: array, nik: array, nama: array, kodim: array}
+     */
+    public function mapPointsMeta(): array
+    {
+        $payload = $this->buildMapPointsPayload();
+        unset($payload['binary']);
+
+        return $payload;
+    }
+
+    /**
+     * Payload biner titik peta pemetaan lahan: lat/lng dan seluruh field
+     * numerik/enum di-pack jadi typed array per kolom (structure-of-arrays),
+     * bukan dikirim sebagai teks JSON, supaya lebih ringkas dan tidak perlu
+     * JSON.parse untuk ~36 ribu titik. Urutan blok byte:
+     * lat(f32) lng(f32) | provinsiIdx(u16) kotaKabupatenIdx(u16)
+     * kecamatanIdx(u16) jumlahKaryawan(u16) | validationStatusIdx(u8)
+     * progress(u8) completedSarprasCount(u8) flags(u8) tierIdx(u8)
+     * colorIdx(u8). Harus selaras dengan decodeMapPointsBinary() di
+     * resources/js/components/monitoring/KoperasiMap.tsx.
+     */
+    public function mapPointsBinary(): string
+    {
+        return $this->buildMapPointsPayload()['binary'];
+    }
 
     /**
      * Titik peta pemetaan lahan, satu titik per pengajuan lahan terverifikasi.
      * Setiap titik diprioritaskan ke tahap paling lanjut yang sudah dicapai:
      * Odoo (PO/GR/penjualan) > SDM > sarpras > status verifikasi/pembangunan.
      *
-     * `points` adalah array tuple posisional (lihat MAP_POINT_FIELDS), bukan
-     * object berkey, agar payload untuk sekitar 35 ribu titik tidak membengkak
-     * akibat pengulangan nama field.
-     *
-     * @return array{status: 'ok'|'error', points: array, fetched_at: string|null}
+     * @return array{status: 'ok'|'error', fetched_at: string|null, count: int, tables: array, nik: array, nama: array, kodim: array, binary: string}
      */
-    public function mapPoints(): array
+    private function buildMapPointsPayload(): array
     {
         $latestSyncRaw = KoperasiSarprasStatusPoint::query()->max('synced_at');
 
         if (! $latestSyncRaw) {
-            return ['status' => 'error', 'points' => [], 'fetched_at' => null];
+            return [
+                'status' => 'error',
+                'fetched_at' => null,
+                'count' => 0,
+                'tables' => ['provinsi' => [], 'kotaKabupaten' => [], 'kecamatan' => [], 'validationStatus' => []],
+                'nik' => [],
+                'nama' => [],
+                'kodim' => [],
+                'binary' => '',
+            ];
         }
 
         $latestSync = Carbon::parse($latestSyncRaw)->toIso8601String();
-        $cacheKey = 'monitoring:koperasi-sarpras-status-points:'.$latestSync;
+        $cacheKey = 'monitoring:koperasi-sarpras-status-points-binary:'.$latestSync;
 
         return Cache::remember($cacheKey, self::MAP_POINTS_CACHE_TTL_SECONDS, function () use ($latestSync): array {
             $sdmByNik = SdmKdkmpEntry::query()->pluck('jumlah_karyawan', 'nik');
@@ -151,60 +201,119 @@ class MonitoringDashboardService
                 ->get(['nik', 'has_po', 'has_receipt', 'has_sales'])
                 ->keyBy('nik');
 
-            $points = KoperasiSarprasStatusPoint::query()
-                ->cursor()
-                ->map(fn (KoperasiSarprasStatusPoint $point): array => $this->buildMapPoint($point, $sdmByNik, $odooByNik))
-                ->all();
+            $provinsiTable = [];
+            $provinsiLookup = [];
+            $kotaKabupatenTable = [];
+            $kotaKabupatenLookup = [];
+            $kecamatanTable = [];
+            $kecamatanLookup = [];
+            $validationStatusTable = [];
+            $validationStatusLookup = [];
+
+            $lat = [];
+            $lng = [];
+            $provinsiIdx = [];
+            $kotaKabupatenIdx = [];
+            $kecamatanIdx = [];
+            $jumlahKaryawan = [];
+            $validationStatusIdx = [];
+            $progress = [];
+            $completedSarprasCount = [];
+            $flags = [];
+            $tierIdx = [];
+            $colorIdx = [];
+            $nik = [];
+            $nama = [];
+            $kodim = [];
+
+            foreach (KoperasiSarprasStatusPoint::query()->cursor() as $point) {
+                $nikValue = $point->nik;
+                $progressValue = $point->progress_percentage;
+                $jumlahKaryawanValue = $nikValue ? (int) ($sdmByNik[$nikValue] ?? 0) : 0;
+                $odoo = $nikValue ? $odooByNik->get($nikValue) : null;
+
+                [$tier, $color] = $this->resolveMarker($point, $progressValue, $jumlahKaryawanValue, $odoo);
+
+                $lat[] = (float) $point->lat;
+                $lng[] = (float) $point->lng;
+                $provinsiIdx[] = $this->internString($provinsiTable, $provinsiLookup, $point->provinsi);
+                $kotaKabupatenIdx[] = $this->internString($kotaKabupatenTable, $kotaKabupatenLookup, $point->kota_kabupaten);
+                $kecamatanIdx[] = $this->internString($kecamatanTable, $kecamatanLookup, $point->kecamatan);
+                $jumlahKaryawan[] = $jumlahKaryawanValue;
+                $validationStatusIdx[] = $this->internString($validationStatusTable, $validationStatusLookup, $point->validation_status);
+                $progress[] = (int) round($progressValue);
+                $completedSarprasCount[] = (int) $point->completed_sarpras_count;
+
+                $flagByte = 0;
+                $flagByte |= $point->sarpras_primary_lengkap ? self::FLAG_SARPRAS_PRIMARY : 0;
+                $flagByte |= $point->sarpras_secondary_lengkap ? self::FLAG_SARPRAS_SECONDARY : 0;
+                $flagByte |= $point->sarpras_lengkap ? self::FLAG_SARPRAS_LENGKAP : 0;
+                $flagByte |= ($odoo?->has_po ?? false) ? self::FLAG_HAS_PO : 0;
+                $flagByte |= ($odoo?->has_receipt ?? false) ? self::FLAG_HAS_RECEIPT : 0;
+                $flagByte |= ($odoo?->has_sales ?? false) ? self::FLAG_HAS_SALES : 0;
+                $flags[] = $flagByte;
+
+                $tierIdx[] = array_search($tier, self::MARKER_TIERS, true);
+                $colorIdx[] = array_search($color, self::MARKER_COLORS, true);
+
+                $nik[] = $nikValue;
+                $nama[] = $point->nama_koperasi;
+                $kodim[] = $point->kodim;
+            }
+
+            $binary =
+                pack('g*', ...$lat).
+                pack('g*', ...$lng).
+                pack('v*', ...$provinsiIdx).
+                pack('v*', ...$kotaKabupatenIdx).
+                pack('v*', ...$kecamatanIdx).
+                pack('v*', ...$jumlahKaryawan).
+                pack('C*', ...$validationStatusIdx).
+                pack('C*', ...$progress).
+                pack('C*', ...$completedSarprasCount).
+                pack('C*', ...$flags).
+                pack('C*', ...$tierIdx).
+                pack('C*', ...$colorIdx);
 
             return [
                 'status' => 'ok',
-                'points' => $points,
                 'fetched_at' => $latestSync,
+                'count' => count($lat),
+                'tables' => [
+                    'provinsi' => $provinsiTable,
+                    'kotaKabupaten' => $kotaKabupatenTable,
+                    'kecamatan' => $kecamatanTable,
+                    'validationStatus' => $validationStatusTable,
+                ],
+                'nik' => $nik,
+                'nama' => $nama,
+                'kodim' => $kodim,
+                'binary' => $binary,
             ];
         });
     }
 
     /**
-     * Dikembalikan sebagai tuple posisional (bukan object berkey) agar payload
-     * untuk sekitar 35 ribu titik tidak membengkak akibat pengulangan nama
-     * field. Urutan elemen harus selaras dengan MAP_POINT_FIELDS dan tipe
-     * MapPointTuple di resources/js/types/monitoring.ts.
+     * Mendaftarkan $value ke $table bila belum ada, mengembalikan index-nya.
+     * $lookup adalah peta value => index untuk pencarian O(1), supaya proses
+     * dedup ~36 ribu baris tidak jadi O(n^2).
      *
-     * @param  array<string, int>  $sdmByNik
-     * @param  Collection<string, KdkmpOperationalEntry>  $odooByNik
-     * @return array<string, mixed>
+     * @param  array<int, string>  $table
+     * @param  array<string, int>  $lookup
      */
-    private function buildMapPoint(KoperasiSarprasStatusPoint $point, $sdmByNik, $odooByNik): array
+    private function internString(array &$table, array &$lookup, ?string $value): int
     {
-        $nik = $point->nik;
-        $progress = $point->progress_percentage;
-        $jumlahKaryawan = $nik ? (int) ($sdmByNik[$nik] ?? 0) : 0;
-        $odoo = $nik ? $odooByNik->get($nik) : null;
+        $value ??= '';
 
-        [$tier, $color] = $this->resolveMarker($point, $progress, $jumlahKaryawan, $odoo);
+        if (isset($lookup[$value])) {
+            return $lookup[$value];
+        }
 
-        return [
-            $nik,
-            $point->nama_koperasi,
-            $point->provinsi,
-            $point->kota_kabupaten,
-            $point->kecamatan,
-            $point->kodim,
-            $point->lat,
-            $point->lng,
-            $point->validation_status,
-            $progress,
-            $point->completed_sarpras_count,
-            $point->sarpras_primary_lengkap,
-            $point->sarpras_secondary_lengkap,
-            $point->sarpras_lengkap,
-            $jumlahKaryawan,
-            (bool) ($odoo?->has_po ?? false),
-            (bool) ($odoo?->has_receipt ?? false),
-            (bool) ($odoo?->has_sales ?? false),
-            $tier,
-            $color,
-        ];
+        $index = count($table);
+        $table[] = $value;
+        $lookup[$value] = $index;
+
+        return $index;
     }
 
     /**
