@@ -45,6 +45,14 @@ export type SdmSummary = {
     total_karyawan: number;
 };
 
+export type OperasionalOdooSummary = {
+    total_kdkmp: number;
+    kdkmp_sudah_dibuatkan_po: number;
+    kdkmp_sudah_penerimaan_barang: number;
+    kdkmp_sudah_penjualan: number;
+    updated_at: string | null;
+};
+
 export type StockSummary = {
     stock_berputar: number;
     active_sku: number;
@@ -65,6 +73,7 @@ export type MonitoringDashboardProps = {
     sarpras: ExternalSection<SarprasCompletionSummary>;
     pemetaan_lahan: ExternalSection<PemetaanLahanStats>;
     sdm: SdmSummary;
+    operasional_odoo: OperasionalOdooSummary;
     stock: StockSummary;
     produk_subsidi: ProdukSubsidiSummary;
 };

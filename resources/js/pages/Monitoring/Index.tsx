@@ -118,30 +118,6 @@ function StatCard({
     );
 }
 
-function ComingSoonCard({
-    title,
-    icon: Icon,
-}: {
-    title: string;
-    icon: React.ElementType;
-}) {
-    return (
-        <Card className="border-l-4 border-dashed border-l-muted-foreground/40 bg-card">
-            <CardContent className="flex items-center justify-between p-5">
-                <div>
-                    <p className="text-sm text-muted-foreground">{title}</p>
-                    <Badge variant="outline" className="mt-2 text-xs">
-                        Coming soon
-                    </Badge>
-                </div>
-                <div className="rounded-full bg-muted-foreground/10 p-3 text-muted-foreground">
-                    <Icon className="h-5 w-5" />
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
 function SectionUnavailable({ label }: { label: string }) {
     return (
         <Card className="border-l-4 border-dashed border-l-amber-500">
@@ -269,6 +245,7 @@ export default function MonitoringIndex({
     sarpras,
     pemetaan_lahan: pemetaanLahan,
     sdm,
+    operasional_odoo: operasionalOdoo,
     stock,
     produk_subsidi: produkSubsidi,
 }: MonitoringDashboardProps) {
@@ -494,6 +471,44 @@ export default function MonitoringIndex({
                             Data diinput manual oleh tim HC.
                         </p>
                     </section>
+                    <section className="space-y-3">
+                        <SectionHeading
+                            icon={Construction}
+                            title="Operasional Odoo Lainnya"
+                            tone="default"
+                            updatedAt={operasionalOdoo.updated_at}
+                        />
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <StatCard
+                                title="KDKMP Sudah Dibuatkan PO"
+                                value={
+                                    operasionalOdoo.kdkmp_sudah_dibuatkan_po
+                                }
+                                icon={Package}
+                                tone="default"
+                            />
+                            <StatCard
+                                title="KDKMP Sudah Melakukan Penerimaan Barang"
+                                value={
+                                    operasionalOdoo.kdkmp_sudah_penerimaan_barang
+                                }
+                                icon={CheckCircle2}
+                                tone="success"
+                            />
+                            <StatCard
+                                title="KDKMP Sudah Melakukan Penjualan"
+                                value={operasionalOdoo.kdkmp_sudah_penjualan}
+                                icon={Tag}
+                                tone="warning"
+                            />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Data dihitung dari {operasionalOdoo.total_kdkmp}{' '}
+                            KDKMP hasil import Excel operasional. Kolom PO
+                            menjadi indikator PO, Receipt menjadi penerimaan
+                            barang, dan Sales menjadi penjualan.
+                        </p>
+                    </section>
 
                     <section className="space-y-3">
                         <SectionHeading
@@ -509,15 +524,21 @@ export default function MonitoringIndex({
                                 </Badge>
                             }
                         />
-                        <div className="grid gap-4 md:grid-cols-3">
-                            <StatCard
+                        <div className="grid gap-4 md:grid-cols-2">
+                            {/* <StatCard
                                 title="Stock Berputar"
                                 value={stock.stock_berputar}
                                 icon={Package}
                                 tone="default"
-                            />
+                            /> */}
                             <StatCard
                                 title="Active SKU"
+                                value={stock.active_sku}
+                                icon={Boxes}
+                                tone="success"
+                            />
+                            <StatCard
+                                title="Rata Rata SKU Active per KDKMP"
                                 value={stock.active_sku}
                                 icon={Boxes}
                                 tone="success"
@@ -628,36 +649,6 @@ export default function MonitoringIndex({
                             pada saat snapshot. Saat ini menggunakan data dummy
                             menunggu integrasi Odoo.
                         </p>
-                    </section>
-
-                    <section className="space-y-3">
-                        <SectionHeading
-                            icon={Construction}
-                            title="Operasional Odoo Lainnya"
-                            tone="default"
-                            action={
-                                <Badge
-                                    variant="outline"
-                                    className="ml-auto text-xs"
-                                >
-                                    Coming soon
-                                </Badge>
-                            }
-                        />
-                        <div className="grid gap-4 md:grid-cols-3">
-                            <ComingSoonCard
-                                title="KDKMP Sudah Dibuatkan PO"
-                                icon={Construction}
-                            />
-                            <ComingSoonCard
-                                title="KDKMP Sudah Melakukan Penerimaan Barang"
-                                icon={Construction}
-                            />
-                            <ComingSoonCard
-                                title="KDKMP Sudah Melakukan Penjualan"
-                                icon={Construction}
-                            />
-                        </div>
                     </section>
                 </div>
             </div>

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\KdkmpOperationalEntry;
 use App\Models\SdmKdkmpEntry;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -17,6 +18,7 @@ class MonitoringDashboardService
             'sarpras' => $this->sarprasCompletionSummary(),
             'pemetaan_lahan' => $this->pemetaanLahanStats(),
             'sdm' => $this->sdmSummary(),
+            'operasional_odoo' => $this->operasionalOdooSummary(),
             'stock' => $this->stockSummary(),
             'produk_subsidi' => $this->produkSubsidiSummary(),
         ];
@@ -81,6 +83,25 @@ class MonitoringDashboardService
         return [
             'jumlah_kdkmp_ditambahkan' => SdmKdkmpEntry::query()->where('jumlah_karyawan', '>', 0)->count(),
             'total_karyawan' => (int) SdmKdkmpEntry::query()->sum('jumlah_karyawan'),
+        ];
+    }
+
+    /**
+     * @return array{total_kdkmp: int, kdkmp_sudah_dibuatkan_po: int, kdkmp_sudah_penerimaan_barang: int, kdkmp_sudah_penjualan: int, updated_at: string|null}
+     */
+    public function operasionalOdooSummary(): array
+    {
+        $lastImportedEntry = KdkmpOperationalEntry::query()
+            ->whereNotNull('imported_at')
+            ->latest('imported_at')
+            ->first();
+
+        return [
+            'total_kdkmp' => KdkmpOperationalEntry::query()->count(),
+            'kdkmp_sudah_dibuatkan_po' => KdkmpOperationalEntry::query()->where('has_po', true)->count(),
+            'kdkmp_sudah_penerimaan_barang' => KdkmpOperationalEntry::query()->where('has_receipt', true)->count(),
+            'kdkmp_sudah_penjualan' => KdkmpOperationalEntry::query()->where('has_sales', true)->count(),
+            'updated_at' => $lastImportedEntry?->imported_at?->toIso8601String(),
         ];
     }
 
