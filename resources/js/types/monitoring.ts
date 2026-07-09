@@ -45,10 +45,28 @@ export type SdmSummary = {
     total_karyawan: number;
 };
 
+export type StockSummary = {
+    stock_berputar: number;
+    active_sku: number;
+    jumlah_sku: number;
+};
+
+export type ProdukSubsidiSummary = {
+    total_sku_subsidi: number;
+    availability: {
+        gerai: number;
+        kabupaten: number;
+        provinsi: number;
+        nasional: number;
+    };
+};
+
 export type MonitoringDashboardProps = {
     sarpras: ExternalSection<SarprasCompletionSummary>;
     pemetaan_lahan: ExternalSection<PemetaanLahanStats>;
     sdm: SdmSummary;
+    stock: StockSummary;
+    produk_subsidi: ProdukSubsidiSummary;
 };
 
 export type SdmEntry = {

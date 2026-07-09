@@ -17,6 +17,40 @@ class MonitoringDashboardService
             'sarpras' => $this->sarprasCompletionSummary(),
             'pemetaan_lahan' => $this->pemetaanLahanStats(),
             'sdm' => $this->sdmSummary(),
+            'stock' => $this->stockSummary(),
+            'produk_subsidi' => $this->produkSubsidiSummary(),
+        ];
+    }
+
+    /**
+     * Placeholder stock summary. Replace with Odoo integration.
+     *
+     * @return array{stock_berputar: int, active_sku: int, jumlah_sku: int}
+     */
+    public function stockSummary(): array
+    {
+        return [
+            'stock_berputar' => 12450,
+            'active_sku' => 482,
+            'jumlah_sku' => 615,
+        ];
+    }
+
+    /**
+     * Placeholder produk subsidi summary. Replace with Odoo integration.
+     *
+     * @return array{total_sku_subsidi: int, availability: array{gerai: float, kabupaten: float, provinsi: float, nasional: float}}
+     */
+    public function produkSubsidiSummary(): array
+    {
+        return [
+            'total_sku_subsidi' => 38,
+            'availability' => [
+                'gerai' => 72.4,
+                'kabupaten' => 80.1,
+                'provinsi' => 85.6,
+                'nasional' => 89.2,
+            ],
         ];
     }
 

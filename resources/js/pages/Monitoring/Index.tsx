@@ -1,14 +1,19 @@
 import { Head, Link, usePoll } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Boxes,
     Building2,
     CheckCircle2,
     ChevronRight,
     Clock,
     Construction,
     FileWarning,
+    Layers,
     Map,
+    Package,
+    Percent,
     ShieldCheck,
+    Tag,
     Users,
 } from 'lucide-react';
 import IndicatorBarChart from '@/components/monitoring/IndicatorBarChart';
@@ -151,10 +156,121 @@ function SectionUnavailable({ label }: { label: string }) {
     );
 }
 
+function formatPercent(value: number) {
+    return `${value.toLocaleString('id-ID', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+    })}%`;
+}
+
+function AvailabilityBar({
+    label,
+    value,
+    tone = 'default',
+}: {
+    label: string;
+    value: number;
+    tone?: Tone;
+}) {
+    const clamped = Math.max(0, Math.min(100, value));
+
+    return (
+        <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-foreground">{label}</span>
+                <span className={`tabular-nums ${TONE_TEXT[tone]}`}>
+                    {formatPercent(clamped)}
+                </span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                    className={`h-full rounded-full ${TONE_BG[tone]}`}
+                    style={{
+                        width: `${clamped}%`,
+                        backgroundColor:
+                            tone === 'success'
+                                ? '#059669'
+                                : tone === 'warning'
+                                  ? '#d97706'
+                                  : tone === 'danger'
+                                    ? '#dc2626'
+                                    : tone === 'neutral'
+                                      ? '#94a3b8'
+                                      : '#2563eb',
+                    }}
+                />
+            </div>
+        </div>
+    );
+}
+
+function AvailabilityBreakdown({
+    availability,
+}: {
+    availability: {
+        gerai: number;
+        kabupaten: number;
+        provinsi: number;
+        nasional: number;
+    };
+}) {
+    const toneFor = (value: number): Tone => {
+        if (value >= 90) {
+            return 'success';
+        }
+
+        if (value >= 70) {
+            return 'warning';
+        }
+
+        return 'danger';
+    };
+
+    const levels: Array<{
+        key: keyof typeof availability;
+        label: string;
+    }> = [
+        { key: 'gerai', label: 'Gerai' },
+        { key: 'kabupaten', label: 'Kabupaten / Kota' },
+        { key: 'provinsi', label: 'Provinsi' },
+        { key: 'nasional', label: 'Nasional' },
+    ];
+
+    return (
+        <Card className="border bg-card shadow-sm">
+            <CardContent className="space-y-4 p-5">
+                <div className="flex items-center gap-2">
+                    <Percent className="h-4 w-4 text-primary" />
+                    <p className="text-sm font-semibold text-foreground">
+                        Availability per Level Wilayah
+                    </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                    {levels.map((level) => (
+                        <AvailabilityBar
+                            key={level.key}
+                            label={level.label}
+                            value={availability[level.key]}
+                            tone={toneFor(availability[level.key])}
+                        />
+                    ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                    Availability dihitung dari proporsi gerai KDKMP yang
+                    memiliki SKU subsidi tersedia pada saat snapshot data
+                    terakhir.
+                </p>
+            </CardContent>
+        </Card>
+    );
+}
+
 export default function MonitoringIndex({
     sarpras,
     pemetaan_lahan: pemetaanLahan,
     sdm,
+    stock,
+    produk_subsidi: produkSubsidi,
 }: MonitoringDashboardProps) {
     usePoll(30000);
 
@@ -381,8 +497,143 @@ export default function MonitoringIndex({
 
                     <section className="space-y-3">
                         <SectionHeading
+                            icon={Package}
+                            title="Stock"
+                            tone="default"
+                            action={
+                                <Badge
+                                    variant="outline"
+                                    className="ml-auto text-xs"
+                                >
+                                    Dummy
+                                </Badge>
+                            }
+                        />
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <StatCard
+                                title="Stock Berputar"
+                                value={stock.stock_berputar}
+                                icon={Package}
+                                tone="default"
+                            />
+                            <StatCard
+                                title="Active SKU"
+                                value={stock.active_sku}
+                                icon={Boxes}
+                                tone="success"
+                            />
+                            <StatCard
+                                title="Jumlah SKU"
+                                value={stock.jumlah_sku}
+                                icon={Layers}
+                                tone="neutral"
+                            />
+                        </div>
+                        <IndicatorBarChart
+                            title="Perbandingan Indikator Stock"
+                            data={[
+                                {
+                                    label: 'Stock Berputar',
+                                    value: stock.stock_berputar,
+                                    tone: 'default',
+                                },
+                                {
+                                    label: 'Active SKU',
+                                    value: stock.active_sku,
+                                    tone: 'success',
+                                },
+                                {
+                                    label: 'Jumlah SKU',
+                                    value: stock.jumlah_sku,
+                                    tone: 'neutral',
+                                },
+                            ]}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Stock Berputar: total unit yang berpindah dalam
+                            periode snapshot. Active SKU: SKU yang sedang
+                            dijual/dipasok. Jumlah SKU: total SKU terdaftar di
+                            master data Odoo. Saat ini menggunakan data dummy
+                            menunggu integrasi Odoo.
+                        </p>
+                    </section>
+
+                    <section className="space-y-3">
+                        <SectionHeading
+                            icon={Tag}
+                            title="Produk Subsidi"
+                            tone="default"
+                            action={
+                                <Badge
+                                    variant="outline"
+                                    className="ml-auto text-xs"
+                                >
+                                    Dummy
+                                </Badge>
+                            }
+                        />
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <StatCard
+                                title="SKU Subsidi (Flagging)"
+                                value={produkSubsidi.total_sku_subsidi}
+                                icon={Tag}
+                                tone="warning"
+                            />
+                            <StatCard
+                                title="Availability Nasional"
+                                value={produkSubsidi.availability.nasional}
+                                icon={Percent}
+                                tone={
+                                    produkSubsidi.availability.nasional >= 90
+                                        ? 'success'
+                                        : produkSubsidi.availability.nasional >=
+                                            70
+                                          ? 'warning'
+                                          : 'danger'
+                                }
+                            />
+                            <Card
+                                className={`border-l-4 bg-card shadow-sm ${TONE_BORDER['neutral']}`}
+                            >
+                                <CardContent className="flex items-center justify-between p-5">
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">
+                                            Rasio Subsidi
+                                        </p>
+                                        <p className="mt-1 text-2xl font-bold tabular-nums">
+                                            {formatPercent(
+                                                stock.jumlah_sku > 0
+                                                    ? (produkSubsidi.total_sku_subsidi /
+                                                          stock.jumlah_sku) *
+                                                          100
+                                                    : 0,
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div
+                                        className={`rounded-full p-3 ${TONE_BG['warning']} ${TONE_TEXT['warning']}`}
+                                    >
+                                        <Tag className="h-5 w-5" />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                        <AvailabilityBreakdown
+                            availability={produkSubsidi.availability}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Flagging SKU subsidi mengikuti master penandaan
+                            subsidi di Odoo. Availability menunjukkan
+                            persentase gerai yang memiliki stok SKU subsidi
+                            pada saat snapshot. Saat ini menggunakan data dummy
+                            menunggu integrasi Odoo.
+                        </p>
+                    </section>
+
+                    <section className="space-y-3">
+                        <SectionHeading
                             icon={Construction}
-                            title="Data Odoo"
+                            title="Operasional Odoo Lainnya"
                             tone="default"
                             action={
                                 <Badge
