@@ -1177,17 +1177,15 @@ export default function KoperasiMap() {
         >
             <CardContent className="space-y-4 p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-muted-foreground">
-                        Peta Sebaran KDKMP (WebGL)
+                    <p className="text-sm text-muted-foreground">
                         {status === 'ok' && (
-                            <span className="ml-2 text-xs text-muted-foreground">
-                                (menampilkan{' '}
+                            <>
+                                Menampilkan{' '}
                                 {visibleCount.toLocaleString('id-ID')} dari{' '}
                                 {pointCount.toLocaleString('id-ID')} titik
                                 {fetchedAt &&
                                     `, update ${new Date(fetchedAt).toLocaleString('id-ID')}`}
-                                )
-                            </span>
+                            </>
                         )}
                     </p>
                     <div className="flex items-center gap-2">
