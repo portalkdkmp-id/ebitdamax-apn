@@ -531,6 +531,36 @@ function pointMatches(
     return true;
 }
 
+const WORLD_MAX_LAT = 85.0511287798;
+
+/** Rumus Spherical Mercator EPSG:3857 di zoom referensi 0 (dunia 256x256),
+ * sama seperti perhitungan manual di rebuildBuffer(). worldX linear naik
+ * terhadap lng, worldY monoton turun terhadap lat - jadi bounding box
+ * lat/lng tetap axis-aligned di ruang world ini. */
+function latLngToWorld(lat: number, lng: number): { x: number; y: number } {
+    const clampedLat = Math.max(Math.min(lat, WORLD_MAX_LAT), -WORLD_MAX_LAT);
+    const sinLat = Math.sin((clampedLat * Math.PI) / 180);
+
+    return {
+        x: 128 * (1 + lng / 180),
+        y: 128 - (64 * Math.log((1 + sinLat) / (1 - sinLat))) / Math.PI,
+    };
+}
+
+// Grid spasial atas ruang world (256x256) buat query "titik dalam viewport"
+// tanpa scan seluruh titik ter-buffer - dipakai refreshVisibleForUI() saat
+// dataset besar supaya biaya query sebanding jumlah titik yang KELIHATAN,
+// bukan jumlah total titik yang lolos filter.
+const GRID_CELLS = 128;
+const GRID_CELL_SIZE = 256 / GRID_CELLS;
+
+function worldToCell(coord: number): number {
+    return Math.max(
+        0,
+        Math.min(GRID_CELLS - 1, Math.floor(coord / GRID_CELL_SIZE)),
+    );
+}
+
 // --- Sprite atlas: 24 kombinasi tier x warna digambar sekali ke satu bitmap
 // grid, lalu di-upload sebagai satu texture WebGL. Setiap titik hanya perlu
 // menyimpan index sel di atlas (bukan bitmap terpisah).
@@ -909,9 +939,11 @@ export default function KoperasiMap() {
 
         // Posisi dunia (world position, zoom referensi 0) diupload ke GPU
         // sekali setiap kali data atau filter provinsi/kab-kota/kecamatan/
-        // status berubah - BUKAN setiap pan/zoom. Index array ini dipetakan
-        // ke dataRef supaya bisa ditelusuri balik saat hit-test klik.
-        let bufferedIndices: number[] = [];
+        // status berubah - BUKAN setiap pan/zoom. Grid spasial dibangun
+        // bersamaan (pakai worldX/worldY yang sudah dihitung), dipakai
+        // refreshVisibleForUI() buat query titik dalam viewport tanpa scan
+        // semua titik ter-buffer.
+        let grid = new Map<number, number[]>();
 
         const rebuildBuffer = () => {
             const points = dataRef.current;
@@ -928,7 +960,7 @@ export default function KoperasiMap() {
             // overhead pemanggilan fungsi/alokasi objek Leaflet per titik.
             const worldPositions = new Float32Array(n * 2);
             const texIndices = new Float32Array(n);
-            const indices: number[] = [];
+            const nextGrid = new Map<number, number[]>();
             let count = 0;
             const DEG2RAD = Math.PI / 180;
             const MAX_LAT = 85.0511287798;
@@ -957,8 +989,17 @@ export default function KoperasiMap() {
                 worldPositions[count * 2] = worldX;
                 worldPositions[count * 2 + 1] = worldY;
                 texIndices[count] = spriteIndex;
-                indices.push(i);
                 count++;
+
+                const cellKey =
+                    worldToCell(worldY) * GRID_CELLS + worldToCell(worldX);
+                const bucket = nextGrid.get(cellKey);
+
+                if (bucket) {
+                    bucket.push(i);
+                } else {
+                    nextGrid.set(cellKey, [i]);
+                }
             }
 
             const { gl } = glState;
@@ -976,7 +1017,7 @@ export default function KoperasiMap() {
             );
 
             glState.renderCount = count;
-            bufferedIndices = indices;
+            grid = nextGrid;
         };
 
         // Canvas berada di dalam pane khusus yang otomatis ikut ditransformasi
@@ -1059,9 +1100,10 @@ export default function KoperasiMap() {
         };
 
         // Dipakai buat hit-test klik dan angka "menampilkan X dari Y titik"
-        // di UI - scan O(n) ini terpisah dari render() (yang sekarang O(1)
-        // per pan/zoom), jadi tetap dijalankan tiap moveend tapi tidak lagi
-        // memblokir/menunda gambar ulang titik di GPU.
+        // di UI - query grid spasial (bukan scan semua titik ter-buffer)
+        // terpisah dari render() (yang sekarang O(1) per pan/zoom), jadi
+        // tetap dijalankan tiap moveend tapi tidak lagi memblokir/menunda
+        // gambar ulang titik di GPU.
         const refreshVisibleForUI = () => {
             const points = dataRef.current;
 
@@ -1073,20 +1115,41 @@ export default function KoperasiMap() {
             const nextDrawn: DrawnPoint[] = [];
             const topLeft = lastTopLeft;
 
-            for (const i of bufferedIndices) {
-                const lat = points.lat[i];
-                const lng = points.lng[i];
+            // worldY turun monoton terhadap lat, worldX naik monoton
+            // terhadap lng, jadi bounding box lat/lng tetap axis-aligned
+            // di ruang world - sudut barat-laut/tenggara cukup buat
+            // menentukan rentang sel grid yang perlu di-scan.
+            const nw = latLngToWorld(bounds.getNorth(), bounds.getWest());
+            const se = latLngToWorld(bounds.getSouth(), bounds.getEast());
+            const minCellX = worldToCell(nw.x);
+            const maxCellX = worldToCell(se.x);
+            const minCellY = worldToCell(nw.y);
+            const maxCellY = worldToCell(se.y);
 
-                if (!bounds.contains([lat, lng])) {
-                    continue;
+            for (let cellY = minCellY; cellY <= maxCellY; cellY++) {
+                for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
+                    const bucket = grid.get(cellY * GRID_CELLS + cellX);
+
+                    if (!bucket) {
+                        continue;
+                    }
+
+                    for (const i of bucket) {
+                        const lat = points.lat[i];
+                        const lng = points.lng[i];
+
+                        if (!bounds.contains([lat, lng])) {
+                            continue;
+                        }
+
+                        const layerPoint = map.latLngToLayerPoint([lat, lng]);
+                        nextDrawn.push({
+                            x: layerPoint.x - topLeft.x,
+                            y: layerPoint.y - topLeft.y,
+                            index: i,
+                        });
+                    }
                 }
-
-                const layerPoint = map.latLngToLayerPoint([lat, lng]);
-                nextDrawn.push({
-                    x: layerPoint.x - topLeft.x,
-                    y: layerPoint.y - topLeft.y,
-                    index: i,
-                });
             }
 
             drawnPoints = nextDrawn;
