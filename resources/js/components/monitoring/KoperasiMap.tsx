@@ -20,6 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Toggle } from '@/components/ui/toggle';
 import {
     mapPoints as mapPointsMetaRoute,
     mapPointsBinary as mapPointsBinaryRoute,
@@ -38,6 +39,11 @@ const COLOR_HEX: Record<MarkerColor, string> = {
     blue: '#2563eb',
     gray: '#9ca3af',
 };
+
+const ATLAS_TIERS: MarkerTier[] = ['status', 'sarpras', 'sdm', 'odoo'];
+const ATLAS_COLORS = Object.keys(COLOR_HEX) as MarkerColor[];
+const ATLAS_COLS = ATLAS_COLORS.length;
+const ATLAS_ROWS = ATLAS_TIERS.length;
 
 const SPRITE_SIZE = 22;
 const SPRITE_RADIUS = SPRITE_SIZE / 2;
@@ -276,16 +282,30 @@ function LegendGroup({
     tier,
     title,
     items,
+    active,
+    onToggle,
 }: {
     tier: MarkerTier;
     title: string;
     items: Array<{ color: MarkerColor; label: string }>;
+    active: boolean;
+    onToggle: () => void;
 }) {
     return (
-        <div>
-            <p className="mb-1.5 text-xs font-semibold text-foreground">
-                {title}
-            </p>
+        <div className={active ? undefined : 'opacity-40'}>
+            <div className="mb-1.5 flex items-center gap-1.5">
+                <p className="text-xs font-semibold text-foreground">{title}</p>
+                <Toggle
+                    size="sm"
+                    variant="outline"
+                    pressed={active}
+                    onPressedChange={onToggle}
+                    className="h-5 min-w-9 px-1.5 text-[10px] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                    aria-label={`Tampilkan ${title}`}
+                >
+                    {active ? 'On' : 'Off'}
+                </Toggle>
+            </div>
             <div className="space-y-1">
                 {items.map((item) => (
                     <div
@@ -454,14 +474,17 @@ type Filters = {
     provinsi: string;
     kotaKabupaten: string;
     kecamatan: string;
-    tier: string;
+    /** Multi-select - dropdown "Semua Status" dan toggle per kategori di
+     * legend sama-sama membaca/menulis Set ini, jadi keduanya selalu
+     * sinkron. Kosong berarti semua kategori disembunyikan. */
+    tiers: Set<MarkerTier>;
 };
 
 const DEFAULT_FILTERS: Filters = {
     provinsi: ALL,
     kotaKabupaten: ALL,
     kecamatan: ALL,
-    tier: ALL,
+    tiers: new Set(ATLAS_TIERS),
 };
 
 /** Filter (string dari dropdown) diresolusi ke index tabel sekali per
@@ -471,7 +494,8 @@ type ResolvedFilters = {
     provinsiIdx: number;
     kotaKabupatenIdx: number;
     kecamatanIdx: number;
-    tierIdx: number;
+    /** Index ke-n bernilai true kalau ATLAS_TIERS[n] aktif di filter. */
+    tierMask: boolean[];
 };
 
 function resolveFilters(
@@ -491,10 +515,7 @@ function resolveFilters(
             filters.kecamatan === ALL
                 ? -1
                 : data.kecamatanTable.indexOf(filters.kecamatan),
-        tierIdx:
-            filters.tier === ALL
-                ? -1
-                : ATLAS_TIERS.indexOf(filters.tier as MarkerTier),
+        tierMask: ATLAS_TIERS.map((tier) => filters.tiers.has(tier)),
     };
 }
 
@@ -524,7 +545,7 @@ function pointMatches(
         return false;
     }
 
-    if (resolved.tierIdx !== -1 && data.tierIdx[i] !== resolved.tierIdx) {
+    if (!resolved.tierMask[data.tierIdx[i]]) {
         return false;
     }
 
@@ -564,10 +585,6 @@ function worldToCell(coord: number): number {
 // --- Sprite atlas: 24 kombinasi tier x warna digambar sekali ke satu bitmap
 // grid, lalu di-upload sebagai satu texture WebGL. Setiap titik hanya perlu
 // menyimpan index sel di atlas (bukan bitmap terpisah).
-const ATLAS_TIERS: MarkerTier[] = ['status', 'sarpras', 'sdm', 'odoo'];
-const ATLAS_COLORS = Object.keys(COLOR_HEX) as MarkerColor[];
-const ATLAS_COLS = ATLAS_COLORS.length;
-const ATLAS_ROWS = ATLAS_TIERS.length;
 const ATLAS_CELL = 32;
 
 function buildSpriteAtlasCanvas(): HTMLCanvasElement {
@@ -1355,7 +1372,7 @@ export default function KoperasiMap() {
             requestAnimationFrame(() => {
                 rebuildBufferRef.current();
 
-                if ('tier' in patch && Object.keys(patch).length === 1) {
+                if ('tiers' in patch && Object.keys(patch).length === 1) {
                     drawRef.current();
                 } else {
                     fitToFilterRef.current();
@@ -1364,6 +1381,30 @@ export default function KoperasiMap() {
 
             return next;
         });
+    };
+
+    // Dropdown "Semua Status" dan toggle per kategori di legend sama-sama
+    // menulis filters.tiers lewat updateFilter() - keduanya selalu sinkron
+    // karena berbagi satu state.
+    const setTierPreset = (value: string) => {
+        updateFilter({
+            tiers:
+                value === ALL
+                    ? new Set(ATLAS_TIERS)
+                    : new Set([value as MarkerTier]),
+        });
+    };
+
+    const toggleTier = (tier: MarkerTier) => {
+        const next = new Set(filtersRef.current.tiers);
+
+        if (next.has(tier)) {
+            next.delete(tier);
+        } else {
+            next.add(tier);
+        }
+
+        updateFilter({ tiers: next });
     };
 
     const resetFilters = () => {
@@ -1594,13 +1635,17 @@ export default function KoperasiMap() {
                         />
 
                         <Select
-                            value={filters.tier}
-                            onValueChange={(value) =>
-                                updateFilter({ tier: value })
+                            value={
+                                filters.tiers.size === ATLAS_TIERS.length
+                                    ? ALL
+                                    : filters.tiers.size === 1
+                                      ? [...filters.tiers][0]
+                                      : ''
                             }
+                            onValueChange={setTierPreset}
                         >
                             <SelectTrigger size="sm" className="w-[160px]">
-                                <SelectValue placeholder="Semua Status" />
+                                <SelectValue placeholder="Sebagian kategori" />
                             </SelectTrigger>
                             <SelectContent className="z-[1200]">
                                 <SelectItem value={ALL}>
@@ -1659,6 +1704,8 @@ export default function KoperasiMap() {
                             },
                             { color: 'green', label: 'Mulai pembangunan' },
                         ]}
+                        active={filters.tiers.has('status')}
+                        onToggle={() => toggleTier('status')}
                     />
                     <LegendGroup
                         tier="sarpras"
@@ -1671,6 +1718,8 @@ export default function KoperasiMap() {
                             },
                             { color: 'green', label: 'Sarpras esensial 2' },
                         ]}
+                        active={filters.tiers.has('sarpras')}
+                        onToggle={() => toggleTier('sarpras')}
                     />
                     <LegendGroup
                         tier="sdm"
@@ -1683,6 +1732,8 @@ export default function KoperasiMap() {
                                 label: 'SDM 6 orang (lengkap)',
                             },
                         ]}
+                        active={filters.tiers.has('sdm')}
+                        onToggle={() => toggleTier('sdm')}
                     />
                     <LegendGroup
                         tier="odoo"
@@ -1695,6 +1746,8 @@ export default function KoperasiMap() {
                             },
                             { color: 'blue', label: 'Sudah penjualan' },
                         ]}
+                        active={filters.tiers.has('odoo')}
+                        onToggle={() => toggleTier('odoo')}
                     />
                 </div>
                 <p className="text-xs text-muted-foreground">
