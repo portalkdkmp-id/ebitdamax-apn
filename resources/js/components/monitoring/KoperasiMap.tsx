@@ -1044,10 +1044,6 @@ export default function KoperasiMap() {
         // dilakukan GPU lewat uniform u_scale/u_origin (lihat vertex
         // shader) - fungsi ini tidak lagi melakukan loop atas seluruh titik.
         const render = () => {
-            if (glState.renderCount === 0) {
-                return;
-            }
-
             const size = map.getSize();
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
             canvas.width = Math.round(size.x * dpr);
