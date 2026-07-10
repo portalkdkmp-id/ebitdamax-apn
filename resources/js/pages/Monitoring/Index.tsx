@@ -1,6 +1,8 @@
 import { Head, Link, usePoll } from '@inertiajs/react';
 import {
     AlertTriangle,
+    ArrowDown,
+    ArrowUp,
     Boxes,
     Building2,
     CheckCircle2,
@@ -14,9 +16,11 @@ import {
     Percent,
     ShieldCheck,
     Tag,
+    TrendingUp,
     Users,
 } from 'lucide-react';
 import IndicatorBarChart from '@/components/monitoring/IndicatorBarChart';
+import KdkmpSkuDistributionChart from '@/components/monitoring/KdkmpSkuDistributionChart';
 import KoperasiMap from '@/components/monitoring/KoperasiMap';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -521,7 +525,7 @@ export default function MonitoringIndex({
                     <section className="space-y-3">
                         <SectionHeading
                             icon={Package}
-                            title="Stock"
+                            title="Stock & SKU"
                             tone="default"
                             action={
                                 <Badge
@@ -532,65 +536,106 @@ export default function MonitoringIndex({
                                 </Badge>
                             }
                         />
-                        <div className="grid gap-4 md:grid-cols-2">
-                            {/* <StatCard
-                                title="Stock Berputar"
-                                value={stock.stock_berputar}
-                                icon={Package}
-                                tone="default"
-                            /> */}
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                             <StatCard
-                                title="Active SKU"
-                                value={stock.active_sku}
-                                icon={Boxes}
-                                tone="success"
-                            />
-                            <StatCard
-                                title="Rata Rata SKU Active per KDKMP"
-                                value={stock.active_sku}
-                                icon={Boxes}
-                                tone="success"
-                            />
-                            <StatCard
-                                title="Jumlah SKU"
-                                value={stock.jumlah_sku}
+                                title="Jumlah SKU Terdaftar"
+                                value={stock.jumlah_sku_terdaftar}
                                 icon={Layers}
-                                tone="neutral"
+                                tone="default"
+                            />
+                            <StatCard
+                                title="Jumlah SKU Aktif"
+                                value={stock.jumlah_sku_aktif}
+                                icon={Boxes}
+                                tone="success"
+                            />
+                            <StatCard
+                                title="Jumlah SKU Subsidi"
+                                value={stock.jumlah_sku_subsidi}
+                                icon={Tag}
+                                tone="warning"
+                            />
+                            <StatCard
+                                title="Rata-rata SKU per KDKMP"
+                                value={stock.rata_rata_sku_per_kdkmp}
+                                icon={TrendingUp}
+                                tone="default"
+                            />
+                            <StatCard
+                                title="MIN SKU di KDKMP"
+                                value={stock.min_sku_kdkmp}
+                                icon={ArrowDown}
+                                tone="danger"
+                            />
+                            <StatCard
+                                title="MAX SKU di KDKMP"
+                                value={stock.max_sku_kdkmp}
+                                icon={ArrowUp}
+                                tone="success"
                             />
                         </div>
                         <IndicatorBarChart
-                            title="Perbandingan Indikator Stock"
+                            title="Perbandingan Indikator SKU"
                             data={[
                                 {
-                                    label: 'Stock Berputar',
-                                    value: stock.stock_berputar,
+                                    label: 'Jumlah Total SKU',
+                                    value: stock.jumlah_sku_terdaftar,
                                     tone: 'default',
                                 },
                                 {
-                                    label: 'Active SKU',
-                                    value: stock.active_sku,
+                                    label: 'Jumlah SKU Aktif',
+                                    value: stock.jumlah_sku_aktif,
                                     tone: 'success',
                                 },
                                 {
-                                    label: 'Jumlah SKU',
-                                    value: stock.jumlah_sku,
-                                    tone: 'neutral',
+                                    label: 'Rata-rata SKU per KDKMP',
+                                    value: stock.rata_rata_sku_per_kdkmp,
+                                    tone: 'warning',
                                 },
                             ]}
                         />
                         <p className="text-xs text-muted-foreground">
-                            Stock Berputar: total unit yang berpindah dalam
-                            periode snapshot. Active SKU: SKU yang sedang
-                            dijual/dipasok. Jumlah SKU: total SKU terdaftar di
-                            master data Odoo. Saat ini menggunakan data dummy
-                            menunggu integrasi Odoo.
+                            Data dihitung dari {stock.total_kdkmp} KDKMP hasil
+                            snapshot master data SKU. SKU Terdaftar mencakup
+                            seluruh SKU di master, SKU Aktif adalah yang
+                            dipasarkan/dipasok, dan SKU Subsidi mengikuti
+                            penandaan subsidi Odoo. Saat ini menggunakan data
+                            dummy menunggu integrasi Odoo.
                         </p>
                     </section>
 
                     <section className="space-y-3">
                         <SectionHeading
                             icon={Tag}
-                            title="Produk Subsidi"
+                            title="Distribusi SKU per KDKMP"
+                            tone="default"
+                            action={
+                                <Badge
+                                    variant="outline"
+                                    className="ml-auto text-xs"
+                                >
+                                    Dummy
+                                </Badge>
+                            }
+                        />
+                        <KdkmpSkuDistributionChart
+                            title="Jumlah SKU per KDKMP (urut SKU terkecil ke terbesar)"
+                            description={`${stock.total_kdkmp} KDKMP, diurutkan menaik. Garis putus-putus menandai rata-rata ${stock.rata_rata_sku_per_kdkmp} SKU.`}
+                            data={stock.distribusi_per_kdkmp}
+                            average={stock.rata_rata_sku_per_kdkmp}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Setiap bar mewakili satu KDKMP. Hover untuk melihat
+                            nama KDKMP dan jumlah SKU. Garis merah putus-putus
+                            adalah rata-rata nasional untuk memudahkan
+                            identifikasi KDKMP di atas/bawah rata-rata.
+                        </p>
+                    </section>
+
+                    <section className="space-y-3">
+                        <SectionHeading
+                            icon={Percent}
+                            title="Availability Produk Subsidi"
                             tone="default"
                             action={
                                 <Badge
@@ -602,12 +647,6 @@ export default function MonitoringIndex({
                             }
                         />
                         <div className="grid gap-4 md:grid-cols-3">
-                            <StatCard
-                                title="SKU Subsidi (Flagging)"
-                                value={produkSubsidi.total_sku_subsidi}
-                                icon={Tag}
-                                tone="warning"
-                            />
                             <StatCard
                                 title="Availability Nasional"
                                 value={produkSubsidi.availability.nasional}
@@ -631,9 +670,9 @@ export default function MonitoringIndex({
                                         </p>
                                         <p className="mt-1 text-2xl font-bold tabular-nums">
                                             {formatPercent(
-                                                stock.jumlah_sku > 0
-                                                    ? (produkSubsidi.total_sku_subsidi /
-                                                          stock.jumlah_sku) *
+                                                stock.jumlah_sku_terdaftar > 0
+                                                    ? (stock.jumlah_sku_subsidi /
+                                                          stock.jumlah_sku_terdaftar) *
                                                           100
                                                     : 0,
                                             )}
@@ -646,14 +685,19 @@ export default function MonitoringIndex({
                                     </div>
                                 </CardContent>
                             </Card>
+                            <StatCard
+                                title="Kontribusi KDKMP"
+                                value={stock.total_kdkmp}
+                                icon={Building2}
+                                tone="default"
+                            />
                         </div>
                         <AvailabilityBreakdown
                             availability={produkSubsidi.availability}
                         />
                         <p className="text-xs text-muted-foreground">
-                            Flagging SKU subsidi mengikuti master penandaan
-                            subsidi di Odoo. Availability menunjukkan persentase
-                            gerai yang memiliki stok SKU subsidi pada saat
+                            Availability menunjukkan persentase gerai KDKMP
+                            yang memiliki SKU subsidi tersedia pada saat
                             snapshot. Saat ini menggunakan data dummy menunggu
                             integrasi Odoo.
                         </p>

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\KdkmpOperationalEntry;
 use App\Models\KoperasiSarprasStatusPoint;
 use App\Models\SdmKdkmpEntry;
 use Illuminate\Support\Carbon;
@@ -31,26 +30,54 @@ class MonitoringDashboardService
     /**
      * Placeholder stock summary. Replace with Odoo integration.
      *
-     * @return array{stock_berputar: int, active_sku: int, jumlah_sku: int}
+     * @return array{
+     *     jumlah_sku_terdaftar: int,
+     *     jumlah_sku_aktif: int,
+     *     jumlah_sku_subsidi: int,
+     *     rata_rata_sku_per_kdkmp: int,
+     *     min_sku_kdkmp: int,
+     *     max_sku_kdkmp: int,
+     *     total_kdkmp: int,
+     *     distribusi_per_kdkmp: array<int, array{kdkmp_id: int, nama: string, sku_count: int}>
+     * }
      */
     public function stockSummary(): array
     {
+        $totalKdkmp = 1112;
+        $jumlahSkuTerdaftar = 1080;
+        $jumlahSkuAktif = 521;
+        $jumlahSkuSubsidi = 38;
+        $avg = 155;
+        $min = 1;
+        $max = 325;
+
+        $distribution = $this->buildDummySkuDistribution(
+            totalKdkmp: $totalKdkmp,
+            avg: $avg,
+            min: $min,
+            max: $max,
+        );
+
         return [
-            'stock_berputar' => 12450,
-            'active_sku' => 482,
-            'jumlah_sku' => 615,
+            'jumlah_sku_terdaftar' => $jumlahSkuTerdaftar,
+            'jumlah_sku_aktif' => $jumlahSkuAktif,
+            'jumlah_sku_subsidi' => $jumlahSkuSubsidi,
+            'rata_rata_sku_per_kdkmp' => $avg,
+            'min_sku_kdkmp' => $min,
+            'max_sku_kdkmp' => $max,
+            'total_kdkmp' => $totalKdkmp,
+            'distribusi_per_kdkmp' => $distribution,
         ];
     }
 
     /**
      * Placeholder produk subsidi summary. Replace with Odoo integration.
      *
-     * @return array{total_sku_subsidi: int, availability: array{gerai: float, kabupaten: float, provinsi: float, nasional: float}}
+     * @return array{availability: array{gerai: float, kabupaten: float, provinsi: float, nasional: float}}
      */
     public function produkSubsidiSummary(): array
     {
         return [
-            'total_sku_subsidi' => 38,
             'availability' => [
                 'gerai' => 72.4,
                 'kabupaten' => 80.1,
@@ -58,6 +85,53 @@ class MonitoringDashboardService
                 'nasional' => 89.2,
             ],
         ];
+    }
+
+    /**
+     * Bangun distribusi dummy per KDKMP untuk grafik sebaran.
+     * Sumbu diurut naik, MIN tepat di slot pertama, MAX di slot terakhir,
+     * slot di antaranya menurun dari MAX ke MIN mendekati rata-rata.
+     *
+     * @return array<int, array{kdkmp_id: int, nama: string, sku_count: int}>
+     */
+    private function buildDummySkuDistribution(int $totalKdkmp, int $avg, int $min, int $max): array
+    {
+        $result = [];
+        $midpoint = intdiv($totalKdkmp, 2);
+
+        for ($i = 0; $i < $totalKdkmp; $i++) {
+            $rank = $i / max(1, $totalKdkmp - 1);
+            // Lerp dari MAX ke MIN dengan sedikit noise sehingga nilai tengah
+            // mendekati rata-rata ($avg).
+            $lerp = $max + ($min - $max) * $rank;
+            $noise = ($i % 7) - 3;
+            $value = (int) round($lerp + $noise);
+
+            if ($i === 0) {
+                $value = $min;
+            } elseif ($i === $totalKdkmp - 1) {
+                $value = $max;
+            } elseif ($i === $midpoint) {
+                $value = $avg;
+            }
+
+            $value = max($min, min($max, $value));
+
+            $result[] = [
+                'kdkmp_id' => $i + 1,
+                'nama' => 'KDKMP-'.str_pad((string) ($i + 1), 4, '0', STR_PAD_LEFT),
+                'sku_count' => $value,
+            ];
+        }
+
+        usort($result, fn (array $a, array $b): int => $a['sku_count'] <=> $b['sku_count']);
+
+        // Re-id setelah sort supaya urutan visual naik konsisten dengan id.
+        foreach ($result as $index => &$row) {
+            $row['kdkmp_id'] = $index + 1;
+        }
+
+        return $result;
     }
 
     /**
@@ -96,18 +170,36 @@ class MonitoringDashboardService
      */
     public function operasionalOdooSummary(): array
     {
-        $lastImportedEntry = KdkmpOperationalEntry::query()
-            ->whereNotNull('imported_at')
-            ->latest('imported_at')
+        $lastUpdatedPoint = KoperasiSarprasStatusPoint::query()
+            ->where(function ($query): void {
+                $query
+                    ->where('has_po', true)
+                    ->orWhere('has_receipt', true)
+                    ->orWhere('has_sales', true);
+            })
+            ->latest('updated_at')
             ->first();
 
         return [
-            'total_kdkmp' => KdkmpOperationalEntry::query()->count(),
-            'kdkmp_sudah_dibuatkan_po' => KdkmpOperationalEntry::query()->where('has_po', true)->count(),
-            'kdkmp_sudah_penerimaan_barang' => KdkmpOperationalEntry::query()->where('has_receipt', true)->count(),
-            'kdkmp_sudah_penjualan' => KdkmpOperationalEntry::query()->where('has_sales', true)->count(),
-            'updated_at' => $lastImportedEntry?->imported_at?->toIso8601String(),
+            'total_kdkmp' => $this->distinctKdkmpCount(),
+            'kdkmp_sudah_dibuatkan_po' => $this->distinctKdkmpCount('has_po'),
+            'kdkmp_sudah_penerimaan_barang' => $this->distinctKdkmpCount('has_receipt'),
+            'kdkmp_sudah_penjualan' => $this->distinctKdkmpCount('has_sales'),
+            'updated_at' => $lastUpdatedPoint?->updated_at?->toIso8601String(),
         ];
+    }
+
+    private function distinctKdkmpCount(?string $flagColumn = null): int
+    {
+        $query = KoperasiSarprasStatusPoint::query()
+            ->whereNotNull('nik')
+            ->where('nik', '<>', '');
+
+        if ($flagColumn !== null) {
+            $query->where($flagColumn, true);
+        }
+
+        return $query->distinct()->count('nik');
     }
 
     /**
@@ -192,14 +284,14 @@ class MonitoringDashboardService
         }
 
         $latestSync = Carbon::parse($latestSyncRaw)->toIso8601String();
-        $cacheKey = 'monitoring:koperasi-sarpras-status-points-binary:'.$latestSync;
+        $latestPointUpdateRaw = KoperasiSarprasStatusPoint::query()->max('updated_at');
+        $latestPointUpdate = $latestPointUpdateRaw
+            ? Carbon::parse($latestPointUpdateRaw)->toIso8601String()
+            : $latestSync;
+        $cacheKey = 'monitoring:koperasi-sarpras-status-points-binary:'.$latestSync.':'.$latestPointUpdate;
 
         return Cache::remember($cacheKey, self::MAP_POINTS_CACHE_TTL_SECONDS, function () use ($latestSync): array {
             $sdmByNik = SdmKdkmpEntry::query()->pluck('jumlah_karyawan', 'nik');
-
-            $odooByNik = KdkmpOperationalEntry::query()
-                ->get(['nik', 'has_po', 'has_receipt', 'has_sales'])
-                ->keyBy('nik');
 
             $provinsiTable = [];
             $provinsiLookup = [];
@@ -230,9 +322,8 @@ class MonitoringDashboardService
                 $nikValue = $point->nik;
                 $progressValue = $point->progress_percentage;
                 $jumlahKaryawanValue = $nikValue ? (int) ($sdmByNik[$nikValue] ?? 0) : 0;
-                $odoo = $nikValue ? $odooByNik->get($nikValue) : null;
 
-                [$tier, $color] = $this->resolveMarker($point, $progressValue, $jumlahKaryawanValue, $odoo);
+                [$tier, $color] = $this->resolveMarker($point, $progressValue, $jumlahKaryawanValue);
 
                 $lat[] = (float) $point->lat;
                 $lng[] = (float) $point->lng;
@@ -248,9 +339,9 @@ class MonitoringDashboardService
                 $flagByte |= $point->sarpras_primary_lengkap ? self::FLAG_SARPRAS_PRIMARY : 0;
                 $flagByte |= $point->sarpras_secondary_lengkap ? self::FLAG_SARPRAS_SECONDARY : 0;
                 $flagByte |= $point->sarpras_lengkap ? self::FLAG_SARPRAS_LENGKAP : 0;
-                $flagByte |= ($odoo?->has_po ?? false) ? self::FLAG_HAS_PO : 0;
-                $flagByte |= ($odoo?->has_receipt ?? false) ? self::FLAG_HAS_RECEIPT : 0;
-                $flagByte |= ($odoo?->has_sales ?? false) ? self::FLAG_HAS_SALES : 0;
+                $flagByte |= $point->has_po ? self::FLAG_HAS_PO : 0;
+                $flagByte |= $point->has_receipt ? self::FLAG_HAS_RECEIPT : 0;
+                $flagByte |= $point->has_sales ? self::FLAG_HAS_SALES : 0;
                 $flags[] = $flagByte;
 
                 $tierIdx[] = array_search($tier, self::MARKER_TIERS, true);
@@ -319,13 +410,13 @@ class MonitoringDashboardService
     /**
      * @return array{0: 'status'|'sarpras'|'sdm'|'odoo', 1: 'red'|'orange'|'yellow'|'green'|'blue'|'gray'}
      */
-    private function resolveMarker(KoperasiSarprasStatusPoint $point, float $progress, int $jumlahKaryawan, ?KdkmpOperationalEntry $odoo): array
+    private function resolveMarker(KoperasiSarprasStatusPoint $point, float $progress, int $jumlahKaryawan): array
     {
         // Tier 3: sudah ada progres Odoo (PO/GR/penjualan), prioritas tertinggi.
-        if ($odoo && ($odoo->has_po || $odoo->has_receipt || $odoo->has_sales)) {
+        if ($point->has_po || $point->has_receipt || $point->has_sales) {
             $color = match (true) {
-                $odoo->has_sales => 'blue',
-                $odoo->has_receipt => 'green',
+                $point->has_sales => 'blue',
+                $point->has_receipt => 'green',
                 default => 'yellow',
             };
 

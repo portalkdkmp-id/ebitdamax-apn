@@ -54,13 +54,21 @@ export type OperasionalOdooSummary = {
 };
 
 export type StockSummary = {
-    stock_berputar: number;
-    active_sku: number;
-    jumlah_sku: number;
+    jumlah_sku_terdaftar: number;
+    jumlah_sku_aktif: number;
+    jumlah_sku_subsidi: number;
+    rata_rata_sku_per_kdkmp: number;
+    min_sku_kdkmp: number;
+    max_sku_kdkmp: number;
+    total_kdkmp: number;
+    distribusi_per_kdkmp: Array<{
+        kdkmp_id: number;
+        nama: string;
+        sku_count: number;
+    }>;
 };
 
 export type ProdukSubsidiSummary = {
-    total_sku_subsidi: number;
     availability: {
         gerai: number;
         kabupaten: number;

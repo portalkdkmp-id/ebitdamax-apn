@@ -30,6 +30,9 @@ return new class extends Migration
             $table->boolean('sarpras_primary_lengkap')->default(false);
             $table->boolean('sarpras_secondary_lengkap')->default(false);
             $table->boolean('sarpras_lengkap')->default(false);
+            $table->boolean('has_po')->default(false);
+            $table->boolean('has_receipt')->default(false);
+            $table->boolean('has_sales')->default(false);
             $table->timestamp('synced_at')->nullable();
             $table->timestamps();
 

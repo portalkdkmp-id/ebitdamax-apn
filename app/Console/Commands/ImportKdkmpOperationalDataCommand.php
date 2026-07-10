@@ -2,14 +2,14 @@
 
 namespace App\Console\Commands;
 
-use App\Models\KdkmpOperationalEntry;
+use App\Models\KoperasiSarprasStatusPoint;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 #[Signature('import:koperasi-operasional {path : Path to the Export_Laporan_Koperasi xlsx file with PO, Receipt, and Sales columns}')]
-#[Description('Import/refresh KDKMP operational flags from Excel. Upserts rows only; does not truncate or delete existing data.')]
+#[Description('Import/refresh KDKMP operational flags into koperasi_sarpras_status_points. Updates matching NIK only; does not truncate or delete data.')]
 class ImportKdkmpOperationalDataCommand extends Command
 {
     /**
@@ -37,18 +37,14 @@ class ImportKdkmpOperationalDataCommand extends Command
 
         $headers = $this->headersByName($headerRow);
         $columns = [
-            'nik' => $this->columnFor($headers, ['nik']),
-            'nama_kdkmp' => $this->columnFor($headers, ['nama', 'nama_koperasi', 'nama_kdkmp', 'kdkmp']),
-            'provinsi' => $this->columnFor($headers, ['provinsi']),
-            'kota_kabupaten' => $this->columnFor($headers, ['kota_kabupaten', 'kabupaten_kota']),
-            'kecamatan' => $this->columnFor($headers, ['kecamatan']),
+            'nik' => $this->columnFor($headers, ['nama_kdkmp', 'nik', 'kdkmp']),
             'po' => $this->columnFor($headers, ['po', 'purchase_order', 'dibuatkan_po', 'sudah_dibuatkan_po', 'kdkmp_sudah_dibuatkan_po']),
             'receipt' => $this->columnFor($headers, ['receipt', 'penerimaan_barang', 'sudah_penerimaan_barang', 'sudah_melakukan_penerimaan_barang']),
             'sales' => $this->columnFor($headers, ['sales', 'sale', 'penjualan', 'sudah_penjualan', 'sudah_melakukan_penjualan']),
         ];
 
         $missingRequiredColumns = collect([
-            'Nama KDKMP' => $columns['nama_kdkmp'],
+            'Nama KDKMP / NIK' => $columns['nik'],
             'PO' => $columns['po'],
             'Receipt' => $columns['receipt'],
             'Sales' => $columns['sales'],
@@ -63,16 +59,16 @@ class ImportKdkmpOperationalDataCommand extends Command
             return self::FAILURE;
         }
 
-        $created = 0;
-        $updated = 0;
+        $matchedKdkmp = 0;
+        $updatedPoints = 0;
+        $unmatchedKdkmp = 0;
         $skipped = 0;
-        $importedAt = now();
+        $updatedAt = now();
 
-        foreach ($rows as $rowNumber => $row) {
+        foreach ($rows as $row) {
             $nik = $this->stringValue($this->valueAt($row, $columns['nik']));
-            $namaKdkmp = $this->stringValue($this->valueAt($row, $columns['nama_kdkmp']));
 
-            if ($nik === '' && $namaKdkmp === '') {
+            if ($nik === '') {
                 $skipped++;
 
                 continue;
@@ -81,39 +77,28 @@ class ImportKdkmpOperationalDataCommand extends Command
             $poRaw = $this->stringValue($this->valueAt($row, $columns['po']));
             $receiptRaw = $this->stringValue($this->valueAt($row, $columns['receipt']));
             $salesRaw = $this->stringValue($this->valueAt($row, $columns['sales']));
-            $lookup = $nik !== '' ? ['nik' => $nik] : ['nama_kdkmp' => $namaKdkmp];
 
-            $entry = KdkmpOperationalEntry::query()->updateOrCreate(
-                $lookup,
-                [
-                    'nik' => $nik !== '' ? $nik : null,
-                    'nama_kdkmp' => $namaKdkmp !== '' ? $namaKdkmp : $nik,
-                    'provinsi' => $this->nullableString($this->valueAt($row, $columns['provinsi'])),
-                    'kota_kabupaten' => $this->nullableString($this->valueAt($row, $columns['kota_kabupaten'])),
-                    'kecamatan' => $this->nullableString($this->valueAt($row, $columns['kecamatan'])),
+            $updated = KoperasiSarprasStatusPoint::query()
+                ->where('nik', $nik)
+                ->update([
                     'has_po' => $this->truthyOperationalFlag($poRaw),
                     'has_receipt' => $this->truthyOperationalFlag($receiptRaw),
                     'has_sales' => $this->truthyOperationalFlag($salesRaw),
-                    'po_raw' => $poRaw !== '' ? $poRaw : null,
-                    'receipt_raw' => $receiptRaw !== '' ? $receiptRaw : null,
-                    'sales_raw' => $salesRaw !== '' ? $salesRaw : null,
-                    'source_file' => basename($path),
-                    'imported_at' => $importedAt,
-                    'raw_payload' => [
-                        'source_row' => $rowNumber,
-                        'source_columns' => [
-                            'po' => $columns['po'],
-                            'receipt' => $columns['receipt'],
-                            'sales' => $columns['sales'],
-                        ],
-                    ],
-                ],
-            );
+                    'updated_at' => $updatedAt,
+                ]);
 
-            $entry->wasRecentlyCreated ? $created++ : $updated++;
+            if ($updated === 0) {
+                $unmatchedKdkmp++;
+
+                continue;
+            }
+
+            $matchedKdkmp++;
+            $updatedPoints += $updated;
         }
 
-        $this->info("Imported {$created} new KDKMP operational rows, refreshed {$updated} existing rows, skipped {$skipped} blank rows.");
+        $this->info("Updated {$updatedPoints} koperasi_sarpras_status_points from {$matchedKdkmp} matching KDKMP rows.");
+        $this->info("Skipped {$skipped} blank rows, {$unmatchedKdkmp} KDKMP rows did not match any nik in koperasi_sarpras_status_points.");
 
         return self::SUCCESS;
     }
@@ -169,13 +154,6 @@ class ImportKdkmpOperationalDataCommand extends Command
         }
 
         return $row[$column] ?? null;
-    }
-
-    private function nullableString(mixed $value): ?string
-    {
-        $string = $this->stringValue($value);
-
-        return $string !== '' ? $string : null;
     }
 
     private function stringValue(mixed $value): string

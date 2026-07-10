@@ -24,6 +24,9 @@ class KoperasiSarprasStatusPoint extends Model
         'sarpras_primary_lengkap',
         'sarpras_secondary_lengkap',
         'sarpras_lengkap',
+        'has_po',
+        'has_receipt',
+        'has_sales',
         'synced_at',
     ];
 
@@ -36,6 +39,9 @@ class KoperasiSarprasStatusPoint extends Model
         'sarpras_primary_lengkap' => 'boolean',
         'sarpras_secondary_lengkap' => 'boolean',
         'sarpras_lengkap' => 'boolean',
+        'has_po' => 'boolean',
+        'has_receipt' => 'boolean',
+        'has_sales' => 'boolean',
         'synced_at' => 'datetime',
     ];
 }
