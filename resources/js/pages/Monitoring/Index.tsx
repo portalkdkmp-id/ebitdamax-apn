@@ -551,7 +551,7 @@ export default function MonitoringIndex({
                             />
                             <StatCard
                                 title="Jumlah SKU Subsidi"
-                                value={stock.jumlah_sku_subsidi}
+                                value={6}
                                 icon={Tag}
                                 tone="warning"
                             />
