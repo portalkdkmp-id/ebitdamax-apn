@@ -5,6 +5,7 @@ import {
     ClipboardList,
     Database,
     FileSpreadsheet,
+    FileText,
     LayoutDashboard,
     Network,
     Radar,
@@ -27,6 +28,7 @@ import { index as calculationsIndex } from '@/routes/calculations';
 import { index as ebitdaTreeIndex } from '@/routes/ebitda-tree';
 import { index as ebitdaValuesIndex } from '@/routes/ebitda-values';
 import { index as importExcelIndex } from '@/routes/import-excel';
+import { index as meetingMinutesIndex } from '@/routes/meeting-minutes';
 import { index as monitoringIndex } from '@/routes/monitoring';
 import { index as organizationsIndex } from '@/routes/organizations';
 import { index as sdmDataIndex } from '@/routes/sdm-data';
@@ -78,6 +80,11 @@ const mainNavItems: NavItem[] = [
         title: 'Import Excel',
         href: importExcelIndex(),
         icon: FileSpreadsheet,
+    },
+    {
+        title: 'Minutes of Meeting',
+        href: meetingMinutesIndex(),
+        icon: FileText,
     },
 ];
 

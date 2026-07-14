@@ -4,6 +4,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EbitdaTreeController;
 use App\Http\Controllers\EbitdaValueController;
 use App\Http\Controllers\ExcelImportController;
+use App\Http\Controllers\MeetingMinuteController;
 use App\Http\Controllers\MonitoringDashboardController;
 use App\Http\Controllers\OrganizationCalculationController;
 use App\Http\Controllers\OrganizationController;
@@ -68,6 +69,9 @@ Route::get('/monitoring/map-points-binary', [MonitoringDashboardController::clas
 
 Route::resource('sdm-data', SdmKdkmpEntryController::class, ['parameters' => ['sdm-data' => 'sdm_data']])
     ->only(['index', 'update']);
+
+Route::resource('meeting-minutes', MeetingMinuteController::class)
+    ->except(['create', 'edit', 'show']);
 // });
 
 require __DIR__.'/settings.php';
