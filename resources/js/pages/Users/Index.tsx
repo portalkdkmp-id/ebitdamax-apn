@@ -1,6 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     Eye,
+    EyeOff,
     Mail,
     Pencil,
     Plus,
@@ -99,6 +100,9 @@ export default function UsersIndex({ users, roles, filters }: Props) {
     const [detailUser, setDetailUser] = useState<UserItem | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<UserItem | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showPasswordConfirmation, setShowPasswordConfirmation] =
+        useState(false);
     const [filterForm, setFilterForm] = useState({
         search: filters.search ?? '',
         role_id: filters.role_id ? String(filters.role_id) : 'all',
@@ -135,6 +139,8 @@ export default function UsersIndex({ users, roles, filters }: Props) {
         clearErrors();
         reset();
         setData(defaultForm);
+        setShowPassword(false);
+        setShowPasswordConfirmation(false);
         setIsFormOpen(true);
     };
 
@@ -148,6 +154,8 @@ export default function UsersIndex({ users, roles, filters }: Props) {
             password: '',
             password_confirmation: '',
         });
+        setShowPassword(false);
+        setShowPasswordConfirmation(false);
         setIsFormOpen(true);
     };
 
@@ -156,6 +164,8 @@ export default function UsersIndex({ users, roles, filters }: Props) {
         setSelectedUser(null);
         reset();
         clearErrors();
+        setShowPassword(false);
+        setShowPasswordConfirmation(false);
     };
 
     const submit = (event: FormEvent) => {
@@ -574,30 +584,79 @@ export default function UsersIndex({ users, roles, filters }: Props) {
                                         </span>
                                     )}
                                 </Label>
-                                <Input
-                                    type="password"
-                                    value={data.password}
-                                    onChange={(event) =>
-                                        setData('password', event.target.value)
-                                    }
-                                    placeholder="Password"
-                                />
+                                <div className="relative">
+                                    <Input
+                                        type={
+                                            showPassword ? 'text' : 'password'
+                                        }
+                                        value={data.password}
+                                        onChange={(event) =>
+                                            setData(
+                                                'password',
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Password"
+                                        className="pr-10"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="absolute top-0 right-0 h-9 w-9"
+                                        onClick={() =>
+                                            setShowPassword(
+                                                (current) => !current,
+                                            )
+                                        }
+                                    >
+                                        {showPassword ? (
+                                            <EyeOff className="size-4" />
+                                        ) : (
+                                            <Eye className="size-4" />
+                                        )}
+                                    </Button>
+                                </div>
                                 <FieldError message={errors.password} />
                             </div>
 
                             <div className="space-y-2">
                                 <Label>Konfirmasi Password</Label>
-                                <Input
-                                    type="password"
-                                    value={data.password_confirmation}
-                                    onChange={(event) =>
-                                        setData(
-                                            'password_confirmation',
-                                            event.target.value,
-                                        )
-                                    }
-                                    placeholder="Konfirmasi password"
-                                />
+                                <div className="relative">
+                                    <Input
+                                        type={
+                                            showPasswordConfirmation
+                                                ? 'text'
+                                                : 'password'
+                                        }
+                                        value={data.password_confirmation}
+                                        onChange={(event) =>
+                                            setData(
+                                                'password_confirmation',
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Konfirmasi password"
+                                        className="pr-10"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="absolute top-0 right-0 h-9 w-9"
+                                        onClick={() =>
+                                            setShowPasswordConfirmation(
+                                                (current) => !current,
+                                            )
+                                        }
+                                    >
+                                        {showPasswordConfirmation ? (
+                                            <EyeOff className="size-4" />
+                                        ) : (
+                                            <Eye className="size-4" />
+                                        )}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
 

@@ -136,6 +136,53 @@ test('completed task page only shows completed reports for current user', functi
         );
 });
 
+test('superadmin completed task page shows completed reports from all roles', function () {
+    $category = TaskCategory::factory()->create(['name' => 'Operasional']);
+    $superadminRole = Role::factory()->create(['level' => RoleLevel::Superadmin]);
+    $staffRole = Role::factory()->create(['name' => 'Kasir', 'level' => RoleLevel::Staff]);
+    $managerRole = Role::factory()->create(['name' => 'Manager', 'level' => RoleLevel::Manager]);
+    $superadmin = User::factory()->create(['role_id' => $superadminRole->id]);
+    $staff = User::factory()->create(['role_id' => $staffRole->id]);
+    $manager = User::factory()->create(['role_id' => $managerRole->id]);
+    $staffTask = Task::factory()->create([
+        'task_category_id' => $category->id,
+        'role_id' => $staffRole->id,
+        'name' => 'Tutup Kasir',
+    ]);
+    $managerTask = Task::factory()->create([
+        'task_category_id' => $category->id,
+        'role_id' => $managerRole->id,
+        'name' => 'Review Shift',
+    ]);
+
+    TaskReport::query()->create([
+        'task_id' => $staffTask->id,
+        'user_id' => $staff->id,
+        'started_at' => now()->subMinutes(20),
+        'finished_at' => now()->subMinutes(10),
+        'duration_minutes' => 10,
+        'status' => TaskReportStatus::Completed,
+    ]);
+    TaskReport::query()->create([
+        'task_id' => $managerTask->id,
+        'user_id' => $manager->id,
+        'started_at' => now()->subMinutes(15),
+        'finished_at' => now(),
+        'duration_minutes' => 15,
+        'status' => TaskReportStatus::Completed,
+    ]);
+
+    $this->actingAs($superadmin)
+        ->get(route('task-dashboard.completed'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('TaskDashboard/Completed')
+            ->where('reports.total', 2)
+            ->where('reports.data.0.task.role.name', 'Manager')
+            ->where('reports.data.1.task.role.name', 'Kasir')
+        );
+});
+
 test('registration creates staff role when missing', function () {
     $user = app(CreateNewUser::class)->create([
         'name' => 'Registered User',

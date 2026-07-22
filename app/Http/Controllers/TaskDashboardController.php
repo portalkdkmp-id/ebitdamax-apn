@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\RoleLevel;
 use App\Enums\TaskReportStatus;
 use App\Models\Task;
 use App\Models\TaskAdditionalField;
@@ -50,10 +51,11 @@ class TaskDashboardController extends Controller
     public function completed(Request $request): Response
     {
         $user = $request->user();
+        $isSuperadmin = $user?->role?->level === RoleLevel::Superadmin;
 
         $reports = TaskReport::query()
             ->with(['task.taskCategory', 'task.role'])
-            ->where('user_id', $user?->id)
+            ->when(! $isSuperadmin, fn ($query) => $query->where('user_id', $user?->id))
             ->where('status', TaskReportStatus::Completed->value)
             ->latest('finished_at')
             ->paginate(15)

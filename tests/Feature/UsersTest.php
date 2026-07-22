@@ -67,6 +67,35 @@ test('store creates a user with role and generated username', function () {
         ->and(Hash::check('password', $user->password))->toBeTrue();
 });
 
+test('store accepts eight character alphanumeric password', function () {
+    $role = Role::factory()->create();
+
+    $this->post(route('users.store'), [
+        'role_id' => $role->id,
+        'name' => 'User Password',
+        'email' => 'password.user@example.com',
+        'password' => 'abc12345',
+        'password_confirmation' => 'abc12345',
+    ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    expect(User::query()->where('email', 'password.user@example.com')->exists())
+        ->toBeTrue();
+});
+
+test('store rejects password with symbol', function () {
+    $role = Role::factory()->create();
+
+    $this->post(route('users.store'), [
+        'role_id' => $role->id,
+        'name' => 'User Symbol',
+        'email' => 'symbol.user@example.com',
+        'password' => 'abc123!@',
+        'password_confirmation' => 'abc123!@',
+    ])->assertSessionHasErrors('password');
+});
+
 test('store keeps generated usernames unique', function () {
     $role = Role::factory()->create();
 
