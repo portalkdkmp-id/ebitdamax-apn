@@ -9,6 +9,7 @@ import {
     LayoutDashboard,
     Network,
     Radar,
+    ShieldCheck,
     Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
@@ -31,6 +32,7 @@ import { index as importExcelIndex } from '@/routes/import-excel';
 import { index as meetingMinutesIndex } from '@/routes/meeting-minutes';
 import { index as monitoringIndex } from '@/routes/monitoring';
 import { index as organizationsIndex } from '@/routes/organizations';
+import { index as rolesIndex } from '@/routes/roles';
 import { index as sdmDataIndex } from '@/routes/sdm-data';
 import { index as valueChainJobdeskIndex } from '@/routes/value-chain-jobdesk';
 import type { NavItem } from '@/types';
@@ -70,6 +72,11 @@ const mainNavItems: NavItem[] = [
         title: 'Organizations',
         href: organizationsIndex(),
         icon: Network,
+    },
+    {
+        title: 'Roles',
+        href: rolesIndex(),
+        icon: ShieldCheck,
     },
     {
         title: 'Value Chain & Jobdesk',
