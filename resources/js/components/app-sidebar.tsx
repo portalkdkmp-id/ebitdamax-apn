@@ -11,6 +11,7 @@ import {
     Network,
     Radar,
     ShieldCheck,
+    SquareCheckBig,
     UserCog,
     Users,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ import { index as organizationsIndex } from '@/routes/organizations';
 import { index as rolesIndex } from '@/routes/roles';
 import { index as sdmDataIndex } from '@/routes/sdm-data';
 import { index as taskCategoriesIndex } from '@/routes/task-categories';
+import { index as tasksIndex } from '@/routes/tasks';
 import { index as usersIndex } from '@/routes/users';
 import { index as valueChainJobdeskIndex } from '@/routes/value-chain-jobdesk';
 import type { NavItem } from '@/types';
@@ -91,6 +93,11 @@ const mainNavItems: NavItem[] = [
         title: 'Task Categories',
         href: taskCategoriesIndex(),
         icon: FolderKanban,
+    },
+    {
+        title: 'Tasks',
+        href: tasksIndex(),
+        icon: SquareCheckBig,
     },
     {
         title: 'Value Chain & Jobdesk',

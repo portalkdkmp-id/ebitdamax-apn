@@ -11,6 +11,7 @@ use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SdmKdkmpEntryController;
 use App\Http\Controllers\TaskCategoryController;
+use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValueChainJobdeskController;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,9 @@ Route::resource('users', UserController::class)
     ->except(['create', 'edit', 'show']);
 
 Route::resource('task-categories', TaskCategoryController::class)
+    ->except(['create', 'edit', 'show']);
+
+Route::resource('tasks', TaskController::class)
     ->except(['create', 'edit', 'show']);
 
 Route::get('/ebitda-tree', [EbitdaTreeController::class, 'index'])->name('ebitda-tree.index');

@@ -7,6 +7,7 @@ import {
     Menu,
     Search,
     ShieldCheck,
+    SquareCheckBig,
     UserCog,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
@@ -44,6 +45,7 @@ import { cn, toUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { index as rolesIndex } from '@/routes/roles';
 import { index as taskCategoriesIndex } from '@/routes/task-categories';
+import { index as tasksIndex } from '@/routes/tasks';
 import { index as usersIndex } from '@/routes/users';
 import type { BreadcrumbItem, NavItem } from '@/types';
 
@@ -71,6 +73,11 @@ const mainNavItems: NavItem[] = [
         title: 'Task Categories',
         href: taskCategoriesIndex(),
         icon: FolderKanban,
+    },
+    {
+        title: 'Tasks',
+        href: tasksIndex(),
+        icon: SquareCheckBig,
     },
 ];
 
