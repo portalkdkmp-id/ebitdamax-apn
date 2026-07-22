@@ -6,8 +6,13 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 
-test('guests can visit users while auth middleware is bypassed', function () {
-    $response = $this->get(route('users.index'));
+beforeEach(function () {
+    $role = Role::factory()->create(['level' => RoleLevel::Superadmin]);
+    $this->actingAs(User::factory()->create(['role_id' => $role->id]));
+});
+
+test('superadmin can visit users', function () {
+    $response = $this->get(route('users.index', ['search' => 'budi@example.com']));
 
     $response->assertOk();
 });
@@ -34,7 +39,6 @@ test('users page displays the correct component', function () {
             ->where('users.data.0.name', 'Budi Kasir')
             ->where('users.data.0.username', 'budi-kasir')
             ->where('users.data.0.role.name', 'Kasir')
-            ->where('roles.0.name', 'Kasir')
         );
 });
 
@@ -129,7 +133,7 @@ test('destroy deletes a user', function () {
         ->assertSessionHasNoErrors()
         ->assertRedirect();
 
-    expect(User::query()->count())->toBe(0);
+    expect(User::query()->whereKey($user->id)->exists())->toBeFalse();
 });
 
 test('search filters users by email', function () {

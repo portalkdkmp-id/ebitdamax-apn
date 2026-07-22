@@ -2,11 +2,17 @@
 
 use App\Enums\RoleLevel;
 use App\Models\Role;
+use App\Models\User;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
-test('guests can visit roles while auth middleware is bypassed', function () {
-    $response = $this->get(route('roles.index'));
+beforeEach(function () {
+    $role = Role::factory()->create(['level' => RoleLevel::Superadmin]);
+    $this->actingAs(User::factory()->create(['role_id' => $role->id]));
+});
+
+test('superadmin can visit roles', function () {
+    $response = $this->get(route('roles.index', ['search' => 'Kasir']));
 
     $response->assertOk();
 });
@@ -18,7 +24,7 @@ test('roles page displays the correct component', function () {
         'level' => RoleLevel::Staff,
     ]);
 
-    $response = $this->get(route('roles.index'));
+    $response = $this->get(route('roles.index', ['search' => 'Kasir']));
 
     $response
         ->assertOk()
@@ -76,7 +82,7 @@ test('destroy deletes an unused role', function () {
         ->assertSessionHasNoErrors()
         ->assertRedirect();
 
-    expect(Role::query()->count())->toBe(0);
+    expect(Role::query()->whereKey($role->id)->exists())->toBeFalse();
 });
 
 test('search filters roles by name', function () {

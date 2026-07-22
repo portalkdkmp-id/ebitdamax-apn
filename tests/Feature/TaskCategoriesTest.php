@@ -1,10 +1,18 @@
 <?php
 
+use App\Enums\RoleLevel;
+use App\Models\Role;
 use App\Models\TaskCategory;
+use App\Models\User;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
-test('guests can visit task categories while auth middleware is bypassed', function () {
+beforeEach(function () {
+    $role = Role::factory()->create(['level' => RoleLevel::Superadmin]);
+    $this->actingAs(User::factory()->create(['role_id' => $role->id]));
+});
+
+test('superadmin can visit task categories', function () {
     $response = $this->get(route('task-categories.index'));
 
     $response->assertOk();

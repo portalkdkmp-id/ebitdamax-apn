@@ -43,8 +43,10 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useInitials } from '@/hooks/use-initials';
 import { cn, toUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
+import { dashboard as adminDashboard } from '@/routes/admin';
 import { index as rolesIndex } from '@/routes/roles';
 import { index as taskCategoriesIndex } from '@/routes/task-categories';
+import { index as taskDashboardIndex } from '@/routes/task-dashboard';
 import { index as tasksIndex } from '@/routes/tasks';
 import { index as usersIndex } from '@/routes/users';
 import type { BreadcrumbItem, NavItem } from '@/types';
@@ -53,10 +55,10 @@ type Props = {
     breadcrumbs?: BreadcrumbItem[];
 };
 
-const mainNavItems: NavItem[] = [
+const superadminNavItems: NavItem[] = [
     {
         title: 'Dashboard',
-        href: dashboard(),
+        href: adminDashboard(),
         icon: LayoutGrid,
     },
     {
@@ -77,6 +79,14 @@ const mainNavItems: NavItem[] = [
     {
         title: 'Tasks',
         href: tasksIndex(),
+        icon: SquareCheckBig,
+    },
+];
+
+const taskNavItems: NavItem[] = [
+    {
+        title: 'Dashboard Task',
+        href: taskDashboardIndex(),
         icon: SquareCheckBig,
     },
 ];
@@ -102,6 +112,10 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
     const { auth } = page.props;
     const getInitials = useInitials();
     const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
+    const mainNavItems =
+        auth.user?.role?.level === 'superadmin'
+            ? superadminNavItems
+            : taskNavItems;
 
     return (
         <>

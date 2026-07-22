@@ -1,0 +1,80 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Task;
+use App\Models\TaskAdditionalField;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class TaskDashboardController extends Controller
+{
+    public function index(Request $request): Response
+    {
+        $user = $request->user();
+
+        $tasks = Task::query()
+            ->with(['taskCategory', 'role', 'additionalFields'])
+            ->active()
+            ->when(
+                $user?->role_id,
+                fn ($query) => $query->where('role_id', $user->role_id),
+                fn ($query) => $query->whereRaw('1 = 0')
+            )
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Task $task): array => $this->transformTask($task))
+            ->values();
+
+        return Inertia::render('TaskDashboard/Index', [
+            'tasks' => $tasks,
+            'summary' => [
+                'total' => $tasks->count(),
+                'pending' => $tasks->count(),
+                'in_progress' => 0,
+                'completed' => 0,
+            ],
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function transformTask(Task $task): array
+    {
+        return [
+            'id' => $task->id,
+            'uuid' => $task->uuid,
+            'name' => $task->name,
+            'description' => $task->description,
+            'time_require' => $task->time_require,
+            'status' => 'pending',
+            'status_label' => 'Belum Dimulai',
+            'task_category' => [
+                'id' => $task->taskCategory->id,
+                'name' => $task->taskCategory->name,
+                'slug' => $task->taskCategory->slug,
+            ],
+            'role' => [
+                'id' => $task->role->id,
+                'name' => $task->role->name,
+                'slug' => $task->role->slug,
+                'level' => $task->role->level->value,
+                'level_label' => $task->role->level->label(),
+            ],
+            'additional_fields' => $task->additionalFields
+                ->map(fn (TaskAdditionalField $field): array => [
+                    'id' => $field->id,
+                    'label' => $field->label,
+                    'field_name' => $field->field_name,
+                    'input_type' => $field->input_type->value,
+                    'show_when' => $field->show_when->value,
+                    'is_required' => $field->is_required,
+                    'options' => $field->options ?? [],
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+}

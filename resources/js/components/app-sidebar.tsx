@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     Calculator,
     ChartColumn,
@@ -28,6 +28,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { dashboard as adminDashboard } from '@/routes/admin';
 import { index as calculationsIndex } from '@/routes/calculations';
 import { index as ebitdaTreeIndex } from '@/routes/ebitda-tree';
 import { index as ebitdaValuesIndex } from '@/routes/ebitda-values';
@@ -38,15 +39,16 @@ import { index as organizationsIndex } from '@/routes/organizations';
 import { index as rolesIndex } from '@/routes/roles';
 import { index as sdmDataIndex } from '@/routes/sdm-data';
 import { index as taskCategoriesIndex } from '@/routes/task-categories';
+import { index as taskDashboardIndex } from '@/routes/task-dashboard';
 import { index as tasksIndex } from '@/routes/tasks';
 import { index as usersIndex } from '@/routes/users';
 import { index as valueChainJobdeskIndex } from '@/routes/value-chain-jobdesk';
 import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
+const superadminNavItems: NavItem[] = [
     {
         title: 'Dashboard',
-        href: dashboard(),
+        href: adminDashboard(),
         icon: LayoutDashboard,
     },
     {
@@ -116,7 +118,21 @@ const mainNavItems: NavItem[] = [
     },
 ];
 
+const taskNavItems: NavItem[] = [
+    {
+        title: 'Dashboard Task',
+        href: taskDashboardIndex(),
+        icon: SquareCheckBig,
+    },
+];
+
 export function AppSidebar() {
+    const { auth } = usePage().props;
+    const navItems =
+        auth.user?.role?.level === 'superadmin'
+            ? superadminNavItems
+            : taskNavItems;
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -132,7 +148,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={navItems} />
             </SidebarContent>
 
             <SidebarFooter>

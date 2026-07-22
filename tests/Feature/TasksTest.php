@@ -5,10 +5,16 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskAdditionalField;
 use App\Models\TaskCategory;
+use App\Models\User;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
-test('guests can visit tasks while auth middleware is bypassed', function () {
+beforeEach(function () {
+    $role = Role::factory()->create(['level' => RoleLevel::Superadmin]);
+    $this->actingAs(User::factory()->create(['role_id' => $role->id]));
+});
+
+test('superadmin can visit tasks', function () {
     $response = $this->get(route('tasks.index'));
 
     $response->assertOk();

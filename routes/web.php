@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DashboardRedirectController;
 use App\Http\Controllers\EbitdaTreeController;
 use App\Http\Controllers\EbitdaValueController;
 use App\Http\Controllers\ExcelImportController;
@@ -12,82 +13,91 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SdmKdkmpEntryController;
 use App\Http\Controllers\TaskCategoryController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskDashboardController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValueChainJobdeskController;
 use Illuminate\Support\Facades\Route;
 
-// Route::inertia('/', 'welcome')->name('home');
+Route::redirect('/', '/dashboard');
 
-// Route::middleware(['auth', 'verified'])->group(function () {
-Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/dashboard', DashboardRedirectController::class)->name('dashboard');
 
-Route::resource('organizations', OrganizationController::class)
-    ->except(['create', 'edit', 'show']);
+    Route::get('/dashboard/tasks', [TaskDashboardController::class, 'index'])
+        ->middleware('role.level:staff,manager,superadmin')
+        ->name('task-dashboard.index');
 
-Route::resource('roles', RoleController::class)
-    ->except(['create', 'edit', 'show']);
+    Route::middleware('role.level:superadmin')->group(function () {
+        Route::get('/admin-dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
 
-Route::resource('users', UserController::class)
-    ->except(['create', 'edit', 'show']);
+        Route::resource('organizations', OrganizationController::class)
+            ->except(['create', 'edit', 'show']);
 
-Route::resource('task-categories', TaskCategoryController::class)
-    ->except(['create', 'edit', 'show']);
+        Route::resource('roles', RoleController::class)
+            ->except(['create', 'edit', 'show']);
 
-Route::resource('tasks', TaskController::class)
-    ->except(['create', 'edit', 'show']);
+        Route::resource('users', UserController::class)
+            ->except(['create', 'edit', 'show']);
 
-Route::get('/ebitda-tree', [EbitdaTreeController::class, 'index'])->name('ebitda-tree.index');
+        Route::resource('task-categories', TaskCategoryController::class)
+            ->except(['create', 'edit', 'show']);
 
-Route::get('/import-excel', [ExcelImportController::class, 'index'])
-    ->name('import-excel.index');
+        Route::resource('tasks', TaskController::class)
+            ->except(['create', 'edit', 'show']);
 
-Route::post('/import-excel', [ExcelImportController::class, 'store'])
-    ->name('import-excel.store');
+        Route::get('/ebitda-tree', [EbitdaTreeController::class, 'index'])->name('ebitda-tree.index');
 
-Route::get('/dashboard/directorates/{organization}', [DashboardController::class, 'showDirectorate'])
-    ->name('dashboard.directorates.show');
+        Route::get('/import-excel', [ExcelImportController::class, 'index'])
+            ->name('import-excel.index');
 
-Route::resource('ebitda-values', EbitdaValueController::class)
-    ->except(['create', 'edit', 'show']);
+        Route::post('/import-excel', [ExcelImportController::class, 'store'])
+            ->name('import-excel.store');
 
-Route::get('/kalkulasi', [OrganizationCalculationController::class, 'index'])
-    ->name('calculations.index');
+        Route::get('/dashboard/directorates/{organization}', [DashboardController::class, 'showDirectorate'])
+            ->name('dashboard.directorates.show');
 
-Route::post('/kalkulasi', [OrganizationCalculationController::class, 'store'])
-    ->name('calculations.store');
+        Route::resource('ebitda-values', EbitdaValueController::class)
+            ->except(['create', 'edit', 'show']);
 
-Route::put('/kalkulasi/{calculation}', [OrganizationCalculationController::class, 'update'])
-    ->name('calculations.update');
+        Route::get('/kalkulasi', [OrganizationCalculationController::class, 'index'])
+            ->name('calculations.index');
 
-Route::delete('/kalkulasi/{calculation}', [OrganizationCalculationController::class, 'destroy'])
-    ->name('calculations.destroy');
+        Route::post('/kalkulasi', [OrganizationCalculationController::class, 'store'])
+            ->name('calculations.store');
 
-Route::get('/value-chain-jobdesk', [ValueChainJobdeskController::class, 'index'])
-    ->name('value-chain-jobdesk.index');
+        Route::put('/kalkulasi/{calculation}', [OrganizationCalculationController::class, 'update'])
+            ->name('calculations.update');
 
-Route::post('/value-chain-jobdesk', [ValueChainJobdeskController::class, 'store'])
-    ->name('value-chain-jobdesk.store');
+        Route::delete('/kalkulasi/{calculation}', [OrganizationCalculationController::class, 'destroy'])
+            ->name('calculations.destroy');
 
-Route::put('/value-chain-jobdesk/{profile}', [ValueChainJobdeskController::class, 'update'])
-    ->name('value-chain-jobdesk.update');
+        Route::get('/value-chain-jobdesk', [ValueChainJobdeskController::class, 'index'])
+            ->name('value-chain-jobdesk.index');
 
-Route::delete('/value-chain-jobdesk/{profile}', [ValueChainJobdeskController::class, 'destroy'])
-    ->name('value-chain-jobdesk.destroy');
+        Route::post('/value-chain-jobdesk', [ValueChainJobdeskController::class, 'store'])
+            ->name('value-chain-jobdesk.store');
 
-Route::get('/monitoring', [MonitoringDashboardController::class, 'index'])
-    ->name('monitoring.index');
+        Route::put('/value-chain-jobdesk/{profile}', [ValueChainJobdeskController::class, 'update'])
+            ->name('value-chain-jobdesk.update');
 
-Route::get('/monitoring/map-points', [MonitoringDashboardController::class, 'mapPointsMeta'])
-    ->name('monitoring.map-points');
+        Route::delete('/value-chain-jobdesk/{profile}', [ValueChainJobdeskController::class, 'destroy'])
+            ->name('value-chain-jobdesk.destroy');
 
-Route::get('/monitoring/map-points-binary', [MonitoringDashboardController::class, 'mapPointsBinary'])
-    ->name('monitoring.map-points-binary');
+        Route::get('/monitoring', [MonitoringDashboardController::class, 'index'])
+            ->name('monitoring.index');
 
-Route::resource('sdm-data', SdmKdkmpEntryController::class, ['parameters' => ['sdm-data' => 'sdm_data']])
-    ->only(['index', 'update']);
+        Route::get('/monitoring/map-points', [MonitoringDashboardController::class, 'mapPointsMeta'])
+            ->name('monitoring.map-points');
 
-Route::resource('meeting-minutes', MeetingMinuteController::class)
-    ->except(['create', 'edit', 'show']);
-// });
+        Route::get('/monitoring/map-points-binary', [MonitoringDashboardController::class, 'mapPointsBinary'])
+            ->name('monitoring.map-points-binary');
+
+        Route::resource('sdm-data', SdmKdkmpEntryController::class, ['parameters' => ['sdm-data' => 'sdm_data']])
+            ->only(['index', 'update']);
+
+        Route::resource('meeting-minutes', MeetingMinuteController::class)
+            ->except(['create', 'edit', 'show']);
+    });
+});
 
 require __DIR__.'/settings.php';
