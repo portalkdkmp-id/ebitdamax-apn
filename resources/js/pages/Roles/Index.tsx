@@ -97,6 +97,7 @@ export default function RolesIndex({ roles, levelOptions, filters }: Props) {
     const [selectedRole, setSelectedRole] = useState<RoleItem | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<RoleItem | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [filterForm, setFilterForm] = useState({
         search: filters.search ?? '',
         sort: filters.sort ?? 'name',
@@ -162,9 +163,14 @@ export default function RolesIndex({ roles, levelOptions, filters }: Props) {
             return;
         }
 
+        setIsDeleting(true);
+
         router.delete(destroyRole.url(deleteTarget.slug), {
             preserveScroll: true,
-            onSuccess: () => setDeleteTarget(null),
+            onFinish: () => {
+                setIsDeleting(false);
+                setDeleteTarget(null);
+            },
         });
     };
 
@@ -509,8 +515,9 @@ export default function RolesIndex({ roles, levelOptions, filters }: Props) {
                             type="button"
                             variant="destructive"
                             onClick={confirmDelete}
+                            disabled={isDeleting}
                         >
-                            Hapus
+                            {isDeleting ? 'Menghapus...' : 'Hapus'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

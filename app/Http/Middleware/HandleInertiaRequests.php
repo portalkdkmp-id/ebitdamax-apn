@@ -61,7 +61,32 @@ class HandleInertiaRequests extends Middleware
                     ] : null,
                 ] : null,
             ],
+            'flash' => [
+                'toast' => $this->toast($request),
+            ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
+    }
+
+    /**
+     * @return array{type: string, message: string}|null
+     */
+    private function toast(Request $request): ?array
+    {
+        if ($message = $request->session()->get('success')) {
+            return [
+                'type' => 'success',
+                'message' => $message,
+            ];
+        }
+
+        if ($message = $request->session()->get('error')) {
+            return [
+                'type' => 'error',
+                'message' => $message,
+            ];
+        }
+
+        return null;
     }
 }

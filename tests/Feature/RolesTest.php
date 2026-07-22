@@ -2,6 +2,8 @@
 
 use App\Enums\RoleLevel;
 use App\Models\Role;
+use App\Models\Task;
+use App\Models\TaskCategory;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -83,6 +85,20 @@ test('destroy deletes an unused role', function () {
         ->assertRedirect();
 
     expect(Role::query()->whereKey($role->id)->exists())->toBeFalse();
+});
+
+test('destroy keeps role used by task and flashes error', function () {
+    $role = Role::factory()->create();
+    $task = Task::factory()->create([
+        'task_category_id' => TaskCategory::factory()->create()->id,
+    ]);
+    $task->roles()->sync([$role->id]);
+
+    $this->delete(route('roles.destroy', $role))
+        ->assertRedirect()
+        ->assertSessionHas('error');
+
+    expect(Role::query()->whereKey($role->id)->exists())->toBeTrue();
 });
 
 test('search filters roles by name', function () {
