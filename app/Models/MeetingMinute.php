@@ -30,6 +30,13 @@ class MeetingMinute extends Model
             ->orderBy('id');
     }
 
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(MeetingMinuteAttachment::class)
+            ->latest('created_at')
+            ->latest('id');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

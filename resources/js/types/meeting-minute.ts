@@ -11,6 +11,15 @@ export type MeetingMinuteItem = {
     remarks: string | null;
 };
 
+export type MeetingMinuteAttachment = {
+    id: number;
+    name: string;
+    mime_type: string | null;
+    size: number;
+    preview_url: string;
+    download_url: string;
+};
+
 export type MeetingMinute = {
     id: number;
     title: string;
@@ -20,6 +29,7 @@ export type MeetingMinute = {
     location: string | null;
     attendees: string | null;
     items: MeetingMinuteItem[];
+    attachments: MeetingMinuteAttachment[];
     created_at: string | null;
     updated_at: string | null;
 };

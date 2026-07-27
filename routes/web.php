@@ -110,6 +110,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::resource('meeting-minutes', MeetingMinuteController::class)
             ->except(['create', 'edit', 'show']);
+
+        Route::get(
+            '/meeting-minutes/{meetingMinute}/attachments/{attachment}/preview',
+            [MeetingMinuteController::class, 'previewAttachment']
+        )->name('meeting-minutes.attachments.preview');
+
+        Route::get(
+            '/meeting-minutes/{meetingMinute}/attachments/{attachment}/download',
+            [MeetingMinuteController::class, 'downloadAttachment']
+        )->name('meeting-minutes.attachments.download');
     });
 });
 

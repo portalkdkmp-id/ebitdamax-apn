@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\File;
 
 class StoreMeetingMinuteRequest extends FormRequest
 {
@@ -30,6 +31,35 @@ class StoreMeetingMinuteRequest extends FormRequest
             'items.*.pic' => ['nullable', 'string', 'max:255'],
             'items.*.status' => ['nullable', 'string', 'max:50'],
             'items.*.remarks' => ['nullable', 'string'],
+            'documents' => ['nullable', 'array', 'max:10'],
+            'documents.*' => [
+                File::types([
+                    'pdf',
+                    'doc',
+                    'docx',
+                    'xls',
+                    'xlsx',
+                    'ppt',
+                    'pptx',
+                    'txt',
+                    'csv',
+                    'jpg',
+                    'jpeg',
+                    'png',
+                ])->max(10 * 1024),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'documents.max' => 'Maksimal 10 dokumen dalam satu kali upload.',
+            'documents.*.max' => 'Dokumen #:position ditolak karena ukurannya lebih dari 10 MB.',
+            'documents.*.mimes' => 'Format dokumen #:position tidak didukung.',
         ];
     }
 }
