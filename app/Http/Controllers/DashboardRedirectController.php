@@ -13,6 +13,10 @@ class DashboardRedirectController extends Controller
             return to_route('admin.dashboard');
         }
 
+        if ($request->user()?->isKdkmpManager()) {
+            return to_route('kdkmp-dashboard.index');
+        }
+
         return to_route('task-dashboard.index');
     }
 }

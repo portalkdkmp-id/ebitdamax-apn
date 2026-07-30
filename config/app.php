@@ -67,6 +67,8 @@ return [
 
     'timezone' => 'UTC',
 
+    'kdkmp_business_timezone' => env('KDKMP_BUSINESS_TIMEZONE', 'Asia/Jakarta'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

@@ -6,6 +6,7 @@ import {
     Folder,
     FolderCheck,
     FolderKanban,
+    Gauge,
     LayoutGrid,
     Menu,
     Search,
@@ -48,6 +49,8 @@ import { useInitials } from '@/hooks/use-initials';
 import { cn, toUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
+import { index as adminKdkmpDashboardIndex } from '@/routes/admin/kdkmp-dashboard';
+import { index as kdkmpDashboardIndex } from '@/routes/kdkmp-dashboard';
 import { index as rolesIndex } from '@/routes/roles';
 import { index as taskCategoriesIndex } from '@/routes/task-categories';
 import { completed as taskDashboardCompleted } from '@/routes/task-dashboard';
@@ -65,6 +68,11 @@ const superadminNavItems: NavItem[] = [
         title: 'Dashboard',
         href: adminDashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Dashboard KDKMP',
+        href: adminKdkmpDashboardIndex(),
+        icon: Gauge,
     },
     {
         title: 'Roles',
@@ -123,6 +131,14 @@ const staffWorkReportNavItems: NavItem[] = [
     },
 ];
 
+const kdkmpManagerNavItems: NavItem[] = [
+    {
+        title: 'Dashboard KDKMP',
+        href: kdkmpDashboardIndex(),
+        icon: Gauge,
+    },
+];
+
 const rightNavItems: NavItem[] = [
     {
         title: 'Repository',
@@ -145,7 +161,12 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
     const getInitials = useInitials();
     const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
     const isSuperadmin = auth.user?.role?.level === 'superadmin';
-    const mainNavItems = isSuperadmin ? superadminNavItems : [];
+    const isKdkmpManager = auth.user?.role?.slug === 'kepala-toko-manager';
+    const mainNavItems = isSuperadmin
+        ? superadminNavItems
+        : isKdkmpManager
+          ? kdkmpManagerNavItems
+          : [];
     const workReportNavItems = isSuperadmin
         ? superadminWorkReportNavItems
         : staffWorkReportNavItems;

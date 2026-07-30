@@ -20,6 +20,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 /**
  * @property int $id
  * @property int|null $role_id
+ * @property int|null $sdm_kdkmp_entry_id
  * @property string $name
  * @property string|null $username
  * @property string $email
@@ -32,7 +33,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['role_id', 'name', 'username', 'email', 'password'])]
+#[Fillable(['role_id', 'sdm_kdkmp_entry_id', 'name', 'username', 'email', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
@@ -53,6 +54,11 @@ class User extends Authenticatable implements PasskeyUser
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    public function sdmKdkmpEntry(): BelongsTo
+    {
+        return $this->belongsTo(SdmKdkmpEntry::class);
     }
 
     public function businessProcesses(): HasMany
@@ -78,6 +84,11 @@ class User extends Authenticatable implements PasskeyUser
     public function isEbitdaKdkmp(): bool
     {
         return $this->role?->slug === Role::SLUG_EBITDA_KDKMP;
+    }
+
+    public function isKdkmpManager(): bool
+    {
+        return $this->role?->slug === Role::SLUG_KDKMP_MANAGER;
     }
 
     public function getRouteKeyName(): string

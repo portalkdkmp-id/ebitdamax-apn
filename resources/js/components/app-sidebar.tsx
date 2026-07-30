@@ -10,6 +10,7 @@ import {
     FileText,
     FolderCheck,
     FolderKanban,
+    Gauge,
     LayoutDashboard,
     Network,
     Radar,
@@ -34,11 +35,13 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
+import { index as adminKdkmpDashboardIndex } from '@/routes/admin/kdkmp-dashboard';
 import { index as kdkmpGeraiBusinessProcessIndex } from '@/routes/business-processes/kdkmp-gerai';
 import { index as calculationsIndex } from '@/routes/calculations';
 import { index as ebitdaTreeIndex } from '@/routes/ebitda-tree';
 import { index as ebitdaValuesIndex } from '@/routes/ebitda-values';
 import { index as importExcelIndex } from '@/routes/import-excel';
+import { index as kdkmpDashboardIndex } from '@/routes/kdkmp-dashboard';
 import { index as meetingMinutesIndex } from '@/routes/meeting-minutes';
 import { index as meetingActionItemsIndex } from '@/routes/meeting-minutes/action-items';
 import { index as monitoringIndex } from '@/routes/monitoring';
@@ -66,6 +69,11 @@ const superadminNavItems: NavItem[] = [
         title: 'Dashboard Monitoring',
         href: monitoringIndex(),
         icon: Radar,
+    },
+    {
+        title: 'Dashboard KDKMP',
+        href: adminKdkmpDashboardIndex(),
+        icon: Gauge,
     },
     {
         title: 'Data SDM',
@@ -195,10 +203,19 @@ const staffWorkReportNavItems: NavItem[] = [
     },
 ];
 
+const kdkmpManagerNavItems: NavItem[] = [
+    {
+        title: 'Dashboard KDKMP',
+        href: kdkmpDashboardIndex(),
+        icon: Gauge,
+    },
+];
+
 export function AppSidebar() {
     const { auth } = usePage().props;
     const isSuperadmin = auth.user?.role?.level === 'superadmin';
     const isEbitdaKdkmp = auth.user?.role?.slug === 'ebitda_kdkmp';
+    const isKdkmpManager = auth.user?.role?.slug === 'kepala-toko-manager';
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -216,6 +233,7 @@ export function AppSidebar() {
 
             <SidebarContent>
                 {isSuperadmin && <NavMain items={superadminNavItems} />}
+                {isKdkmpManager && <NavMain items={kdkmpManagerNavItems} />}
                 {(isSuperadmin || isEbitdaKdkmp) && (
                     <NavMain
                         items={kdkmpBusinessProcessNavItems}

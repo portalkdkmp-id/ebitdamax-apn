@@ -6,6 +6,8 @@ use App\Http\Controllers\DashboardRedirectController;
 use App\Http\Controllers\EbitdaTreeController;
 use App\Http\Controllers\EbitdaValueController;
 use App\Http\Controllers\ExcelImportController;
+use App\Http\Controllers\KdkmpDashboardController;
+use App\Http\Controllers\KdkmpDashboardMonitoringController;
 use App\Http\Controllers\MeetingActionItemController;
 use App\Http\Controllers\MeetingMinuteController;
 use App\Http\Controllers\MonitoringDashboardController;
@@ -29,6 +31,12 @@ Route::redirect('/', '/dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardRedirectController::class)->name('dashboard');
+
+    Route::get('/dashboard/kdkmp', [KdkmpDashboardController::class, 'index'])
+        ->name('kdkmp-dashboard.index');
+
+    Route::put('/dashboard/kdkmp/today', [KdkmpDashboardController::class, 'upsert'])
+        ->name('kdkmp-dashboard.upsert');
 
     Route::get('/dashboard/tasks', [TaskDashboardController::class, 'index'])
         ->middleware('role.level:staff,manager,superadmin')
@@ -105,6 +113,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware('role.level:superadmin')->group(function () {
         Route::get('/admin-dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+
+        Route::get('/admin/kdkmp-dashboard', KdkmpDashboardMonitoringController::class)
+            ->name('admin.kdkmp-dashboard.index');
 
         Route::resource('organizations', OrganizationController::class)
             ->except(['create', 'edit', 'show']);

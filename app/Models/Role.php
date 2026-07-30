@@ -15,6 +15,8 @@ class Role extends Model
 {
     public const SLUG_EBITDA_KDKMP = 'ebitda_kdkmp';
 
+    public const SLUG_KDKMP_MANAGER = 'kepala-toko-manager';
+
     /** @use HasFactory<RoleFactory> */
     use HasFactory;
 

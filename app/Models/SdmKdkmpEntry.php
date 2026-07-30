@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SdmKdkmpEntry extends Model
 {
@@ -36,5 +38,15 @@ class SdmKdkmpEntry extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function managerUser(): HasOne
+    {
+        return $this->hasOne(User::class);
+    }
+
+    public function dailyEbitdaRecords(): HasMany
+    {
+        return $this->hasMany(EbitdamaxKdkmp::class);
     }
 }

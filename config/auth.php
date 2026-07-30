@@ -114,4 +114,6 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    'kdkmp_manager_initial_password' => env('KDKMP_MANAGER_INITIAL_PASSWORD'),
+
 ];
