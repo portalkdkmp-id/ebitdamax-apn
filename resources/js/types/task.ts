@@ -29,6 +29,16 @@ export type TaskAdditionalFieldInputType =
 export type TaskAdditionalFieldShowWhen = 'start' | 'finish';
 export type TaskPeriod = 'once' | 'daily' | 'weekly' | 'monthly';
 
+export type TaskReportDocument = {
+    phase: 'start' | 'finish';
+    phase_label: string;
+    name: string;
+    mime_type: string | null;
+    size: number;
+    preview_url: string;
+    download_url: string;
+};
+
 export type TaskAdditionalFieldItem = {
     id?: number;
     uuid?: string;

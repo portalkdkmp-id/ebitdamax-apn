@@ -1,5 +1,12 @@
 import { Head, Link } from '@inertiajs/react';
-import { CheckCircle2, ClipboardList, Clock } from 'lucide-react';
+import {
+    CheckCircle2,
+    ClipboardList,
+    Clock,
+    Download,
+    Eye,
+    FileText,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +19,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import type { PaginatedResponse } from '@/types/ebitda';
-import type { TaskCategoryOption } from '@/types/task';
+import type { TaskCategoryOption, TaskReportDocument } from '@/types/task';
 import type { UserRole } from '@/types/user';
 
 type CompletedTaskReport = {
@@ -22,6 +29,7 @@ type CompletedTaskReport = {
     finished_at: string | null;
     duration_minutes: number | null;
     status_label: string;
+    documents: TaskReportDocument[];
     user: {
         id: number;
         name: string;
@@ -123,6 +131,9 @@ export default function CompletedTaskDashboard({
                                         <TableHead className="p-4 text-right">
                                             Durasi
                                         </TableHead>
+                                        <TableHead className="min-w-[220px] p-4">
+                                            Dokumen
+                                        </TableHead>
                                         <TableHead className="p-4">
                                             Status
                                         </TableHead>
@@ -132,7 +143,7 @@ export default function CompletedTaskDashboard({
                                     {reports.data.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={isSuperadmin ? 8 : 7}
+                                                colSpan={isSuperadmin ? 9 : 8}
                                                 className="p-8 text-center text-muted-foreground"
                                             >
                                                 Belum ada tugas selesai.
@@ -209,6 +220,78 @@ export default function CompletedTaskDashboard({
                                                         0}{' '}
                                                     menit
                                                 </span>
+                                            </TableCell>
+                                            <TableCell className="p-4">
+                                                {report.documents.length ===
+                                                0 ? (
+                                                    <span className="text-sm text-muted-foreground">
+                                                        -
+                                                    </span>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {report.documents.map(
+                                                            (
+                                                                document,
+                                                                index,
+                                                            ) => (
+                                                                <div
+                                                                    key={`${document.phase}-${document.name}-${index}`}
+                                                                    className="flex items-center justify-between gap-2 rounded-md border p-2"
+                                                                >
+                                                                    <div className="flex min-w-0 items-center gap-2">
+                                                                        <FileText className="size-4 shrink-0 text-muted-foreground" />
+                                                                        <div className="min-w-0">
+                                                                            <p className="max-w-32 truncate text-xs font-medium">
+                                                                                {
+                                                                                    document.name
+                                                                                }
+                                                                            </p>
+                                                                            <p className="text-[11px] text-muted-foreground">
+                                                                                {
+                                                                                    document.phase_label
+                                                                                }
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex shrink-0">
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            asChild
+                                                                        >
+                                                                            <a
+                                                                                href={
+                                                                                    document.preview_url
+                                                                                }
+                                                                                target="_blank"
+                                                                                rel="noreferrer"
+                                                                                aria-label={`Preview ${document.name}`}
+                                                                            >
+                                                                                <Eye className="size-4" />
+                                                                            </a>
+                                                                        </Button>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            asChild
+                                                                        >
+                                                                            <a
+                                                                                href={
+                                                                                    document.download_url
+                                                                                }
+                                                                                aria-label={`Download ${document.name}`}
+                                                                            >
+                                                                                <Download className="size-4" />
+                                                                            </a>
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                )}
                                             </TableCell>
                                             <TableCell className="p-4">
                                                 <Badge>

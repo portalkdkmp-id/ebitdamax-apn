@@ -88,6 +88,7 @@ class TaskDashboardController extends Controller
                 'finished_at' => $report->finished_at?->toIso8601String(),
                 'duration_minutes' => $report->duration_minutes,
                 'status_label' => $report->status->label(),
+                'documents' => $this->transformDocuments($report),
                 'task' => [
                     'id' => $report->task->id,
                     'uuid' => $report->task->uuid,
@@ -143,6 +144,7 @@ class TaskDashboardController extends Controller
             'period_key' => $periodKey,
             'status' => $status?->value ?? 'pending',
             'status_label' => $status?->label() ?? 'Belum Dimulai',
+            'documents' => $report ? $this->transformDocuments($report) : [],
             'task_category' => [
                 'id' => $task->taskCategory->id,
                 'name' => $task->taskCategory->name,
@@ -178,6 +180,51 @@ class TaskDashboardController extends Controller
                 ->values()
                 ->all(),
         ];
+    }
+
+    /**
+     * @return array<int, array{phase: string, phase_label: string, name: string, mime_type: string|null, size: int, preview_url: string, download_url: string}>
+     */
+    private function transformDocuments(TaskReport $taskReport): array
+    {
+        return collect([
+            'start' => $taskReport->started_documents ?? [],
+            'finish' => $taskReport->finished_documents ?? [],
+        ])->flatMap(function (array $documents, string $phase) use ($taskReport): array {
+            return collect($documents)
+                ->map(function (mixed $document, int $documentIndex) use ($taskReport, $phase): ?array {
+                    if (! is_array($document) || ! isset($document['original_name'], $document['size'])) {
+                        return null;
+                    }
+
+                    $routeParameters = [
+                        'taskReport' => $taskReport,
+                        'phase' => $phase,
+                        'documentIndex' => $documentIndex,
+                    ];
+
+                    return [
+                        'phase' => $phase,
+                        'phase_label' => $phase === 'start' ? 'Mulai' : 'Selesai',
+                        'name' => (string) $document['original_name'],
+                        'mime_type' => isset($document['mime_type']) ? (string) $document['mime_type'] : null,
+                        'size' => (int) $document['size'],
+                        'preview_url' => route(
+                            'task-reports.documents.preview',
+                            $routeParameters,
+                            absolute: false
+                        ),
+                        'download_url' => route(
+                            'task-reports.documents.download',
+                            $routeParameters,
+                            absolute: false
+                        ),
+                    ];
+                })
+                ->filter()
+                ->values()
+                ->all();
+        })->values()->all();
     }
 
     private function periodKey(TaskPeriod $period, CarbonInterface $date): string

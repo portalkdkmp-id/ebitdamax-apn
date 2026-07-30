@@ -4,10 +4,16 @@ import {
     CheckCircle2,
     ClipboardList,
     Clock,
+    Download,
+    Eye,
+    FileText,
     ImageIcon,
     Images,
+    Paperclip,
     Play,
+    X,
 } from 'lucide-react';
+import type { ChangeEvent } from 'react';
 import { useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,11 +40,16 @@ import {
     finish as finishTaskRoute,
     start as startTaskRoute,
 } from '@/routes/tasks';
-import type { TaskAdditionalFieldItem, TaskItem } from '@/types/task';
+import type {
+    TaskAdditionalFieldItem,
+    TaskItem,
+    TaskReportDocument,
+} from '@/types/task';
 
 type DashboardTask = TaskItem & {
     status: 'pending' | 'in_progress' | 'completed';
     status_label: string;
+    documents: TaskReportDocument[];
 };
 
 type Props = {
@@ -56,8 +67,24 @@ type AdditionalFieldValue = string | string[] | boolean;
 type TaskActionFormData = {
     started_photo: File | null;
     finished_photo: File | null;
+    documents: File[];
     values: Record<string, AdditionalFieldValue>;
 };
+
+const MAX_DOCUMENT_COUNT = 10;
+const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024;
+
+function formatFileSize(size: number): string {
+    if (size < 1024) {
+        return `${size} B`;
+    }
+
+    if (size < 1024 * 1024) {
+        return `${(size / 1024).toFixed(1)} KB`;
+    }
+
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function fieldsFor(task: DashboardTask | null, showWhen: 'start' | 'finish') {
     return (
@@ -402,6 +429,7 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
                 photoLabel="Foto Mulai"
                 photoField="started_photo"
                 fields={startFields}
+                existingDocuments={[]}
                 submitLabel="Mulai"
             />
 
@@ -413,6 +441,7 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
                 photoLabel="Foto Selesai"
                 photoField="finished_photo"
                 fields={finishFields}
+                existingDocuments={finishTask?.documents ?? []}
                 submitLabel="Selesaikan"
             />
         </>
@@ -443,6 +472,7 @@ function TaskActionDialog({
     photoLabel,
     photoField,
     fields,
+    existingDocuments,
     submitLabel,
 }: {
     title: string;
@@ -452,6 +482,7 @@ function TaskActionDialog({
     photoLabel: string;
     photoField: 'started_photo' | 'finished_photo';
     fields: TaskAdditionalFieldItem[];
+    existingDocuments: TaskReportDocument[];
     submitLabel: string;
 }) {
     const galleryInputRef = useRef<HTMLInputElement | null>(null);
@@ -463,12 +494,31 @@ function TaskActionDialog({
     );
     const [cameraActive, setCameraActive] = useState(false);
     const [cameraError, setCameraError] = useState<string | null>(null);
-    const { data, setData, post, processing, errors, reset, clearErrors } =
-        useForm<TaskActionFormData>({
-            started_photo: null,
-            finished_photo: null,
-            values: {},
-        });
+    const [documentInputKey, setDocumentInputKey] = useState(0);
+    const [documentSelectionError, setDocumentSelectionError] = useState<
+        string | null
+    >(null);
+    const {
+        data,
+        setData,
+        post,
+        processing,
+        progress,
+        errors,
+        reset,
+        clearErrors,
+    } = useForm<TaskActionFormData>({
+        started_photo: null,
+        finished_photo: null,
+        documents: [],
+        values: {},
+    });
+    const documentError =
+        documentSelectionError ??
+        errors.documents ??
+        Object.entries(errors).find(([field]) =>
+            field.startsWith('documents.'),
+        )?.[1];
 
     const handlePhotoChange = async (file: File | null) => {
         if (!file) {
@@ -586,6 +636,53 @@ function TaskActionDialog({
         });
     };
 
+    const handleDocumentSelection = (event: ChangeEvent<HTMLInputElement>) => {
+        const selectedDocuments = Array.from(event.target.files ?? []);
+
+        if (selectedDocuments.length === 0) {
+            return;
+        }
+
+        const oversizedDocument = selectedDocuments.find(
+            (document) => document.size > MAX_DOCUMENT_SIZE_BYTES,
+        );
+
+        if (oversizedDocument) {
+            setDocumentSelectionError(
+                `File "${oversizedDocument.name}" ditolak karena ukurannya lebih dari 10 MB.`,
+            );
+            setDocumentInputKey((current) => current + 1);
+
+            return;
+        }
+
+        if (
+            data.documents.length + selectedDocuments.length >
+            MAX_DOCUMENT_COUNT
+        ) {
+            setDocumentSelectionError(
+                'Maksimal 10 dokumen dalam satu kali upload.',
+            );
+            setDocumentInputKey((current) => current + 1);
+
+            return;
+        }
+
+        setDocumentSelectionError(null);
+        setData('documents', [...data.documents, ...selectedDocuments]);
+        setDocumentInputKey((current) => current + 1);
+    };
+
+    const removeSelectedDocument = (index: number) => {
+        setDocumentSelectionError(null);
+        setData(
+            'documents',
+            data.documents.filter(
+                (_, documentIndex) => documentIndex !== index,
+            ),
+        );
+    };
+
     const closeDialog = () => {
         reset();
         clearErrors();
@@ -593,6 +690,8 @@ function TaskActionDialog({
         setPreviewUrl(null);
         setCompressionLabel(null);
         setCameraError(null);
+        setDocumentSelectionError(null);
+        setDocumentInputKey((current) => current + 1);
 
         if (galleryInputRef.current) {
             galleryInputRef.current.value = '';
@@ -622,11 +721,12 @@ function TaskActionDialog({
                 }
             }}
         >
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>
-                        Lengkapi foto dan field tambahan yang dibutuhkan.
+                        Lengkapi foto, dokumen, dan field tambahan yang
+                        dibutuhkan.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -739,6 +839,149 @@ function TaskActionDialog({
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <div className="space-y-3 rounded-lg border p-4">
+                        <div>
+                            <h3 className="flex items-center gap-2 text-sm font-semibold">
+                                <Paperclip className="size-4" />
+                                Dokumen Pendukung
+                            </h3>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Maksimal 10 file per tahap dan 10 MB per file.
+                            </p>
+                        </div>
+
+                        {existingDocuments.length > 0 && (
+                            <div className="space-y-2">
+                                <Label>Dokumen tahap sebelumnya</Label>
+                                {existingDocuments.map((document, index) => (
+                                    <div
+                                        key={`${document.phase}-${document.name}-${index}`}
+                                        className="flex flex-col gap-3 rounded-md border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <FileText className="size-5 shrink-0 text-muted-foreground" />
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-medium">
+                                                    {document.name}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {document.phase_label} ·{' '}
+                                                    {formatFileSize(
+                                                        document.size,
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex shrink-0 gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                asChild
+                                            >
+                                                <a
+                                                    href={document.preview_url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    <Eye className="size-4" />
+                                                    Preview
+                                                </a>
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                asChild
+                                            >
+                                                <a href={document.download_url}>
+                                                    <Download className="size-4" />
+                                                    Download
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <Label htmlFor={`${photoField}-documents`}>
+                                Upload dokumen
+                            </Label>
+                            <Input
+                                key={documentInputKey}
+                                id={`${photoField}-documents`}
+                                type="file"
+                                multiple
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png"
+                                onChange={handleDocumentSelection}
+                                disabled={
+                                    processing ||
+                                    data.documents.length >= MAX_DOCUMENT_COUNT
+                                }
+                            />
+                            {documentError && (
+                                <p className="text-sm text-destructive">
+                                    {documentError}
+                                </p>
+                            )}
+                        </div>
+
+                        {data.documents.length > 0 && (
+                            <div className="space-y-2">
+                                <Label>Dokumen yang akan diupload</Label>
+                                {data.documents.map((document, index) => (
+                                    <div
+                                        key={`${document.name}-${document.lastModified}-${index}`}
+                                        className="flex items-center justify-between gap-3 rounded-md border bg-muted/20 p-3"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <FileText className="size-5 shrink-0 text-muted-foreground" />
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-medium">
+                                                    {document.name}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {formatFileSize(
+                                                        document.size,
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() =>
+                                                removeSelectedDocument(index)
+                                            }
+                                            aria-label={`Hapus ${document.name}`}
+                                        >
+                                            <X className="size-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {progress && (
+                            <div className="space-y-1">
+                                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                    <div
+                                        className="h-full bg-primary transition-all"
+                                        style={{
+                                            width: `${progress.percentage}%`,
+                                        }}
+                                    />
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Mengunggah {progress.percentage}%
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {fields.map((field) => (

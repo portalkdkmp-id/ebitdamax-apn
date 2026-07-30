@@ -19,6 +19,7 @@ use App\Http\Controllers\TaskCategoryController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDashboardController;
 use App\Http\Controllers\TaskReportController;
+use App\Http\Controllers\TaskReportDocumentController;
 use App\Http\Controllers\UnitCostAssumptionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValueChainJobdeskController;
@@ -44,6 +45,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/tasks/{task}/finish', [TaskReportController::class, 'finish'])
         ->middleware('role.level:staff,manager,superadmin')
         ->name('tasks.finish');
+
+    Route::get(
+        '/task-reports/{taskReport}/documents/{phase}/{documentIndex}/preview',
+        [TaskReportDocumentController::class, 'preview']
+    )
+        ->whereIn('phase', ['start', 'finish'])
+        ->whereNumber('documentIndex')
+        ->name('task-reports.documents.preview');
+
+    Route::get(
+        '/task-reports/{taskReport}/documents/{phase}/{documentIndex}/download',
+        [TaskReportDocumentController::class, 'download']
+    )
+        ->whereIn('phase', ['start', 'finish'])
+        ->whereNumber('documentIndex')
+        ->name('task-reports.documents.download');
 
     Route::resource('meeting-minutes', MeetingMinuteController::class)
         ->except(['create', 'edit', 'show']);

@@ -246,7 +246,7 @@ class MeetingMinuteController extends Controller
         ?int $uploadedBy,
         array &$storedFiles
     ): void {
-        $disk = (string) config('filesystems.meeting_minute_attachments_disk', 'local');
+        $disk = (string) config('filesystems.documents_disk', 'local');
 
         foreach ($documents as $document) {
             $path = $document->store("meeting-minutes/{$meetingMinute->id}", $disk);
