@@ -3,7 +3,6 @@ import {
     AlertTriangle,
     CheckCircle2,
     CircleDashed,
-    ClipboardList,
     Search,
     Store,
 } from 'lucide-react';
@@ -76,11 +75,7 @@ function StatusBadge({
 
     return (
         <div className="flex flex-col items-start gap-2">
-            {entry.is_complete ? (
-                <Badge className="bg-emerald-600 text-white">Lengkap</Badge>
-            ) : (
-                <Badge className="bg-amber-500 text-white">Draft</Badge>
-            )}
+            <Badge className="bg-emerald-600 text-white">Lengkap</Badge>
             {entry.plan_revenue_requires_review && (
                 <Badge className="bg-rose-600 text-white">
                     Review Plan Revenue
@@ -154,7 +149,7 @@ export default function KdkmpDashboardMonitoring({
                         </p>
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <SummaryCard
                             label="Total KDKMP Manager"
                             value={summary.total}
@@ -166,12 +161,6 @@ export default function KdkmpDashboardMonitoring({
                             value={summary.complete}
                             icon={<CheckCircle2 className="size-5" />}
                             tone="bg-emerald-500/10 text-emerald-600"
-                        />
-                        <SummaryCard
-                            label="Masih Draft"
-                            value={summary.draft}
-                            icon={<ClipboardList className="size-5" />}
-                            tone="bg-amber-500/10 text-amber-600"
                         />
                         <SummaryCard
                             label="Belum Diisi"
@@ -225,9 +214,6 @@ export default function KdkmpDashboardMonitoring({
                                             </SelectItem>
                                             <SelectItem value="complete">
                                                 Lengkap
-                                            </SelectItem>
-                                            <SelectItem value="draft">
-                                                Draft
                                             </SelectItem>
                                             <SelectItem value="not_filled">
                                                 Belum diisi

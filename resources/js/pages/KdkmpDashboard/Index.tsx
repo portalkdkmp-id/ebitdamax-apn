@@ -210,11 +210,7 @@ function EntryStatus({ entry }: { entry: KdkmpDailyEntry | null }) {
 
     return (
         <div className="flex flex-wrap gap-2">
-            {entry.is_complete ? (
-                <Badge className="bg-emerald-600 text-white">Lengkap</Badge>
-            ) : (
-                <Badge className="bg-amber-500 text-white">Draft</Badge>
-            )}
+            <Badge className="bg-emerald-600 text-white">Lengkap</Badge>
             {entry.plan_revenue_requires_review && (
                 <Badge className="bg-rose-600 text-white">
                     Perlu review Plan Revenue
@@ -277,8 +273,8 @@ export default function KdkmpDashboardIndex({
                                     Dashboard EBITDAMAX KDKMP
                                 </h1>
                                 <p className="mt-2 text-muted-foreground">
-                                    Isi pencapaian harian KDKMP. Data dapat
-                                    disimpan bertahap sebagai draft.
+                                    Isi pencapaian harian KDKMP. Setiap data
+                                    yang disimpan langsung berstatus lengkap.
                                 </p>
                             </div>
                             <EntryStatus entry={todayEntry} />
@@ -449,9 +445,9 @@ export default function KdkmpDashboardIndex({
 
                                         <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
                                             <p className="text-sm text-muted-foreground">
-                                                Kolom yang belum tersedia boleh
-                                                dikosongkan dan disimpan sebagai
-                                                draft.
+                                                Nilai 0 maupun kolom yang belum
+                                                tersedia tetap dapat disimpan
+                                                sebagai data lengkap.
                                             </p>
                                             <Button
                                                 type="submit"

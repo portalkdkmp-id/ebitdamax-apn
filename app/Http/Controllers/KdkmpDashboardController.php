@@ -101,8 +101,7 @@ class KdkmpDashboardController extends Controller
 
         $message = match (true) {
             $entry->plan_revenue_requires_review => 'Data berhasil disimpan dan Plan Revenue ditandai untuk direview superadmin.',
-            $entry->isComplete() => 'Dashboard harian KDKMP berhasil disimpan lengkap.',
-            default => 'Draft dashboard harian KDKMP berhasil disimpan.',
+            default => 'Dashboard harian KDKMP berhasil disimpan lengkap.',
         };
 
         return back()->with('success', $message);

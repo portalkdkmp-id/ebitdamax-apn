@@ -37,11 +37,6 @@ class KdkmpDashboardMonitoringController extends Controller
                 $this->forDate($query, $reportDate);
             })
             ->count();
-        $complete = (clone $baseQuery)
-            ->whereHas('dailyEbitdaRecords', function (Builder $query) use ($reportDate): void {
-                $this->completeForDate($query, $reportDate);
-            })
-            ->count();
         $requiresReview = (clone $baseQuery)
             ->whereHas('dailyEbitdaRecords', function (Builder $query) use ($reportDate): void {
                 $this->forDate($query, $reportDate);
@@ -74,12 +69,7 @@ class KdkmpDashboardMonitoringController extends Controller
             })
             ->when($status === 'complete', function (Builder $query) use ($reportDate): void {
                 $query->whereHas('dailyEbitdaRecords', function (Builder $recordQuery) use ($reportDate): void {
-                    $this->completeForDate($recordQuery, $reportDate);
-                });
-            })
-            ->when($status === 'draft', function (Builder $query) use ($reportDate): void {
-                $query->whereHas('dailyEbitdaRecords', function (Builder $recordQuery) use ($reportDate): void {
-                    $this->draftForDate($recordQuery, $reportDate);
+                    $this->forDate($recordQuery, $reportDate);
                 });
             })
             ->when($status === 'not_filled', function (Builder $query) use ($reportDate): void {
@@ -120,8 +110,7 @@ class KdkmpDashboardMonitoringController extends Controller
             'entries' => $entries,
             'summary' => [
                 'total' => $total,
-                'complete' => $complete,
-                'draft' => $filled - $complete,
+                'complete' => $filled,
                 'not_filled' => $total - $filled,
                 'requires_review' => $requiresReview,
             ],
@@ -145,35 +134,6 @@ class KdkmpDashboardMonitoringController extends Controller
     private function forDate(Builder $query, string $reportDate): void
     {
         $query->whereDate('report_date', $reportDate);
-    }
-
-    private function completeForDate(Builder $query, string $reportDate): void
-    {
-        $this->forDate($query, $reportDate);
-
-        foreach (EbitdamaxKdkmp::ACTIVE_FIELDS as $field) {
-            $query->whereNotNull($field)->where($field, '<>', '');
-        }
-    }
-
-    private function draftForDate(Builder $query, string $reportDate): void
-    {
-        $this->forDate($query, $reportDate);
-        $query->where(function (Builder $draftQuery): void {
-            foreach (EbitdamaxKdkmp::ACTIVE_FIELDS as $index => $field) {
-                if ($index === 0) {
-                    $draftQuery
-                        ->whereNull($field)
-                        ->orWhere($field, '');
-
-                    continue;
-                }
-
-                $draftQuery
-                    ->orWhereNull($field)
-                    ->orWhere($field, '');
-            }
-        });
     }
 
     /**

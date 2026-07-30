@@ -88,17 +88,7 @@ class EbitdamaxKdkmp extends Model
 
     public function isComplete(): bool
     {
-        foreach (self::ACTIVE_FIELDS as $field) {
-            $value = $field === 'actual_ebitda_margin'
-                ? self::calculateActualEbitdaMargin($this->actual_revenue)
-                : $this->getAttribute($field);
-
-            if ($value === null || trim((string) $value) === '') {
-                return false;
-            }
-        }
-
-        return true;
+        return $this->exists;
     }
 
     public static function planRevenueRequiresReview(?string $planRevenue): bool

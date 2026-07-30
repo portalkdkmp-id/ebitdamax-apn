@@ -63,13 +63,12 @@ export type KdkmpMonitoringProps = {
     summary: {
         total: number;
         complete: number;
-        draft: number;
         not_filled: number;
         requires_review: number;
     };
     filters: {
         date: string;
         search: string;
-        status: 'all' | 'complete' | 'draft' | 'not_filled' | 'requires_review';
+        status: 'all' | 'complete' | 'not_filled' | 'requires_review';
     };
 };
