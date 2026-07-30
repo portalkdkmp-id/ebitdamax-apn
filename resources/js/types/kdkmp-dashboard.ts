@@ -10,16 +10,25 @@ export type KdkmpIdentity = {
     provinsi: string | null;
 };
 
-export type KdkmpDailyEntry = {
+export type KdkmpManualFields = {
+    target_revenue: string | null;
+    plan_revenue: string | null;
+    actual_revenue: string | null;
+    target_cost: string | null;
+    plan_cost: string | null;
+    actual_cost: string | null;
+    target_ebitda: string | null;
+    plan_ebitda: string | null;
+    actual_ebitda: string | null;
+    target_ebitda_margin: string | null;
+    actual_ebitda_margin: string | null;
+    total_duration: string | null;
+    performance_scoring: string | null;
+};
+
+export type KdkmpDailyEntry = KdkmpManualFields & {
     id: number;
     report_date: string;
-    target_revenue: number | null;
-    actual_revenue: number | null;
-    cost: number | null;
-    total_duration_minutes: number | null;
-    duration_hours: number | null;
-    duration_minutes: number | null;
-    performance_score: number | null;
     is_complete: boolean;
     updated_at: string | null;
 };
@@ -37,16 +46,10 @@ export type KdkmpMonitoringEntry = KdkmpIdentity & {
         email: string;
         username: string | null;
     } | null;
-    daily_entry: Pick<
-        KdkmpDailyEntry,
-        | 'target_revenue'
-        | 'actual_revenue'
-        | 'cost'
-        | 'total_duration_minutes'
-        | 'performance_score'
-        | 'is_complete'
-        | 'updated_at'
-    > | null;
+    daily_entry:
+        | (KdkmpManualFields &
+              Pick<KdkmpDailyEntry, 'is_complete' | 'updated_at'>)
+        | null;
 };
 
 export type KdkmpMonitoringProps = {

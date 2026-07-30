@@ -23,23 +23,20 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import InputError from '@/components/input-error';
+import { kdkmpManualFields } from '@/lib/kdkmp-dashboard-fields';
 import { upsert } from '@/routes/kdkmp-dashboard';
 import type {
     KdkmpDailyEntry,
     KdkmpManagerDashboardProps,
+    KdkmpManualFields,
 } from '@/types/kdkmp-dashboard';
 
 type DailyForm = {
-    target_revenue: string;
-    actual_revenue: string;
-    cost: string;
-    duration_hours: string;
-    duration_minutes: string;
-    performance_score: string;
+    [Field in keyof KdkmpManualFields]: string;
 };
 
-function inputValue(value: number | null | undefined): string {
-    return value === null || value === undefined ? '' : String(value);
+function inputValue(value: string | null | undefined): string {
+    return value ?? '';
 }
 
 function formatRupiahInput(value: string): string {
@@ -47,19 +44,28 @@ function formatRupiahInput(value: string): string {
         return '';
     }
 
-    const [integerPart, decimalPart] = value.split('.');
+    if (value === '-') {
+        return '-';
+    }
+
+    const isNegative = value.startsWith('-');
+    const [integerPart, decimalPart] = value.replace(/^-/, '').split('.');
     const integerDigits = integerPart.replace(/\D/g, '') || '0';
     const formattedInteger = integerDigits.replace(
         /\B(?=(\d{3})+(?!\d))/g,
         '.',
     );
 
-    return decimalPart === undefined
-        ? formattedInteger
-        : `${formattedInteger},${decimalPart.slice(0, 2)}`;
+    const formattedValue =
+        decimalPart === undefined
+            ? formattedInteger
+            : `${formattedInteger},${decimalPart.slice(0, 2)}`;
+
+    return isNegative ? `-${formattedValue}` : formattedValue;
 }
 
 function parseRupiahInput(value: string): string {
+    const isNegative = value.trimStart().startsWith('-');
     const sanitized = value.replace(/[^\d,.]/g, '').replaceAll('.', '');
     const [integerPart, ...decimalParts] = sanitized.split(',');
     const integerDigits = integerPart
@@ -68,14 +74,16 @@ function parseRupiahInput(value: string): string {
     const decimalDigits = decimalParts.join('').replace(/\D/g, '').slice(0, 2);
 
     if (integerDigits === '' && decimalDigits === '') {
-        return '';
+        return isNegative ? '-' : '';
     }
+
+    const prefix = isNegative ? '-' : '';
 
     if (sanitized.includes(',')) {
-        return `${integerDigits || '0'}.${decimalDigits}`;
+        return `${prefix}${integerDigits || '0'}.${decimalDigits}`;
     }
 
-    return integerDigits;
+    return `${prefix}${integerDigits}`;
 }
 
 function RupiahInput({
@@ -110,11 +118,18 @@ function RupiahInput({
 function formDataFrom(entry: KdkmpDailyEntry | null): DailyForm {
     return {
         target_revenue: inputValue(entry?.target_revenue),
+        plan_revenue: inputValue(entry?.plan_revenue),
         actual_revenue: inputValue(entry?.actual_revenue),
-        cost: inputValue(entry?.cost),
-        duration_hours: inputValue(entry?.duration_hours),
-        duration_minutes: inputValue(entry?.duration_minutes),
-        performance_score: inputValue(entry?.performance_score),
+        target_cost: inputValue(entry?.target_cost),
+        plan_cost: inputValue(entry?.plan_cost),
+        actual_cost: inputValue(entry?.actual_cost),
+        target_ebitda: inputValue(entry?.target_ebitda),
+        plan_ebitda: inputValue(entry?.plan_ebitda),
+        actual_ebitda: inputValue(entry?.actual_ebitda),
+        target_ebitda_margin: inputValue(entry?.target_ebitda_margin),
+        actual_ebitda_margin: inputValue(entry?.actual_ebitda_margin),
+        total_duration: inputValue(entry?.total_duration),
+        performance_scoring: inputValue(entry?.performance_scoring),
     };
 }
 
@@ -126,27 +141,20 @@ function formatDate(value: string): string {
     }).format(new Date(`${value}T00:00:00`));
 }
 
-function formatCurrency(value: number | null): string {
-    if (value === null) {
+function formatManualValue(value: string | null, isRupiah: boolean): string {
+    if (value === null || value.trim() === '') {
         return '-';
+    }
+
+    if (!isRupiah || !/^-?\d+(\.\d{0,2})?$/.test(value)) {
+        return value;
     }
 
     return new Intl.NumberFormat('id-ID', {
         style: 'currency',
         currency: 'IDR',
         maximumFractionDigits: 2,
-    }).format(value);
-}
-
-function formatDuration(value: number | null): string {
-    if (value === null) {
-        return '-';
-    }
-
-    const hours = Math.floor(value / 60);
-    const minutes = value % 60;
-
-    return `${hours} jam ${minutes} menit`;
+    }).format(Number(value));
 }
 
 function EntryStatus({ entry }: { entry: KdkmpDailyEntry | null }) {
@@ -283,173 +291,55 @@ export default function KdkmpDashboardIndex({
                                         className="space-y-6"
                                     >
                                         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="target_revenue">
-                                                    Target Revenue
-                                                </Label>
-                                                <RupiahInput
-                                                    id="target_revenue"
-                                                    value={data.target_revenue}
-                                                    onValueChange={(value) =>
-                                                        setData(
-                                                            'target_revenue',
-                                                            value,
-                                                        )
-                                                    }
-                                                />
-                                                <InputError
-                                                    message={
-                                                        errors.target_revenue
-                                                    }
-                                                />
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <Label htmlFor="actual_revenue">
-                                                    Actual Revenue
-                                                </Label>
-                                                <RupiahInput
-                                                    id="actual_revenue"
-                                                    value={data.actual_revenue}
-                                                    onValueChange={(value) =>
-                                                        setData(
-                                                            'actual_revenue',
-                                                            value,
-                                                        )
-                                                    }
-                                                />
-                                                <InputError
-                                                    message={
-                                                        errors.actual_revenue
-                                                    }
-                                                />
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <Label htmlFor="cost">
-                                                    Cost
-                                                </Label>
-                                                <RupiahInput
-                                                    id="cost"
-                                                    value={data.cost}
-                                                    onValueChange={(value) =>
-                                                        setData('cost', value)
-                                                    }
-                                                />
-                                                <InputError
-                                                    message={errors.cost}
-                                                />
-                                            </div>
-
-                                            <div className="space-y-2 md:col-span-2 xl:col-span-1">
-                                                <Label>Total Duration</Label>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <div className="relative">
-                                                            <Input
-                                                                aria-label="Durasi jam"
-                                                                type="number"
-                                                                min="0"
-                                                                step="1"
-                                                                value={
-                                                                    data.duration_hours
-                                                                }
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    setData(
-                                                                        'duration_hours',
-                                                                        event
-                                                                            .target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                className="pr-12"
-                                                                placeholder="0"
-                                                            />
-                                                            <span className="absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
-                                                                jam
-                                                            </span>
-                                                        </div>
-                                                        <InputError
-                                                            message={
-                                                                errors.duration_hours
+                                            {kdkmpManualFields.map((field) => (
+                                                <div
+                                                    key={field.key}
+                                                    className="space-y-2"
+                                                >
+                                                    <Label htmlFor={field.key}>
+                                                        {field.label}
+                                                    </Label>
+                                                    {field.isRupiah ? (
+                                                        <RupiahInput
+                                                            id={field.key}
+                                                            value={
+                                                                data[field.key]
                                                             }
-                                                            className="mt-2"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <div className="relative">
-                                                            <Input
-                                                                aria-label="Durasi menit"
-                                                                type="number"
-                                                                min="0"
-                                                                max="59"
-                                                                step="1"
-                                                                value={
-                                                                    data.duration_minutes
-                                                                }
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    setData(
-                                                                        'duration_minutes',
-                                                                        event
-                                                                            .target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                className="pr-14"
-                                                                placeholder="0"
-                                                            />
-                                                            <span className="absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
-                                                                menit
-                                                            </span>
-                                                        </div>
-                                                        <InputError
-                                                            message={
-                                                                errors.duration_minutes
+                                                            onValueChange={(
+                                                                value,
+                                                            ) =>
+                                                                setData(
+                                                                    field.key,
+                                                                    value,
+                                                                )
                                                             }
-                                                            className="mt-2"
                                                         />
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <Label htmlFor="performance_score">
-                                                    Performance Score
-                                                </Label>
-                                                <div className="relative">
-                                                    <Input
-                                                        id="performance_score"
-                                                        type="number"
-                                                        min="0"
-                                                        max="100"
-                                                        step="0.01"
-                                                        value={
-                                                            data.performance_score
+                                                    ) : (
+                                                        <Input
+                                                            id={field.key}
+                                                            type="text"
+                                                            value={
+                                                                data[field.key]
+                                                            }
+                                                            onChange={(event) =>
+                                                                setData(
+                                                                    field.key,
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder={
+                                                                field.placeholder
+                                                            }
+                                                        />
+                                                    )}
+                                                    <InputError
+                                                        message={
+                                                            errors[field.key]
                                                         }
-                                                        onChange={(event) =>
-                                                            setData(
-                                                                'performance_score',
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                        className="pr-10"
-                                                        placeholder="0"
                                                     />
-                                                    <span className="absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted-foreground">
-                                                        %
-                                                    </span>
                                                 </div>
-                                                <InputError
-                                                    message={
-                                                        errors.performance_score
-                                                    }
-                                                />
-                                            </div>
+                                            ))}
                                         </div>
 
                                         <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
@@ -483,21 +373,15 @@ export default function KdkmpDashboardIndex({
                         </CardHeader>
                         <CardContent className="space-y-4 p-5">
                             <div className="overflow-x-auto">
-                                <Table className="min-w-[980px]">
+                                <Table className="min-w-[2700px]">
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Tanggal</TableHead>
-                                            <TableHead>
-                                                Target Revenue
-                                            </TableHead>
-                                            <TableHead>
-                                                Actual Revenue
-                                            </TableHead>
-                                            <TableHead>Cost</TableHead>
-                                            <TableHead>
-                                                Total Duration
-                                            </TableHead>
-                                            <TableHead>Performance</TableHead>
+                                            {kdkmpManualFields.map((field) => (
+                                                <TableHead key={field.key}>
+                                                    {field.label}
+                                                </TableHead>
+                                            ))}
                                             <TableHead>Status</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -505,7 +389,10 @@ export default function KdkmpDashboardIndex({
                                         {history.data.length === 0 && (
                                             <TableRow>
                                                 <TableCell
-                                                    colSpan={7}
+                                                    colSpan={
+                                                        kdkmpManualFields.length +
+                                                        2
+                                                    }
                                                     className="py-8 text-center text-muted-foreground"
                                                 >
                                                     Belum ada riwayat laporan
@@ -520,30 +407,22 @@ export default function KdkmpDashboardIndex({
                                                         entry.report_date,
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="tabular-nums">
-                                                    {formatCurrency(
-                                                        entry.target_revenue,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="tabular-nums">
-                                                    {formatCurrency(
-                                                        entry.actual_revenue,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="tabular-nums">
-                                                    {formatCurrency(entry.cost)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {formatDuration(
-                                                        entry.total_duration_minutes,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="tabular-nums">
-                                                    {entry.performance_score ===
-                                                    null
-                                                        ? '-'
-                                                        : `${entry.performance_score}%`}
-                                                </TableCell>
+                                                {kdkmpManualFields.map(
+                                                    (field) => (
+                                                        <TableCell
+                                                            key={field.key}
+                                                            className="tabular-nums"
+                                                        >
+                                                            {formatManualValue(
+                                                                entry[
+                                                                    field.key
+                                                                ],
+                                                                field.isRupiah ===
+                                                                    true,
+                                                            )}
+                                                        </TableCell>
+                                                    ),
+                                                )}
                                                 <TableCell>
                                                     <EntryStatus
                                                         entry={entry}

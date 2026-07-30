@@ -10,16 +10,40 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[UsePolicy(EbitdamaxKdkmpPolicy::class)]
 class EbitdamaxKdkmp extends Model
 {
+    public const MANUAL_FIELDS = [
+        'target_revenue',
+        'plan_revenue',
+        'actual_revenue',
+        'target_cost',
+        'plan_cost',
+        'actual_cost',
+        'target_ebitda',
+        'plan_ebitda',
+        'actual_ebitda',
+        'target_ebitda_margin',
+        'actual_ebitda_margin',
+        'total_duration',
+        'performance_scoring',
+    ];
+
     protected $table = 'ebitdamax_kdkmp';
 
     protected $fillable = [
         'sdm_kdkmp_entry_id',
         'report_date',
         'target_revenue',
+        'plan_revenue',
         'actual_revenue',
-        'cost',
-        'total_duration_minutes',
-        'performance_score',
+        'target_cost',
+        'plan_cost',
+        'actual_cost',
+        'target_ebitda',
+        'plan_ebitda',
+        'actual_ebitda',
+        'target_ebitda_margin',
+        'actual_ebitda_margin',
+        'total_duration',
+        'performance_scoring',
         'created_by',
         'updated_by',
     ];
@@ -41,11 +65,15 @@ class EbitdamaxKdkmp extends Model
 
     public function isComplete(): bool
     {
-        return $this->target_revenue !== null
-            && $this->actual_revenue !== null
-            && $this->cost !== null
-            && $this->total_duration_minutes !== null
-            && $this->performance_score !== null;
+        foreach (self::MANUAL_FIELDS as $field) {
+            $value = $this->getAttribute($field);
+
+            if ($value === null || trim((string) $value) === '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -57,11 +85,6 @@ class EbitdamaxKdkmp extends Model
     {
         return [
             'report_date' => 'date',
-            'target_revenue' => 'decimal:2',
-            'actual_revenue' => 'decimal:2',
-            'cost' => 'decimal:2',
-            'total_duration_minutes' => 'integer',
-            'performance_score' => 'decimal:2',
         ];
     }
 }

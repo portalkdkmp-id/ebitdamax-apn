@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\MonitorEbitdamaxKdkmpRequest;
+use App\Models\EbitdamaxKdkmp;
 use App\Models\Role;
 use App\Models\SdmKdkmpEntry;
 use Carbon\CarbonImmutable;
@@ -108,24 +109,29 @@ class KdkmpDashboardMonitoringController extends Controller
     private function completeForDate(Builder $query, string $reportDate): void
     {
         $this->forDate($query, $reportDate);
-        $query
-            ->whereNotNull('target_revenue')
-            ->whereNotNull('actual_revenue')
-            ->whereNotNull('cost')
-            ->whereNotNull('total_duration_minutes')
-            ->whereNotNull('performance_score');
+
+        foreach (EbitdamaxKdkmp::MANUAL_FIELDS as $field) {
+            $query->whereNotNull($field)->where($field, '<>', '');
+        }
     }
 
     private function draftForDate(Builder $query, string $reportDate): void
     {
         $this->forDate($query, $reportDate);
         $query->where(function (Builder $draftQuery): void {
-            $draftQuery
-                ->whereNull('target_revenue')
-                ->orWhereNull('actual_revenue')
-                ->orWhereNull('cost')
-                ->orWhereNull('total_duration_minutes')
-                ->orWhereNull('performance_score');
+            foreach (EbitdamaxKdkmp::MANUAL_FIELDS as $index => $field) {
+                if ($index === 0) {
+                    $draftQuery
+                        ->whereNull($field)
+                        ->orWhere($field, '');
+
+                    continue;
+                }
+
+                $draftQuery
+                    ->orWhereNull($field)
+                    ->orWhere($field, '');
+            }
         });
     }
 
@@ -135,6 +141,19 @@ class KdkmpDashboardMonitoringController extends Controller
     private function transformEntry(SdmKdkmpEntry $entry): array
     {
         $dailyEntry = $entry->dailyEbitdaRecords->first();
+
+        $dailyEntryData = null;
+
+        if ($dailyEntry) {
+            $dailyEntryData = [
+                'is_complete' => $dailyEntry->isComplete(),
+                'updated_at' => $dailyEntry->updated_at?->toIso8601String(),
+            ];
+
+            foreach (EbitdamaxKdkmp::MANUAL_FIELDS as $field) {
+                $dailyEntryData[$field] = $dailyEntry->getAttribute($field);
+            }
+        }
 
         return [
             'id' => $entry->id,
@@ -149,15 +168,7 @@ class KdkmpDashboardMonitoringController extends Controller
                 'email' => $entry->managerUser->email,
                 'username' => $entry->managerUser->username,
             ] : null,
-            'daily_entry' => $dailyEntry ? [
-                'target_revenue' => $dailyEntry->target_revenue !== null ? (float) $dailyEntry->target_revenue : null,
-                'actual_revenue' => $dailyEntry->actual_revenue !== null ? (float) $dailyEntry->actual_revenue : null,
-                'cost' => $dailyEntry->cost !== null ? (float) $dailyEntry->cost : null,
-                'total_duration_minutes' => $dailyEntry->total_duration_minutes,
-                'performance_score' => $dailyEntry->performance_score !== null ? (float) $dailyEntry->performance_score : null,
-                'is_complete' => $dailyEntry->isComplete(),
-                'updated_at' => $dailyEntry->updated_at?->toIso8601String(),
-            ] : null,
+            'daily_entry' => $dailyEntryData,
         ];
     }
 }

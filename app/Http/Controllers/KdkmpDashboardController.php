@@ -60,12 +60,6 @@ class KdkmpDashboardController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User && $user->sdm_kdkmp_entry_id !== null, 403);
 
-        $hours = $request->validated('duration_hours');
-        $minutes = $request->validated('duration_minutes');
-        $totalDurationMinutes = $hours === null && $minutes === null
-            ? null
-            : ((int) ($hours ?? 0) * 60) + (int) ($minutes ?? 0);
-
         $entry = EbitdamaxKdkmp::query()->firstOrNew([
             'sdm_kdkmp_entry_id' => $user->sdm_kdkmp_entry_id,
             'report_date' => $this->businessDate()->toDateString(),
@@ -75,14 +69,13 @@ class KdkmpDashboardController extends Controller
             $entry->created_by = $user->id;
         }
 
-        $entry->fill([
-            'target_revenue' => $request->validated('target_revenue'),
-            'actual_revenue' => $request->validated('actual_revenue'),
-            'cost' => $request->validated('cost'),
-            'total_duration_minutes' => $totalDurationMinutes,
-            'performance_score' => $request->validated('performance_score'),
-            'updated_by' => $user->id,
-        ]);
+        $payload = ['updated_by' => $user->id];
+
+        foreach (EbitdamaxKdkmp::MANUAL_FIELDS as $field) {
+            $payload[$field] = $request->validated($field);
+        }
+
+        $entry->fill($payload);
         $entry->save();
 
         $message = $entry->isComplete()
@@ -97,21 +90,18 @@ class KdkmpDashboardController extends Controller
      */
     private function transformEntry(EbitdamaxKdkmp $entry): array
     {
-        $durationMinutes = $entry->total_duration_minutes;
-
-        return [
+        $data = [
             'id' => $entry->id,
             'report_date' => $entry->report_date?->toDateString(),
-            'target_revenue' => $entry->target_revenue !== null ? (float) $entry->target_revenue : null,
-            'actual_revenue' => $entry->actual_revenue !== null ? (float) $entry->actual_revenue : null,
-            'cost' => $entry->cost !== null ? (float) $entry->cost : null,
-            'total_duration_minutes' => $durationMinutes,
-            'duration_hours' => $durationMinutes !== null ? intdiv($durationMinutes, 60) : null,
-            'duration_minutes' => $durationMinutes !== null ? $durationMinutes % 60 : null,
-            'performance_score' => $entry->performance_score !== null ? (float) $entry->performance_score : null,
             'is_complete' => $entry->isComplete(),
             'updated_at' => $entry->updated_at?->toIso8601String(),
         ];
+
+        foreach (EbitdamaxKdkmp::MANUAL_FIELDS as $field) {
+            $data[$field] = $entry->getAttribute($field);
+        }
+
+        return $data;
     }
 
     /**

@@ -28,6 +28,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { kdkmpManualFields } from '@/lib/kdkmp-dashboard-fields';
 import { index as monitoringIndex } from '@/routes/admin/kdkmp-dashboard';
 import type {
     KdkmpMonitoringEntry,
@@ -44,24 +45,23 @@ function formatDate(value: string): string {
     }).format(new Date(`${value}T00:00:00`));
 }
 
-function formatCurrency(value: number | null | undefined): string {
-    if (value === null || value === undefined) {
+function formatManualValue(
+    value: string | null | undefined,
+    isRupiah: boolean,
+): string {
+    if (value === null || value === undefined || value.trim() === '') {
         return '-';
+    }
+
+    if (!isRupiah || !/^-?\d+(\.\d{0,2})?$/.test(value)) {
+        return value;
     }
 
     return new Intl.NumberFormat('id-ID', {
         style: 'currency',
         currency: 'IDR',
         maximumFractionDigits: 2,
-    }).format(value);
-}
-
-function formatDuration(value: number | null | undefined): string {
-    if (value === null || value === undefined) {
-        return '-';
-    }
-
-    return `${Math.floor(value / 60)} jam ${value % 60} menit`;
+    }).format(Number(value));
 }
 
 function StatusBadge({
@@ -250,24 +250,18 @@ export default function KdkmpDashboardMonitoring({
                             </div>
 
                             <div className="overflow-x-auto">
-                                <Table className="min-w-[1380px]">
+                                <Table className="min-w-[3000px]">
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>
                                                 KDKMP / Manager
                                             </TableHead>
                                             <TableHead>Wilayah</TableHead>
-                                            <TableHead>
-                                                Target Revenue
-                                            </TableHead>
-                                            <TableHead>
-                                                Actual Revenue
-                                            </TableHead>
-                                            <TableHead>Cost</TableHead>
-                                            <TableHead>
-                                                Total Duration
-                                            </TableHead>
-                                            <TableHead>Performance</TableHead>
+                                            {kdkmpManualFields.map((field) => (
+                                                <TableHead key={field.key}>
+                                                    {field.label}
+                                                </TableHead>
+                                            ))}
                                             <TableHead>Status</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -275,7 +269,10 @@ export default function KdkmpDashboardMonitoring({
                                         {entries.data.length === 0 && (
                                             <TableRow>
                                                 <TableCell
-                                                    colSpan={8}
+                                                    colSpan={
+                                                        kdkmpManualFields.length +
+                                                        3
+                                                    }
                                                     className="py-10 text-center text-muted-foreground"
                                                 >
                                                     Tidak ada data yang sesuai
@@ -309,39 +306,23 @@ export default function KdkmpDashboardMonitoring({
                                                         {entry.provinsi ?? '-'}
                                                     </p>
                                                 </TableCell>
-                                                <TableCell className="tabular-nums">
-                                                    {formatCurrency(
-                                                        entry.daily_entry
-                                                            ?.target_revenue,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="tabular-nums">
-                                                    {formatCurrency(
-                                                        entry.daily_entry
-                                                            ?.actual_revenue,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="tabular-nums">
-                                                    {formatCurrency(
-                                                        entry.daily_entry?.cost,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {formatDuration(
-                                                        entry.daily_entry
-                                                            ?.total_duration_minutes,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="tabular-nums">
-                                                    {entry.daily_entry
-                                                        ?.performance_score ===
-                                                        null ||
-                                                    entry.daily_entry
-                                                        ?.performance_score ===
-                                                        undefined
-                                                        ? '-'
-                                                        : `${entry.daily_entry.performance_score}%`}
-                                                </TableCell>
+                                                {kdkmpManualFields.map(
+                                                    (field) => (
+                                                        <TableCell
+                                                            key={field.key}
+                                                            className="tabular-nums"
+                                                        >
+                                                            {formatManualValue(
+                                                                entry
+                                                                    .daily_entry?.[
+                                                                    field.key
+                                                                ],
+                                                                field.isRupiah ===
+                                                                    true,
+                                                            )}
+                                                        </TableCell>
+                                                    ),
+                                                )}
                                                 <TableCell>
                                                     <StatusBadge
                                                         entry={

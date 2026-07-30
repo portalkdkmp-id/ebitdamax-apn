@@ -21,12 +21,19 @@ class SaveEbitdamaxKdkmpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'target_revenue' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:999999999999999999.99'],
-            'actual_revenue' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:999999999999999999.99'],
-            'cost' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:999999999999999999.99'],
-            'duration_hours' => ['nullable', 'integer', 'min:0', 'max:71582788'],
-            'duration_minutes' => ['nullable', 'integer', 'between:0,59'],
-            'performance_score' => ['nullable', 'numeric', 'decimal:0,2', 'between:0,100'],
+            'target_revenue' => ['nullable', 'string', 'max:255'],
+            'plan_revenue' => ['nullable', 'string', 'max:255'],
+            'actual_revenue' => ['nullable', 'string', 'max:255'],
+            'target_cost' => ['nullable', 'string', 'max:255'],
+            'plan_cost' => ['nullable', 'string', 'max:255'],
+            'actual_cost' => ['nullable', 'string', 'max:255'],
+            'target_ebitda' => ['nullable', 'string', 'max:255'],
+            'plan_ebitda' => ['nullable', 'string', 'max:255'],
+            'actual_ebitda' => ['nullable', 'string', 'max:255'],
+            'target_ebitda_margin' => ['nullable', 'string', 'max:255'],
+            'actual_ebitda_margin' => ['nullable', 'string', 'max:255'],
+            'total_duration' => ['nullable', 'string', 'max:255'],
+            'performance_scoring' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -39,11 +46,18 @@ class SaveEbitdamaxKdkmpRequest extends FormRequest
     {
         return [
             'target_revenue' => 'target revenue',
+            'plan_revenue' => 'plan revenue',
             'actual_revenue' => 'actual revenue',
-            'cost' => 'cost',
-            'duration_hours' => 'durasi jam',
-            'duration_minutes' => 'durasi menit',
-            'performance_score' => 'performance score',
+            'target_cost' => 'target cost',
+            'plan_cost' => 'plan cost',
+            'actual_cost' => 'actual cost',
+            'target_ebitda' => 'target EBITDA',
+            'plan_ebitda' => 'plan EBITDA',
+            'actual_ebitda' => 'actual EBITDA',
+            'target_ebitda_margin' => 'target EBITDA margin',
+            'actual_ebitda_margin' => 'actual EBITDA margin',
+            'total_duration' => 'total duration',
+            'performance_scoring' => 'performance scoring',
         ];
     }
 }
