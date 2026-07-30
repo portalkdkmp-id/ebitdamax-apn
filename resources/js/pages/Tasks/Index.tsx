@@ -75,6 +75,8 @@ type TaskFormData = {
     name: string;
     description: string;
     time_require: string;
+    lower_time_threshold_minutes: string;
+    upper_time_threshold_minutes: string;
     period: TaskPeriod;
     is_active: boolean;
     additional_fields: TaskAdditionalFieldItem[];
@@ -96,6 +98,8 @@ const defaultForm: TaskFormData = {
     name: '',
     description: '',
     time_require: '30',
+    lower_time_threshold_minutes: '',
+    upper_time_threshold_minutes: '',
     period: 'once',
     is_active: true,
     additional_fields: [],
@@ -121,6 +125,19 @@ function paginationLabel(label: string) {
     return label;
 }
 
+function timeThresholdLabel(task: TaskItem): string {
+    if (
+        task.lower_time_threshold_minutes === null &&
+        task.upper_time_threshold_minutes === null
+    ) {
+        return 'Belum ditentukan';
+    }
+
+    return `${task.lower_time_threshold_minutes ?? '-'}–${
+        task.upper_time_threshold_minutes ?? '-'
+    } menit`;
+}
+
 function toFormData(task: TaskItem): TaskFormData {
     return {
         task_category_id: String(task.task_category_id),
@@ -128,6 +145,14 @@ function toFormData(task: TaskItem): TaskFormData {
         name: task.name,
         description: task.description ?? '',
         time_require: String(task.time_require),
+        lower_time_threshold_minutes:
+            task.lower_time_threshold_minutes === null
+                ? ''
+                : String(task.lower_time_threshold_minutes),
+        upper_time_threshold_minutes:
+            task.upper_time_threshold_minutes === null
+                ? ''
+                : String(task.upper_time_threshold_minutes),
         period: task.period,
         is_active: task.is_active,
         additional_fields: task.additional_fields.map((field) => ({
@@ -561,7 +586,11 @@ export default function TasksIndex({
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="p-4 text-right">
-                                                {task.time_require} menit
+                                                <p>{task.time_require} menit</p>
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    Ambang:{' '}
+                                                    {timeThresholdLabel(task)}
+                                                </p>
                                             </TableCell>
                                             <TableCell className="p-4">
                                                 {task.is_active ? (
@@ -663,8 +692,8 @@ export default function TasksIndex({
                                 {selectedTask ? 'Edit Task' : 'Tambah Task'}
                             </DialogTitle>
                             <DialogDescription>
-                                Tambahkan additional field sesuai kebutuhan
-                                task.
+                                Atur estimasi, ambang batas waktu, dan
+                                additional field sesuai kebutuhan task.
                             </DialogDescription>
                         </DialogHeader>
 
@@ -723,7 +752,7 @@ export default function TasksIndex({
                             </div>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-[1fr_160px_180px]">
+                        <div className="grid gap-4 md:grid-cols-[1fr_180px]">
                             <div className="space-y-2">
                                 <Label>Nama Task</Label>
                                 <Input
@@ -734,22 +763,6 @@ export default function TasksIndex({
                                     placeholder="Contoh: Input uang masuk"
                                 />
                                 <FieldError message={errors.name} />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Estimasi Waktu</Label>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    value={data.time_require}
-                                    onChange={(event) =>
-                                        setData(
-                                            'time_require',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                                <FieldError message={errors.time_require} />
                             </div>
 
                             <FormSelect
@@ -763,6 +776,87 @@ export default function TasksIndex({
                                 error={errors.period}
                             />
                         </div>
+
+                        <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                            <div>
+                                <h2 className="font-semibold text-foreground">
+                                    Pengaturan Waktu
+                                </h2>
+                                <p className="text-sm text-muted-foreground">
+                                    Seluruh nilai waktu menggunakan satuan
+                                    menit. Ambang batas bersifat opsional,
+                                    tetapi batas bawah dan atas harus diisi
+                                    berpasangan.
+                                </p>
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <div className="space-y-2">
+                                    <Label>Estimasi Waktu</Label>
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        value={data.time_require}
+                                        onChange={(event) =>
+                                            setData(
+                                                'time_require',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                    <FieldError message={errors.time_require} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Ambang Waktu Bawah</Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        placeholder="Contoh: 20"
+                                        value={
+                                            data.lower_time_threshold_minutes
+                                        }
+                                        onChange={(event) =>
+                                            setData(
+                                                'lower_time_threshold_minutes',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                    <FieldError
+                                        message={
+                                            errors.lower_time_threshold_minutes
+                                        }
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Ambang Waktu Atas</Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        placeholder="Contoh: 45"
+                                        value={
+                                            data.upper_time_threshold_minutes
+                                        }
+                                        onChange={(event) =>
+                                            setData(
+                                                'upper_time_threshold_minutes',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                    <FieldError
+                                        message={
+                                            errors.upper_time_threshold_minutes
+                                        }
+                                    />
+                                </div>
+                            </div>
+                        </section>
 
                         <div className="space-y-2">
                             <Label>Deskripsi</Label>
@@ -1017,6 +1111,24 @@ export default function TasksIndex({
                                 <DetailItem
                                     label="Estimasi Waktu"
                                     value={`${detailTask.time_require} menit`}
+                                />
+                                <DetailItem
+                                    label="Ambang Waktu Bawah"
+                                    value={
+                                        detailTask.lower_time_threshold_minutes ===
+                                        null
+                                            ? 'Belum ditentukan'
+                                            : `${detailTask.lower_time_threshold_minutes} menit`
+                                    }
+                                />
+                                <DetailItem
+                                    label="Ambang Waktu Atas"
+                                    value={
+                                        detailTask.upper_time_threshold_minutes ===
+                                        null
+                                            ? 'Belum ditentukan'
+                                            : `${detailTask.upper_time_threshold_minutes} menit`
+                                    }
                                 />
                                 <DetailItem
                                     label="Periode"

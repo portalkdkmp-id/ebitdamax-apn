@@ -62,6 +62,8 @@ export type TaskItem = {
     name: string;
     description: string | null;
     time_require: number;
+    lower_time_threshold_minutes: number | null;
+    upper_time_threshold_minutes: number | null;
     period: TaskPeriod;
     period_label: string;
     is_active: boolean;

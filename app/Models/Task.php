@@ -23,12 +23,16 @@ class Task extends Model
         'name',
         'description',
         'time_require',
+        'lower_time_threshold_minutes',
+        'upper_time_threshold_minutes',
         'period',
         'is_active',
     ];
 
     protected $casts = [
         'time_require' => 'integer',
+        'lower_time_threshold_minutes' => 'integer',
+        'upper_time_threshold_minutes' => 'integer',
         'period' => TaskPeriod::class,
         'is_active' => 'boolean',
     ];

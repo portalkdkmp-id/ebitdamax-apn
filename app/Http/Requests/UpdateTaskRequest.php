@@ -24,6 +24,20 @@ class UpdateTaskRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'time_require' => ['required', 'integer', 'min:1'],
+            'lower_time_threshold_minutes' => [
+                'nullable',
+                'required_with:upper_time_threshold_minutes',
+                'integer',
+                'min:0',
+                'lte:upper_time_threshold_minutes',
+            ],
+            'upper_time_threshold_minutes' => [
+                'nullable',
+                'required_with:lower_time_threshold_minutes',
+                'integer',
+                'min:0',
+                'gte:lower_time_threshold_minutes',
+            ],
             'period' => ['required', Rule::enum(TaskPeriod::class)],
             'is_active' => ['required', 'boolean'],
             'additional_fields' => ['nullable', 'array'],
@@ -34,6 +48,17 @@ class UpdateTaskRequest extends FormRequest
             'additional_fields.*.is_required' => ['required', 'boolean'],
             'additional_fields.*.options' => ['nullable', 'array'],
             'additional_fields.*.options.*' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'lower_time_threshold_minutes' => 'ambang waktu bawah',
+            'upper_time_threshold_minutes' => 'ambang waktu atas',
         ];
     }
 }

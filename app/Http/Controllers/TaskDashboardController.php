@@ -95,6 +95,8 @@ class TaskDashboardController extends Controller
                     'name' => $report->task->name,
                     'description' => $report->task->description,
                     'time_require' => $report->task->time_require,
+                    'lower_time_threshold_minutes' => $report->task->lower_time_threshold_minutes,
+                    'upper_time_threshold_minutes' => $report->task->upper_time_threshold_minutes,
                     'task_category' => [
                         'id' => $report->task->taskCategory->id,
                         'name' => $report->task->taskCategory->name,
@@ -139,6 +141,8 @@ class TaskDashboardController extends Controller
             'name' => $task->name,
             'description' => $task->description,
             'time_require' => $task->time_require,
+            'lower_time_threshold_minutes' => $task->lower_time_threshold_minutes,
+            'upper_time_threshold_minutes' => $task->upper_time_threshold_minutes,
             'period' => $task->period->value,
             'period_label' => $task->period->label(),
             'period_key' => $periodKey,

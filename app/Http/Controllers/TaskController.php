@@ -118,6 +118,8 @@ class TaskController extends Controller
             'name' => $payload['name'],
             'description' => $payload['description'] ?? null,
             'time_require' => $payload['time_require'],
+            'lower_time_threshold_minutes' => $payload['lower_time_threshold_minutes'] ?? null,
+            'upper_time_threshold_minutes' => $payload['upper_time_threshold_minutes'] ?? null,
             'period' => $payload['period'],
             'is_active' => $payload['is_active'],
         ];
@@ -247,6 +249,8 @@ class TaskController extends Controller
             'name' => $task->name,
             'description' => $task->description,
             'time_require' => $task->time_require,
+            'lower_time_threshold_minutes' => $task->lower_time_threshold_minutes,
+            'upper_time_threshold_minutes' => $task->upper_time_threshold_minutes,
             'period' => $task->period->value,
             'period_label' => $task->period->label(),
             'is_active' => $task->is_active,
