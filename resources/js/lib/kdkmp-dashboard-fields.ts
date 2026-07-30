@@ -1,36 +1,45 @@
-import type { KdkmpManualFields } from '@/types/kdkmp-dashboard';
+import type { KdkmpDashboardFields } from '@/types/kdkmp-dashboard';
 
-export type KdkmpManualField = {
-    key: keyof KdkmpManualFields;
+export type KdkmpDashboardField = {
+    key: keyof KdkmpDashboardFields;
     label: string;
     isRupiah?: boolean;
+    isDisabled?: boolean;
     placeholder?: string;
+    description?: string;
 };
 
-export const kdkmpManualFields: KdkmpManualField[] = [
-    { key: 'target_revenue', label: 'Target Revenue', isRupiah: true },
+export const kdkmpDashboardFields: KdkmpDashboardField[] = [
+    {
+        key: 'target_revenue',
+        label: 'Target Revenue (Hari Ini)',
+        isRupiah: true,
+        isDisabled: true,
+        description: 'Target tetap yang ditentukan sistem.',
+    },
     { key: 'plan_revenue', label: 'Plan Revenue', isRupiah: true },
     { key: 'actual_revenue', label: 'Actual Revenue', isRupiah: true },
-    { key: 'target_cost', label: 'Target Cost', isRupiah: true },
     { key: 'plan_cost', label: 'Plan Cost', isRupiah: true },
-    { key: 'actual_cost', label: 'Actual Cost', isRupiah: true },
-    { key: 'target_ebitda', label: 'Target EBITDA', isRupiah: true },
-    { key: 'plan_ebitda', label: 'Plan EBITDA', isRupiah: true },
-    { key: 'actual_ebitda', label: 'Actual EBITDA', isRupiah: true },
     {
-        key: 'target_ebitda_margin',
-        label: 'Target EBITDA Margin (%)',
-        placeholder: 'Contoh: 20%',
+        key: 'actual_cost',
+        label: 'Actual Cost',
+        isRupiah: true,
+        isDisabled: true,
+        description:
+            'Akumulasi nilai numerik task Catat pengeluaran harian yang selesai hari ini.',
     },
     {
         key: 'actual_ebitda_margin',
         label: 'Actual EBITDA Margin (%)',
-        placeholder: 'Contoh: 18,5%',
+        isDisabled: true,
+        description:
+            'Dihitung otomatis: ((Actual Revenue - Rp17.477.716) / Actual Revenue) x 100%.',
     },
     {
         key: 'total_duration',
         label: 'Total Duration',
-        placeholder: 'Contoh: 8 jam 30 menit',
+        isDisabled: true,
+        description: 'Akumulasi durasi seluruh task yang selesai hari ini.',
     },
     {
         key: 'performance_scoring',

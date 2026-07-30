@@ -6,6 +6,7 @@ use App\Http\Requests\MonitorEbitdamaxKdkmpRequest;
 use App\Models\EbitdamaxKdkmp;
 use App\Models\Role;
 use App\Models\SdmKdkmpEntry;
+use App\Services\KdkmpDashboardMetricsService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Inertia\Inertia;
@@ -13,12 +14,21 @@ use Inertia\Response;
 
 class KdkmpDashboardMonitoringController extends Controller
 {
+    public function __construct(
+        private readonly KdkmpDashboardMetricsService $dashboardMetrics,
+    ) {}
+
     public function __invoke(MonitorEbitdamaxKdkmpRequest $request): Response
     {
         $today = CarbonImmutable::now((string) config('app.kdkmp_business_timezone'));
         $reportDate = (string) ($request->validated('date') ?? $today->toDateString());
         $search = trim((string) ($request->validated('search') ?? ''));
         $status = (string) ($request->validated('status') ?? 'all');
+        $selectedBusinessDate = CarbonImmutable::createFromFormat(
+            'Y-m-d',
+            $reportDate,
+            (string) config('app.kdkmp_business_timezone')
+        )->startOfDay();
 
         $baseQuery = $this->managerKdkmpQuery();
         $total = (clone $baseQuery)->count();
@@ -30,6 +40,12 @@ class KdkmpDashboardMonitoringController extends Controller
         $complete = (clone $baseQuery)
             ->whereHas('dailyEbitdaRecords', function (Builder $query) use ($reportDate): void {
                 $this->completeForDate($query, $reportDate);
+            })
+            ->count();
+        $requiresReview = (clone $baseQuery)
+            ->whereHas('dailyEbitdaRecords', function (Builder $query) use ($reportDate): void {
+                $this->forDate($query, $reportDate);
+                $query->where('plan_revenue_requires_review', true);
             })
             ->count();
 
@@ -71,10 +87,34 @@ class KdkmpDashboardMonitoringController extends Controller
                     $this->forDate($recordQuery, $reportDate);
                 });
             })
+            ->when($status === 'requires_review', function (Builder $query) use ($reportDate): void {
+                $query->whereHas('dailyEbitdaRecords', function (Builder $recordQuery) use ($reportDate): void {
+                    $this->forDate($recordQuery, $reportDate);
+                    $recordQuery->where('plan_revenue_requires_review', true);
+                });
+            })
             ->orderBy('nama_koperasi')
             ->paginate(25)
-            ->withQueryString()
-            ->through(fn (SdmKdkmpEntry $entry): array => $this->transformEntry($entry));
+            ->withQueryString();
+
+        $metricsByUser = $this->dashboardMetrics->forUsers(
+            $entries->getCollection()
+                ->map(fn (SdmKdkmpEntry $entry): ?int => $entry->managerUser?->id)
+                ->filter(),
+            $selectedBusinessDate
+        );
+
+        $entries->through(function (SdmKdkmpEntry $entry) use ($metricsByUser): array {
+            $managerUserId = $entry->managerUser?->id;
+            $metrics = $managerUserId !== null
+                ? $metricsByUser->get($managerUserId, [])
+                : [];
+
+            return $this->transformEntry($entry, [
+                'target_revenue' => EbitdamaxKdkmp::TARGET_REVENUE,
+                ...$metrics,
+            ]);
+        });
 
         return Inertia::render('KdkmpDashboard/Monitoring', [
             'entries' => $entries,
@@ -83,6 +123,7 @@ class KdkmpDashboardMonitoringController extends Controller
                 'complete' => $complete,
                 'draft' => $filled - $complete,
                 'not_filled' => $total - $filled,
+                'requires_review' => $requiresReview,
             ],
             'filters' => [
                 'date' => $reportDate,
@@ -110,7 +151,7 @@ class KdkmpDashboardMonitoringController extends Controller
     {
         $this->forDate($query, $reportDate);
 
-        foreach (EbitdamaxKdkmp::MANUAL_FIELDS as $field) {
+        foreach (EbitdamaxKdkmp::ACTIVE_FIELDS as $field) {
             $query->whereNotNull($field)->where($field, '<>', '');
         }
     }
@@ -119,7 +160,7 @@ class KdkmpDashboardMonitoringController extends Controller
     {
         $this->forDate($query, $reportDate);
         $query->where(function (Builder $draftQuery): void {
-            foreach (EbitdamaxKdkmp::MANUAL_FIELDS as $index => $field) {
+            foreach (EbitdamaxKdkmp::ACTIVE_FIELDS as $index => $field) {
                 if ($index === 0) {
                     $draftQuery
                         ->whereNull($field)
@@ -138,7 +179,7 @@ class KdkmpDashboardMonitoringController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function transformEntry(SdmKdkmpEntry $entry): array
+    private function transformEntry(SdmKdkmpEntry $entry, array $overrides = []): array
     {
         $dailyEntry = $entry->dailyEbitdaRecords->first();
 
@@ -147,12 +188,17 @@ class KdkmpDashboardMonitoringController extends Controller
         if ($dailyEntry) {
             $dailyEntryData = [
                 'is_complete' => $dailyEntry->isComplete(),
+                'plan_revenue_requires_review' => $dailyEntry->plan_revenue_requires_review,
                 'updated_at' => $dailyEntry->updated_at?->toIso8601String(),
             ];
 
-            foreach (EbitdamaxKdkmp::MANUAL_FIELDS as $field) {
-                $dailyEntryData[$field] = $dailyEntry->getAttribute($field);
+            foreach (EbitdamaxKdkmp::ACTIVE_FIELDS as $field) {
+                $dailyEntryData[$field] = $overrides[$field] ?? $dailyEntry->getAttribute($field);
             }
+
+            $dailyEntryData['actual_ebitda_margin'] = EbitdamaxKdkmp::calculateActualEbitdaMargin(
+                is_string($dailyEntryData['actual_revenue']) ? $dailyEntryData['actual_revenue'] : null
+            );
         }
 
         return [

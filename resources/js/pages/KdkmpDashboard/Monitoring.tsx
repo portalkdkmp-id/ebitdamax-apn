@@ -1,5 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import {
+    AlertTriangle,
     CheckCircle2,
     CircleDashed,
     ClipboardList,
@@ -28,7 +29,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { kdkmpManualFields } from '@/lib/kdkmp-dashboard-fields';
+import { kdkmpDashboardFields } from '@/lib/kdkmp-dashboard-fields';
 import { index as monitoringIndex } from '@/routes/admin/kdkmp-dashboard';
 import type {
     KdkmpMonitoringEntry,
@@ -73,10 +74,19 @@ function StatusBadge({
         return <Badge variant="outline">Belum diisi</Badge>;
     }
 
-    return entry.is_complete ? (
-        <Badge className="bg-emerald-600 text-white">Lengkap</Badge>
-    ) : (
-        <Badge className="bg-amber-500 text-white">Draft</Badge>
+    return (
+        <div className="flex flex-col items-start gap-2">
+            {entry.is_complete ? (
+                <Badge className="bg-emerald-600 text-white">Lengkap</Badge>
+            ) : (
+                <Badge className="bg-amber-500 text-white">Draft</Badge>
+            )}
+            {entry.plan_revenue_requires_review && (
+                <Badge className="bg-rose-600 text-white">
+                    Review Plan Revenue
+                </Badge>
+            )}
+        </div>
     );
 }
 
@@ -144,7 +154,7 @@ export default function KdkmpDashboardMonitoring({
                         </p>
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                         <SummaryCard
                             label="Total KDKMP Manager"
                             value={summary.total}
@@ -168,6 +178,12 @@ export default function KdkmpDashboardMonitoring({
                             value={summary.not_filled}
                             icon={<CircleDashed className="size-5" />}
                             tone="bg-slate-500/10 text-slate-600"
+                        />
+                        <SummaryCard
+                            label="Plan Revenue Perlu Review"
+                            value={summary.requires_review}
+                            icon={<AlertTriangle className="size-5" />}
+                            tone="bg-rose-500/10 text-rose-600"
                         />
                     </div>
 
@@ -216,6 +232,9 @@ export default function KdkmpDashboardMonitoring({
                                             <SelectItem value="not_filled">
                                                 Belum diisi
                                             </SelectItem>
+                                            <SelectItem value="requires_review">
+                                                Plan Revenue perlu review
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -250,18 +269,20 @@ export default function KdkmpDashboardMonitoring({
                             </div>
 
                             <div className="overflow-x-auto">
-                                <Table className="min-w-[3000px]">
+                                <Table className="min-w-[1900px]">
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>
                                                 KDKMP / Manager
                                             </TableHead>
                                             <TableHead>Wilayah</TableHead>
-                                            {kdkmpManualFields.map((field) => (
-                                                <TableHead key={field.key}>
-                                                    {field.label}
-                                                </TableHead>
-                                            ))}
+                                            {kdkmpDashboardFields.map(
+                                                (field) => (
+                                                    <TableHead key={field.key}>
+                                                        {field.label}
+                                                    </TableHead>
+                                                ),
+                                            )}
                                             <TableHead>Status</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -270,7 +291,7 @@ export default function KdkmpDashboardMonitoring({
                                             <TableRow>
                                                 <TableCell
                                                     colSpan={
-                                                        kdkmpManualFields.length +
+                                                        kdkmpDashboardFields.length +
                                                         3
                                                     }
                                                     className="py-10 text-center text-muted-foreground"
@@ -306,7 +327,7 @@ export default function KdkmpDashboardMonitoring({
                                                         {entry.provinsi ?? '-'}
                                                     </p>
                                                 </TableCell>
-                                                {kdkmpManualFields.map(
+                                                {kdkmpDashboardFields.map(
                                                     (field) => (
                                                         <TableCell
                                                             key={field.key}

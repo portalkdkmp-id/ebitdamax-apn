@@ -6,6 +6,7 @@ use App\Http\Requests\SaveEbitdamaxKdkmpRequest;
 use App\Models\EbitdamaxKdkmp;
 use App\Models\SdmKdkmpEntry;
 use App\Models\User;
+use App\Services\KdkmpDashboardMetricsService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,10 @@ use Inertia\Response;
 
 class KdkmpDashboardController extends Controller
 {
+    public function __construct(
+        private readonly KdkmpDashboardMetricsService $dashboardMetrics,
+    ) {}
+
     public function index(Request $request): Response
     {
         Gate::authorize('viewDashboard', EbitdamaxKdkmp::class);
@@ -24,6 +29,10 @@ class KdkmpDashboardController extends Controller
 
         $businessDate = $this->businessDate();
         $sdmKdkmpEntry = $user->sdmKdkmpEntry;
+        $computedValues = [
+            'target_revenue' => EbitdamaxKdkmp::TARGET_REVENUE,
+            ...$this->dashboardMetrics->forUser($user->id, $businessDate),
+        ];
 
         $todayEntry = $sdmKdkmpEntry
             ? $sdmKdkmpEntry->dailyEbitdaRecords()
@@ -49,8 +58,9 @@ class KdkmpDashboardController extends Controller
                 ? $this->transformKdkmp($sdmKdkmpEntry)
                 : null,
             'todayEntry' => $todayEntry
-                ? $this->transformEntry($todayEntry)
+                ? $this->transformEntry($todayEntry, $computedValues)
                 : null,
+            'computedValues' => $computedValues,
             'history' => $history,
         ]);
     }
@@ -60,27 +70,40 @@ class KdkmpDashboardController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User && $user->sdm_kdkmp_entry_id !== null, 403);
 
+        $businessDate = $this->businessDate();
         $entry = EbitdamaxKdkmp::query()->firstOrNew([
             'sdm_kdkmp_entry_id' => $user->sdm_kdkmp_entry_id,
-            'report_date' => $this->businessDate()->toDateString(),
+            'report_date' => $businessDate->toDateString(),
         ]);
 
         if (! $entry->exists) {
             $entry->created_by = $user->id;
         }
 
-        $payload = ['updated_by' => $user->id];
+        $metrics = $this->dashboardMetrics->forUser($user->id, $businessDate);
+        $planRevenue = $request->validated('plan_revenue');
+        $actualRevenue = $request->validated('actual_revenue');
+        $payload = [
+            'target_revenue' => EbitdamaxKdkmp::TARGET_REVENUE,
+            'actual_cost' => $metrics['actual_cost'],
+            'actual_ebitda_margin' => EbitdamaxKdkmp::calculateActualEbitdaMargin($actualRevenue),
+            'total_duration' => $metrics['total_duration'],
+            'plan_revenue_requires_review' => EbitdamaxKdkmp::planRevenueRequiresReview($planRevenue),
+            'updated_by' => $user->id,
+        ];
 
-        foreach (EbitdamaxKdkmp::MANUAL_FIELDS as $field) {
+        foreach (EbitdamaxKdkmp::EDITABLE_FIELDS as $field) {
             $payload[$field] = $request->validated($field);
         }
 
         $entry->fill($payload);
         $entry->save();
 
-        $message = $entry->isComplete()
-            ? 'Dashboard harian KDKMP berhasil disimpan lengkap.'
-            : 'Draft dashboard harian KDKMP berhasil disimpan.';
+        $message = match (true) {
+            $entry->plan_revenue_requires_review => 'Data berhasil disimpan dan Plan Revenue ditandai untuk direview superadmin.',
+            $entry->isComplete() => 'Dashboard harian KDKMP berhasil disimpan lengkap.',
+            default => 'Draft dashboard harian KDKMP berhasil disimpan.',
+        };
 
         return back()->with('success', $message);
     }
@@ -88,18 +111,23 @@ class KdkmpDashboardController extends Controller
     /**
      * @return array<string, int|float|string|bool|null>
      */
-    private function transformEntry(EbitdamaxKdkmp $entry): array
+    private function transformEntry(EbitdamaxKdkmp $entry, array $overrides = []): array
     {
         $data = [
             'id' => $entry->id,
             'report_date' => $entry->report_date?->toDateString(),
             'is_complete' => $entry->isComplete(),
+            'plan_revenue_requires_review' => $entry->plan_revenue_requires_review,
             'updated_at' => $entry->updated_at?->toIso8601String(),
         ];
 
-        foreach (EbitdamaxKdkmp::MANUAL_FIELDS as $field) {
-            $data[$field] = $entry->getAttribute($field);
+        foreach (EbitdamaxKdkmp::ACTIVE_FIELDS as $field) {
+            $data[$field] = $overrides[$field] ?? $entry->getAttribute($field);
         }
+
+        $data['actual_ebitda_margin'] = EbitdamaxKdkmp::calculateActualEbitdaMargin(
+            is_string($data['actual_revenue']) ? $data['actual_revenue'] : null
+        );
 
         return $data;
     }

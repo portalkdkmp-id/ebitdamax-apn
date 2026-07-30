@@ -44,6 +44,6 @@ class MonitorEbitdamaxKdkmpRequest extends FormRequest
 
     private function statusRule(): In
     {
-        return Rule::in(['all', 'complete', 'draft', 'not_filled']);
+        return Rule::in(['all', 'complete', 'draft', 'not_filled', 'requires_review']);
     }
 }

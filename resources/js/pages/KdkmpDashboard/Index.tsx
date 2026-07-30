@@ -1,6 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     Building2,
+    AlertTriangle,
     CalendarDays,
     Clock3,
     MapPin,
@@ -8,12 +9,21 @@ import {
     Store,
 } from 'lucide-react';
 import type { FormEvent } from 'react';
+import { useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     Table,
     TableBody,
@@ -23,17 +33,19 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import InputError from '@/components/input-error';
-import { kdkmpManualFields } from '@/lib/kdkmp-dashboard-fields';
+import { kdkmpDashboardFields } from '@/lib/kdkmp-dashboard-fields';
 import { upsert } from '@/routes/kdkmp-dashboard';
 import type {
     KdkmpDailyEntry,
+    KdkmpDashboardFields,
     KdkmpManagerDashboardProps,
-    KdkmpManualFields,
 } from '@/types/kdkmp-dashboard';
 
 type DailyForm = {
-    [Field in keyof KdkmpManualFields]: string;
+    [Field in keyof KdkmpDashboardFields]: string;
 };
+
+const ACTUAL_EBITDA_MARGIN_FIXED_COST = 17_477_716;
 
 function inputValue(value: string | null | undefined): string {
     return value ?? '';
@@ -90,10 +102,12 @@ function RupiahInput({
     id,
     value,
     onValueChange,
+    disabled = false,
 }: {
     id: string;
     value: string;
     onValueChange: (value: string) => void;
+    disabled?: boolean;
 }) {
     return (
         <div className="relative">
@@ -105,32 +119,64 @@ function RupiahInput({
                 type="text"
                 inputMode="decimal"
                 value={formatRupiahInput(value)}
+                disabled={disabled}
                 onChange={(event) =>
                     onValueChange(parseRupiahInput(event.target.value))
                 }
-                className="pl-10"
+                className="pl-10 disabled:cursor-not-allowed disabled:opacity-70"
                 placeholder="0"
             />
         </div>
     );
 }
 
-function formDataFrom(entry: KdkmpDailyEntry | null): DailyForm {
+function formDataFrom(
+    entry: KdkmpDailyEntry | null,
+    computedValues: KdkmpManagerDashboardProps['computedValues'],
+): DailyForm {
     return {
-        target_revenue: inputValue(entry?.target_revenue),
+        target_revenue: inputValue(computedValues.target_revenue),
         plan_revenue: inputValue(entry?.plan_revenue),
         actual_revenue: inputValue(entry?.actual_revenue),
-        target_cost: inputValue(entry?.target_cost),
         plan_cost: inputValue(entry?.plan_cost),
-        actual_cost: inputValue(entry?.actual_cost),
-        target_ebitda: inputValue(entry?.target_ebitda),
-        plan_ebitda: inputValue(entry?.plan_ebitda),
-        actual_ebitda: inputValue(entry?.actual_ebitda),
-        target_ebitda_margin: inputValue(entry?.target_ebitda_margin),
-        actual_ebitda_margin: inputValue(entry?.actual_ebitda_margin),
-        total_duration: inputValue(entry?.total_duration),
+        actual_cost: inputValue(computedValues.actual_cost),
+        actual_ebitda_margin: calculateActualEbitdaMargin(
+            inputValue(entry?.actual_revenue),
+        ),
+        total_duration: inputValue(computedValues.total_duration),
         performance_scoring: inputValue(entry?.performance_scoring),
     };
+}
+
+function calculateActualEbitdaMargin(actualRevenue: string): string {
+    if (actualRevenue.trim() === '') {
+        return '';
+    }
+
+    const revenue = Number(actualRevenue);
+
+    if (!Number.isFinite(revenue) || revenue === 0) {
+        return '';
+    }
+
+    const margin =
+        ((revenue - ACTUAL_EBITDA_MARGIN_FIXED_COST) / revenue) * 100;
+
+    return `${margin
+        .toFixed(2)
+        .replace(/\.00$/, '')
+        .replace(/(\.\d)0$/, '$1')}%`;
+}
+
+function dashboardFieldValue(
+    data: DailyForm,
+    field: keyof KdkmpDashboardFields,
+): string {
+    if (field === 'actual_ebitda_margin') {
+        return calculateActualEbitdaMargin(data.actual_revenue);
+    }
+
+    return data[field];
 }
 
 function formatDate(value: string): string {
@@ -162,10 +208,19 @@ function EntryStatus({ entry }: { entry: KdkmpDailyEntry | null }) {
         return <Badge variant="outline">Belum diisi</Badge>;
     }
 
-    return entry.is_complete ? (
-        <Badge className="bg-emerald-600 text-white">Lengkap</Badge>
-    ) : (
-        <Badge className="bg-amber-500 text-white">Draft</Badge>
+    return (
+        <div className="flex flex-wrap gap-2">
+            {entry.is_complete ? (
+                <Badge className="bg-emerald-600 text-white">Lengkap</Badge>
+            ) : (
+                <Badge className="bg-amber-500 text-white">Draft</Badge>
+            )}
+            {entry.plan_revenue_requires_review && (
+                <Badge className="bg-rose-600 text-white">
+                    Perlu review Plan Revenue
+                </Badge>
+            )}
+        </div>
     );
 }
 
@@ -173,15 +228,37 @@ export default function KdkmpDashboardIndex({
     businessDate,
     kdkmp,
     todayEntry,
+    computedValues,
     history,
 }: KdkmpManagerDashboardProps) {
     const { data, setData, put, processing, errors } = useForm<DailyForm>(
-        formDataFrom(todayEntry),
+        formDataFrom(todayEntry, computedValues),
     );
+    const [showLowPlanRevenueConfirmation, setShowLowPlanRevenueConfirmation] =
+        useState(false);
+
+    const save = () => {
+        setShowLowPlanRevenueConfirmation(false);
+        put(upsert.url(), { preserveScroll: true });
+    };
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        put(upsert.url(), { preserveScroll: true });
+
+        const planRevenue = Number(data.plan_revenue);
+        const targetRevenue = Number(computedValues.target_revenue);
+
+        if (
+            data.plan_revenue !== '' &&
+            Number.isFinite(planRevenue) &&
+            planRevenue < targetRevenue
+        ) {
+            setShowLowPlanRevenueConfirmation(true);
+
+            return;
+        }
+
+        save();
     };
 
     return (
@@ -291,55 +368,83 @@ export default function KdkmpDashboardIndex({
                                         className="space-y-6"
                                     >
                                         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                                            {kdkmpManualFields.map((field) => (
-                                                <div
-                                                    key={field.key}
-                                                    className="space-y-2"
-                                                >
-                                                    <Label htmlFor={field.key}>
-                                                        {field.label}
-                                                    </Label>
-                                                    {field.isRupiah ? (
-                                                        <RupiahInput
-                                                            id={field.key}
-                                                            value={
-                                                                data[field.key]
-                                                            }
-                                                            onValueChange={(
-                                                                value,
-                                                            ) =>
-                                                                setData(
+                                            {kdkmpDashboardFields.map(
+                                                (field) => (
+                                                    <div
+                                                        key={field.key}
+                                                        className="space-y-2"
+                                                    >
+                                                        <Label
+                                                            htmlFor={field.key}
+                                                        >
+                                                            {field.label}
+                                                        </Label>
+                                                        {field.isRupiah ? (
+                                                            <RupiahInput
+                                                                id={field.key}
+                                                                value={dashboardFieldValue(
+                                                                    data,
                                                                     field.key,
+                                                                )}
+                                                                onValueChange={(
                                                                     value,
-                                                                )
-                                                            }
-                                                        />
-                                                    ) : (
-                                                        <Input
-                                                            id={field.key}
-                                                            type="text"
-                                                            value={
-                                                                data[field.key]
-                                                            }
-                                                            onChange={(event) =>
-                                                                setData(
+                                                                ) => {
+                                                                    if (
+                                                                        !field.isDisabled
+                                                                    ) {
+                                                                        setData(
+                                                                            field.key,
+                                                                            value,
+                                                                        );
+                                                                    }
+                                                                }}
+                                                                disabled={
+                                                                    field.isDisabled
+                                                                }
+                                                            />
+                                                        ) : (
+                                                            <Input
+                                                                id={field.key}
+                                                                type="text"
+                                                                disabled={
+                                                                    field.isDisabled
+                                                                }
+                                                                value={dashboardFieldValue(
+                                                                    data,
                                                                     field.key,
-                                                                    event.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            placeholder={
-                                                                field.placeholder
+                                                                )}
+                                                                onChange={(
+                                                                    event,
+                                                                ) =>
+                                                                    setData(
+                                                                        field.key,
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                placeholder={
+                                                                    field.placeholder
+                                                                }
+                                                            />
+                                                        )}
+                                                        {field.description && (
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {
+                                                                    field.description
+                                                                }
+                                                            </p>
+                                                        )}
+                                                        <InputError
+                                                            message={
+                                                                errors[
+                                                                    field.key
+                                                                ]
                                                             }
                                                         />
-                                                    )}
-                                                    <InputError
-                                                        message={
-                                                            errors[field.key]
-                                                        }
-                                                    />
-                                                </div>
-                                            ))}
+                                                    </div>
+                                                ),
+                                            )}
                                         </div>
 
                                         <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
@@ -377,11 +482,13 @@ export default function KdkmpDashboardIndex({
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Tanggal</TableHead>
-                                            {kdkmpManualFields.map((field) => (
-                                                <TableHead key={field.key}>
-                                                    {field.label}
-                                                </TableHead>
-                                            ))}
+                                            {kdkmpDashboardFields.map(
+                                                (field) => (
+                                                    <TableHead key={field.key}>
+                                                        {field.label}
+                                                    </TableHead>
+                                                ),
+                                            )}
                                             <TableHead>Status</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -390,7 +497,7 @@ export default function KdkmpDashboardIndex({
                                             <TableRow>
                                                 <TableCell
                                                     colSpan={
-                                                        kdkmpManualFields.length +
+                                                        kdkmpDashboardFields.length +
                                                         2
                                                     }
                                                     className="py-8 text-center text-muted-foreground"
@@ -407,7 +514,7 @@ export default function KdkmpDashboardIndex({
                                                         entry.report_date,
                                                     )}
                                                 </TableCell>
-                                                {kdkmpManualFields.map(
+                                                {kdkmpDashboardFields.map(
                                                     (field) => (
                                                         <TableCell
                                                             key={field.key}
@@ -480,6 +587,53 @@ export default function KdkmpDashboardIndex({
                     </Card>
                 </div>
             </div>
+
+            <Dialog
+                open={showLowPlanRevenueConfirmation}
+                onOpenChange={setShowLowPlanRevenueConfirmation}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <div className="mb-2 flex size-11 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+                            <AlertTriangle className="size-5" />
+                        </div>
+                        <DialogTitle>Konfirmasi Plan Revenue</DialogTitle>
+                        <DialogDescription>
+                            Plan Revenue yang dimasukkan adalah{' '}
+                            <span className="font-semibold text-foreground">
+                                {formatManualValue(data.plan_revenue, true)}
+                            </span>
+                            , lebih rendah dari Target Revenue{' '}
+                            <span className="font-semibold text-foreground">
+                                {formatManualValue(
+                                    computedValues.target_revenue,
+                                    true,
+                                )}
+                            </span>
+                            . Data ini akan ditandai untuk direview oleh
+                            superadmin.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                                setShowLowPlanRevenueConfirmation(false)
+                            }
+                        >
+                            Periksa Kembali
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={save}
+                            disabled={processing}
+                        >
+                            Setujui & Simpan
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

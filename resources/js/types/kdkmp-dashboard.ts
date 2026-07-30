@@ -10,26 +10,27 @@ export type KdkmpIdentity = {
     provinsi: string | null;
 };
 
-export type KdkmpManualFields = {
+export type KdkmpDashboardFields = {
     target_revenue: string | null;
     plan_revenue: string | null;
     actual_revenue: string | null;
-    target_cost: string | null;
     plan_cost: string | null;
     actual_cost: string | null;
-    target_ebitda: string | null;
-    plan_ebitda: string | null;
-    actual_ebitda: string | null;
-    target_ebitda_margin: string | null;
     actual_ebitda_margin: string | null;
     total_duration: string | null;
     performance_scoring: string | null;
 };
 
-export type KdkmpDailyEntry = KdkmpManualFields & {
+export type KdkmpComputedValues = Pick<
+    KdkmpDashboardFields,
+    'target_revenue' | 'actual_cost' | 'total_duration'
+>;
+
+export type KdkmpDailyEntry = KdkmpDashboardFields & {
     id: number;
     report_date: string;
     is_complete: boolean;
+    plan_revenue_requires_review: boolean;
     updated_at: string | null;
 };
 
@@ -37,6 +38,7 @@ export type KdkmpManagerDashboardProps = {
     businessDate: string;
     kdkmp: KdkmpIdentity | null;
     todayEntry: KdkmpDailyEntry | null;
+    computedValues: KdkmpComputedValues;
     history: PaginatedResponse<KdkmpDailyEntry>;
 };
 
@@ -47,8 +49,11 @@ export type KdkmpMonitoringEntry = KdkmpIdentity & {
         username: string | null;
     } | null;
     daily_entry:
-        | (KdkmpManualFields &
-              Pick<KdkmpDailyEntry, 'is_complete' | 'updated_at'>)
+        | (KdkmpDashboardFields &
+              Pick<
+                  KdkmpDailyEntry,
+                  'is_complete' | 'plan_revenue_requires_review' | 'updated_at'
+              >)
         | null;
 };
 
@@ -60,10 +65,11 @@ export type KdkmpMonitoringProps = {
         complete: number;
         draft: number;
         not_filled: number;
+        requires_review: number;
     };
     filters: {
         date: string;
         search: string;
-        status: 'all' | 'complete' | 'draft' | 'not_filled';
+        status: 'all' | 'complete' | 'draft' | 'not_filled' | 'requires_review';
     };
 };
