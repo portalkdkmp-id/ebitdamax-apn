@@ -13,6 +13,8 @@ use Illuminate\Support\Str;
 
 class Role extends Model
 {
+    public const SLUG_EBITDA_KDKMP = 'ebitda_kdkmp';
+
     /** @use HasFactory<RoleFactory> */
     use HasFactory;
 

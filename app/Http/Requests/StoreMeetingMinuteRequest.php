@@ -2,14 +2,17 @@
 
 namespace App\Http\Requests;
 
+use App\Models\MeetingMinute;
+use App\Models\MeetingMinuteItem;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
 
 class StoreMeetingMinuteRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('create', MeetingMinute::class) === true;
     }
 
     public function rules(): array
@@ -29,7 +32,7 @@ class StoreMeetingMinuteRequest extends FormRequest
             'items.*.date_start' => ['nullable', 'date'],
             'items.*.date_finish' => ['nullable', 'date'],
             'items.*.pic' => ['nullable', 'string', 'max:255'],
-            'items.*.status' => ['nullable', 'string', 'max:50'],
+            'items.*.status' => ['nullable', 'string', Rule::in(MeetingMinuteItem::STATUSES)],
             'items.*.remarks' => ['nullable', 'string'],
             'documents' => ['nullable', 'array', 'max:10'],
             'documents.*' => [
@@ -57,6 +60,7 @@ class StoreMeetingMinuteRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'items.*.status.in' => 'Status item #:position tidak valid.',
             'documents.max' => 'Maksimal 10 dokumen dalam satu kali upload.',
             'documents.*.max' => 'Dokumen #:position ditolak karena ukurannya lebih dari 10 MB.',
             'documents.*.mimes' => 'Format dokumen #:position tidak didukung.',

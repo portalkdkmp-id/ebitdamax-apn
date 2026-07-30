@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\RoleLevel;
 use App\Http\Requests\StoreMeetingMinuteRequest;
 use App\Http\Requests\UpdateMeetingMinuteRequest;
 use App\Models\MeetingMinute;
 use App\Models\MeetingMinuteAttachment;
 use App\Models\MeetingMinuteItem;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,17 +27,25 @@ class MeetingMinuteController extends Controller
 {
     public function index(Request $request): Response
     {
+        Gate::authorize('viewAny', MeetingMinute::class);
+
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        $canViewAll = $user->role?->level === RoleLevel::Superadmin;
         $search = trim((string) $request->input('search', ''));
 
         $meetingMinutes = MeetingMinute::query()
             ->with([
-                'items' => function ($query): void {
+                'items' => function (HasMany $query): void {
                     $query->orderBy('sort_order')->orderBy('id');
                 },
                 'attachments',
+                'creator:id,name,username,email',
             ])
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
+            ->when(! $canViewAll, fn (Builder $query): Builder => $query->whereBelongsTo($user, 'creator'))
+            ->when($search !== '', function (Builder $query) use ($search): void {
+                $query->where(function (Builder $subQuery) use ($search): void {
                     $subQuery
                         ->where('title', 'ilike', "%{$search}%")
                         ->orWhere('location', 'ilike', "%{$search}%")
@@ -46,6 +59,7 @@ class MeetingMinuteController extends Controller
 
         return Inertia::render('MeetingMinutes/Index', [
             'meetingMinutes' => $meetingMinutes,
+            'canViewAll' => $canViewAll,
             'filters' => [
                 'search' => $search,
             ],
@@ -54,10 +68,15 @@ class MeetingMinuteController extends Controller
 
     public function store(StoreMeetingMinuteRequest $request): RedirectResponse
     {
+        Gate::authorize('create', MeetingMinute::class);
+
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
         $storedFiles = [];
 
         try {
-            DB::transaction(function () use ($request, &$storedFiles): void {
+            DB::transaction(function () use ($request, $user, &$storedFiles): void {
                 $meetingMinute = MeetingMinute::query()->create([
                     'title' => $request->validated('title'),
                     'meeting_date' => $request->validated('meeting_date'),
@@ -65,14 +84,14 @@ class MeetingMinuteController extends Controller
                     'end_time' => $request->validated('end_time'),
                     'location' => $request->validated('location'),
                     'attendees' => $request->validated('attendees'),
-                    'created_by' => $request->user()?->id,
+                    'created_by' => $user->id,
                 ]);
 
                 $this->syncItems($meetingMinute, $request->validated('items', []));
                 $this->storeAttachments(
                     meetingMinute: $meetingMinute,
                     documents: $request->file('documents', []),
-                    uploadedBy: $request->user()?->id,
+                    uploadedBy: $user->id,
                     storedFiles: $storedFiles,
                 );
             });
@@ -87,11 +106,16 @@ class MeetingMinuteController extends Controller
 
     public function update(UpdateMeetingMinuteRequest $request, MeetingMinute $meetingMinute): RedirectResponse
     {
+        Gate::authorize('update', $meetingMinute);
+
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
         $storedFiles = [];
         $attachmentsToDelete = collect();
 
         try {
-            DB::transaction(function () use ($request, $meetingMinute, &$storedFiles, &$attachmentsToDelete): void {
+            DB::transaction(function () use ($request, $meetingMinute, $user, &$storedFiles, &$attachmentsToDelete): void {
                 $meetingMinute->update([
                     'title' => $request->validated('title'),
                     'meeting_date' => $request->validated('meeting_date'),
@@ -99,7 +123,7 @@ class MeetingMinuteController extends Controller
                     'end_time' => $request->validated('end_time'),
                     'location' => $request->validated('location'),
                     'attendees' => $request->validated('attendees'),
-                    'updated_by' => $request->user()?->id,
+                    'updated_by' => $user->id,
                 ]);
 
                 $this->syncItems($meetingMinute, $request->validated('items', []));
@@ -115,7 +139,7 @@ class MeetingMinuteController extends Controller
                 $this->storeAttachments(
                     meetingMinute: $meetingMinute,
                     documents: $request->file('documents', []),
-                    uploadedBy: $request->user()?->id,
+                    uploadedBy: $user->id,
                     storedFiles: $storedFiles,
                 );
             });
@@ -132,6 +156,8 @@ class MeetingMinuteController extends Controller
 
     public function destroy(MeetingMinute $meetingMinute): RedirectResponse
     {
+        Gate::authorize('delete', $meetingMinute);
+
         $attachments = $meetingMinute->attachments()->get()->all();
         $meetingMinute->delete();
         $this->deleteAttachmentFiles($attachments);
@@ -143,6 +169,7 @@ class MeetingMinuteController extends Controller
         MeetingMinute $meetingMinute,
         MeetingMinuteAttachment $attachment
     ): StreamedResponse {
+        Gate::authorize('view', $meetingMinute);
         $this->ensureAttachmentBelongsToMeetingMinute($meetingMinute, $attachment);
 
         $storage = Storage::disk($attachment->disk);
@@ -160,6 +187,7 @@ class MeetingMinuteController extends Controller
         MeetingMinute $meetingMinute,
         MeetingMinuteAttachment $attachment
     ): StreamedResponse {
+        Gate::authorize('view', $meetingMinute);
         $this->ensureAttachmentBelongsToMeetingMinute($meetingMinute, $attachment);
 
         $storage = Storage::disk($attachment->disk);
@@ -283,6 +311,12 @@ class MeetingMinuteController extends Controller
             'end_time' => $meetingMinute->end_time,
             'location' => $meetingMinute->location,
             'attendees' => $meetingMinute->attendees,
+            'creator' => $meetingMinute->creator ? [
+                'id' => $meetingMinute->creator->id,
+                'name' => $meetingMinute->creator->name,
+                'username' => $meetingMinute->creator->username,
+                'email' => $meetingMinute->creator->email,
+            ] : null,
             'items' => $meetingMinute->items->map(fn (MeetingMinuteItem $item): array => [
                 'id' => $item->id,
                 'subject' => $item->subject,
