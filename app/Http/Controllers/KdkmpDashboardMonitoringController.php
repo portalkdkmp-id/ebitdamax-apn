@@ -159,6 +159,12 @@ class KdkmpDashboardMonitoringController extends Controller
             $dailyEntryData['actual_ebitda_margin'] = EbitdamaxKdkmp::calculateActualEbitdaMargin(
                 is_string($dailyEntryData['actual_revenue']) ? $dailyEntryData['actual_revenue'] : null
             );
+            $dailyEntryData['performance_scoring'] = EbitdamaxKdkmp::calculatePerformanceScoring(
+                is_string($dailyEntryData['plan_revenue']) ? $dailyEntryData['plan_revenue'] : null,
+                is_string($dailyEntryData['actual_revenue']) ? $dailyEntryData['actual_revenue'] : null,
+                (float) ($overrides['task_completion_rate'] ?? 0),
+                (float) ($overrides['time_compliance_rate'] ?? 0),
+            );
         }
 
         return [

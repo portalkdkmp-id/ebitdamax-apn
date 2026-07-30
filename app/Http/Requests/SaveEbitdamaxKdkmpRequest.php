@@ -24,7 +24,6 @@ class SaveEbitdamaxKdkmpRequest extends FormRequest
             'plan_revenue' => ['nullable', 'string', 'regex:/^\d+(?:\.\d{1,2})?$/', 'max:255'],
             'actual_revenue' => ['nullable', 'string', 'regex:/^\d+(?:\.\d{1,2})?$/', 'max:255'],
             'plan_cost' => ['nullable', 'string', 'max:255'],
-            'performance_scoring' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -39,7 +38,6 @@ class SaveEbitdamaxKdkmpRequest extends FormRequest
             'plan_revenue' => 'plan revenue',
             'actual_revenue' => 'actual revenue',
             'plan_cost' => 'plan cost',
-            'performance_scoring' => 'performance scoring',
         ];
     }
 }

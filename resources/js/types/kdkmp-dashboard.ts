@@ -23,8 +23,11 @@ export type KdkmpDashboardFields = {
 
 export type KdkmpComputedValues = Pick<
     KdkmpDashboardFields,
-    'target_revenue' | 'actual_cost' | 'total_duration'
->;
+    'target_revenue' | 'actual_cost' | 'total_duration' | 'performance_scoring'
+> & {
+    task_completion_rate: number;
+    time_compliance_rate: number;
+};
 
 export type KdkmpDailyEntry = KdkmpDashboardFields & {
     id: number;

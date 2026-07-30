@@ -14,6 +14,12 @@ class EbitdamaxKdkmp extends Model
 
     public const ACTUAL_EBITDA_MARGIN_FIXED_COST = 17_477_716;
 
+    public const TASK_COMPLETION_WEIGHT = 55;
+
+    public const TIME_COMPLIANCE_WEIGHT = 30;
+
+    public const REVENUE_WEIGHT = 15;
+
     public const ALL_FIELDS = [
         'target_revenue',
         'plan_revenue',
@@ -45,7 +51,6 @@ class EbitdamaxKdkmp extends Model
         'plan_revenue',
         'actual_revenue',
         'plan_cost',
-        'performance_scoring',
     ];
 
     protected $table = 'ebitdamax_kdkmp';
@@ -116,6 +121,42 @@ class EbitdamaxKdkmp extends Model
         $formattedMargin = rtrim(rtrim(number_format($margin, 2, '.', ''), '0'), '.');
 
         return $formattedMargin.'%';
+    }
+
+    public static function calculatePerformanceScoring(
+        ?string $planRevenue,
+        ?string $actualRevenue,
+        float $taskCompletionRate,
+        float $timeComplianceRate,
+    ): string {
+        $completionComponent = self::clampPercentage($taskCompletionRate)
+            * self::TASK_COMPLETION_WEIGHT / 100;
+        $timeComponent = self::clampPercentage($timeComplianceRate)
+            * self::TIME_COMPLIANCE_WEIGHT / 100;
+        $revenueRate = 0.0;
+
+        if (
+            $planRevenue !== null
+            && $actualRevenue !== null
+            && is_numeric($planRevenue)
+            && is_numeric($actualRevenue)
+            && (float) $planRevenue > 0
+        ) {
+            $revenueRate = self::clampPercentage(
+                ((float) $actualRevenue / (float) $planRevenue) * 100
+            );
+        }
+
+        $revenueComponent = $revenueRate * self::REVENUE_WEIGHT / 100;
+        $score = min(100, max(0, $completionComponent + $timeComponent + $revenueComponent));
+        $formattedScore = rtrim(rtrim(number_format($score, 2, '.', ''), '0'), '.');
+
+        return $formattedScore.'%';
+    }
+
+    private static function clampPercentage(float $value): float
+    {
+        return min(100, max(0, $value));
     }
 
     /**

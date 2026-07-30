@@ -29,16 +29,22 @@ class KdkmpDashboardController extends Controller
 
         $businessDate = $this->businessDate();
         $sdmKdkmpEntry = $user->sdmKdkmpEntry;
-        $computedValues = [
-            'target_revenue' => EbitdamaxKdkmp::TARGET_REVENUE,
-            ...$this->dashboardMetrics->forUser($user->id, $businessDate),
-        ];
-
         $todayEntry = $sdmKdkmpEntry
             ? $sdmKdkmpEntry->dailyEbitdaRecords()
                 ->whereDate('report_date', $businessDate->toDateString())
                 ->first()
             : null;
+        $metrics = $this->dashboardMetrics->forUser($user->id, $businessDate);
+        $computedValues = [
+            'target_revenue' => EbitdamaxKdkmp::TARGET_REVENUE,
+            ...$metrics,
+            'performance_scoring' => EbitdamaxKdkmp::calculatePerformanceScoring(
+                $todayEntry?->plan_revenue,
+                $todayEntry?->actual_revenue,
+                $metrics['task_completion_rate'],
+                $metrics['time_compliance_rate'],
+            ),
+        ];
 
         $history = EbitdamaxKdkmp::query()
             ->when(
@@ -87,6 +93,12 @@ class KdkmpDashboardController extends Controller
             'target_revenue' => EbitdamaxKdkmp::TARGET_REVENUE,
             'actual_cost' => $metrics['actual_cost'],
             'actual_ebitda_margin' => EbitdamaxKdkmp::calculateActualEbitdaMargin($actualRevenue),
+            'performance_scoring' => EbitdamaxKdkmp::calculatePerformanceScoring(
+                $planRevenue,
+                $actualRevenue,
+                $metrics['task_completion_rate'],
+                $metrics['time_compliance_rate'],
+            ),
             'total_duration' => $metrics['total_duration'],
             'plan_revenue_requires_review' => EbitdamaxKdkmp::planRevenueRequiresReview($planRevenue),
             'updated_by' => $user->id,

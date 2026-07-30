@@ -44,6 +44,8 @@ export const kdkmpDashboardFields: KdkmpDashboardField[] = [
     {
         key: 'performance_scoring',
         label: 'Performance Scoring',
-        placeholder: 'Contoh: 85%',
+        isDisabled: true,
+        description:
+            'Otomatis: 55% penyelesaian task + 30% kepatuhan ambang waktu + 15% pencapaian revenue.',
     },
 ];

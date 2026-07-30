@@ -46,6 +46,9 @@ type DailyForm = {
 };
 
 const ACTUAL_EBITDA_MARGIN_FIXED_COST = 17_477_716;
+const TASK_COMPLETION_WEIGHT = 55;
+const TIME_COMPLIANCE_WEIGHT = 30;
+const REVENUE_WEIGHT = 15;
 
 function inputValue(value: string | null | undefined): string {
     return value ?? '';
@@ -144,7 +147,7 @@ function formDataFrom(
             inputValue(entry?.actual_revenue),
         ),
         total_duration: inputValue(computedValues.total_duration),
-        performance_scoring: inputValue(entry?.performance_scoring),
+        performance_scoring: inputValue(computedValues.performance_scoring),
     };
 }
 
@@ -168,12 +171,53 @@ function calculateActualEbitdaMargin(actualRevenue: string): string {
         .replace(/(\.\d)0$/, '$1')}%`;
 }
 
+function calculatePerformanceScoring(
+    planRevenue: string,
+    actualRevenue: string,
+    taskCompletionRate: number,
+    timeComplianceRate: number,
+): string {
+    const clampPercentage = (value: number) =>
+        Math.min(100, Math.max(0, value));
+    const plan = Number(planRevenue);
+    const actual = Number(actualRevenue);
+    const revenueRate =
+        planRevenue.trim() !== '' &&
+        actualRevenue.trim() !== '' &&
+        Number.isFinite(plan) &&
+        Number.isFinite(actual) &&
+        plan > 0
+            ? clampPercentage((actual / plan) * 100)
+            : 0;
+    const score = clampPercentage(
+        (clampPercentage(taskCompletionRate) * TASK_COMPLETION_WEIGHT) / 100 +
+            (clampPercentage(timeComplianceRate) * TIME_COMPLIANCE_WEIGHT) /
+                100 +
+            (revenueRate * REVENUE_WEIGHT) / 100,
+    );
+
+    return `${score
+        .toFixed(2)
+        .replace(/\.00$/, '')
+        .replace(/(\.\d)0$/, '$1')}%`;
+}
+
 function dashboardFieldValue(
     data: DailyForm,
     field: keyof KdkmpDashboardFields,
+    computedValues: KdkmpManagerDashboardProps['computedValues'],
 ): string {
     if (field === 'actual_ebitda_margin') {
         return calculateActualEbitdaMargin(data.actual_revenue);
+    }
+
+    if (field === 'performance_scoring') {
+        return calculatePerformanceScoring(
+            data.plan_revenue,
+            data.actual_revenue,
+            computedValues.task_completion_rate,
+            computedValues.time_compliance_rate,
+        );
     }
 
     return data[field];
@@ -381,6 +425,7 @@ export default function KdkmpDashboardIndex({
                                                                 value={dashboardFieldValue(
                                                                     data,
                                                                     field.key,
+                                                                    computedValues,
                                                                 )}
                                                                 onValueChange={(
                                                                     value,
@@ -408,6 +453,7 @@ export default function KdkmpDashboardIndex({
                                                                 value={dashboardFieldValue(
                                                                     data,
                                                                     field.key,
+                                                                    computedValues,
                                                                 )}
                                                                 onChange={(
                                                                     event,
