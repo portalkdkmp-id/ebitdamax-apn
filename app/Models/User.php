@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -35,6 +36,8 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
+    public const EMAIL_KDKMP_GERAI = 'kdkmp.gerai@ebitdamax.local';
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
@@ -50,6 +53,31 @@ class User extends Authenticatable implements PasskeyUser
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    public function businessProcesses(): HasMany
+    {
+        return $this->hasMany(BusinessProcess::class);
+    }
+
+    public function unitCostAssumptions(): HasMany
+    {
+        return $this->hasMany(UnitCostAssumption::class);
+    }
+
+    public function revenuePlans(): HasMany
+    {
+        return $this->hasMany(RevenuePlan::class);
+    }
+
+    public function planEbitdaMatrices(): HasMany
+    {
+        return $this->hasMany(PlanEbitdaMatrix::class);
+    }
+
+    public function isEbitdaKdkmp(): bool
+    {
+        return $this->role?->slug === Role::SLUG_EBITDA_KDKMP;
     }
 
     public function getRouteKeyName(): string

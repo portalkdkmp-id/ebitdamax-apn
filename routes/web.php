@@ -1,20 +1,25 @@
 <?php
 
+use App\Http\Controllers\BusinessProcessController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardRedirectController;
 use App\Http\Controllers\EbitdaTreeController;
 use App\Http\Controllers\EbitdaValueController;
 use App\Http\Controllers\ExcelImportController;
+use App\Http\Controllers\MeetingActionItemController;
 use App\Http\Controllers\MeetingMinuteController;
 use App\Http\Controllers\MonitoringDashboardController;
 use App\Http\Controllers\OrganizationCalculationController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\PlanEbitdaMatrixController;
+use App\Http\Controllers\RevenuePlanController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SdmKdkmpEntryController;
 use App\Http\Controllers\TaskCategoryController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDashboardController;
 use App\Http\Controllers\TaskReportController;
+use App\Http\Controllers\UnitCostAssumptionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValueChainJobdeskController;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +44,47 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/tasks/{task}/finish', [TaskReportController::class, 'finish'])
         ->middleware('role.level:staff,manager,superadmin')
         ->name('tasks.finish');
+
+    Route::resource('meeting-minutes', MeetingMinuteController::class)
+        ->except(['create', 'edit', 'show']);
+
+    Route::get('/business-processes/kdkmp-gerai', [BusinessProcessController::class, 'kdkmpGerai'])
+        ->name('business-processes.kdkmp-gerai.index');
+    Route::post('/business-processes/kdkmp-gerai', [BusinessProcessController::class, 'store'])
+        ->name('business-processes.kdkmp-gerai.store');
+    Route::put('/business-processes/kdkmp-gerai/{businessProcess}', [BusinessProcessController::class, 'update'])
+        ->name('business-processes.kdkmp-gerai.update');
+
+    Route::get('/unit-cost-assumptions/kdkmp-gerai', [UnitCostAssumptionController::class, 'kdkmpGerai'])
+        ->name('unit-cost-assumptions.kdkmp-gerai.index');
+    Route::post('/unit-cost-assumptions/kdkmp-gerai', [UnitCostAssumptionController::class, 'store'])
+        ->name('unit-cost-assumptions.kdkmp-gerai.store');
+    Route::put('/unit-cost-assumptions/kdkmp-gerai/{unitCostAssumption}', [UnitCostAssumptionController::class, 'update'])
+        ->name('unit-cost-assumptions.kdkmp-gerai.update');
+
+    Route::get('/revenue-plans/kdkmp-gerai', [RevenuePlanController::class, 'kdkmpGerai'])
+        ->name('revenue-plans.kdkmp-gerai.index');
+    Route::post('/revenue-plans/kdkmp-gerai', [RevenuePlanController::class, 'store'])
+        ->name('revenue-plans.kdkmp-gerai.store');
+    Route::put('/revenue-plans/kdkmp-gerai/{revenuePlan}', [RevenuePlanController::class, 'update'])
+        ->name('revenue-plans.kdkmp-gerai.update');
+
+    Route::get('/plan-ebitda-matrices/kdkmp-gerai', [PlanEbitdaMatrixController::class, 'kdkmpGerai'])
+        ->name('plan-ebitda-matrices.kdkmp-gerai.index');
+    Route::post('/plan-ebitda-matrices/kdkmp-gerai', [PlanEbitdaMatrixController::class, 'store'])
+        ->name('plan-ebitda-matrices.kdkmp-gerai.store');
+    Route::put('/plan-ebitda-matrices/kdkmp-gerai/{planEbitdaMatrix}', [PlanEbitdaMatrixController::class, 'update'])
+        ->name('plan-ebitda-matrices.kdkmp-gerai.update');
+
+    Route::get(
+        '/meeting-minutes/{meetingMinute}/attachments/{attachment}/preview',
+        [MeetingMinuteController::class, 'previewAttachment']
+    )->name('meeting-minutes.attachments.preview');
+
+    Route::get(
+        '/meeting-minutes/{meetingMinute}/attachments/{attachment}/download',
+        [MeetingMinuteController::class, 'downloadAttachment']
+    )->name('meeting-minutes.attachments.download');
 
     Route::middleware('role.level:superadmin')->group(function () {
         Route::get('/admin-dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
@@ -108,18 +154,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('sdm-data', SdmKdkmpEntryController::class, ['parameters' => ['sdm-data' => 'sdm_data']])
             ->only(['index', 'update']);
 
-        Route::resource('meeting-minutes', MeetingMinuteController::class)
-            ->except(['create', 'edit', 'show']);
+        Route::get('/meeting-minutes/action-items', [MeetingActionItemController::class, 'index'])
+            ->name('meeting-minutes.action-items.index');
 
-        Route::get(
-            '/meeting-minutes/{meetingMinute}/attachments/{attachment}/preview',
-            [MeetingMinuteController::class, 'previewAttachment']
-        )->name('meeting-minutes.attachments.preview');
-
-        Route::get(
-            '/meeting-minutes/{meetingMinute}/attachments/{attachment}/download',
-            [MeetingMinuteController::class, 'downloadAttachment']
-        )->name('meeting-minutes.attachments.download');
+        Route::patch('/meeting-minutes/action-items/{meetingMinuteItem}', [MeetingActionItemController::class, 'update'])
+            ->name('meeting-minutes.action-items.update');
     });
 });
 

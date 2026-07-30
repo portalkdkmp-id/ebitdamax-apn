@@ -12,6 +12,7 @@ import {
     Plus,
     Search,
     Trash2,
+    UserRound,
     Users,
     X,
 } from 'lucide-react';
@@ -46,7 +47,12 @@ import {
     TableRow,
 } from '@/components/ui/table';
 
-import { index as meetingMinutesIndex } from '@/routes/meeting-minutes';
+import {
+    destroy as destroyMeetingMinute,
+    index as meetingMinutesIndex,
+    store as storeMeetingMinute,
+    update as updateMeetingMinute,
+} from '@/routes/meeting-minutes';
 import type {
     MeetingMinute,
     MeetingMinuteAttachment,
@@ -57,6 +63,7 @@ import { MEETING_ITEM_STATUSES, STATUS_LABELS } from '@/types/meeting-minute';
 
 type Props = {
     meetingMinutes: MeetingMinute[];
+    canViewAll: boolean;
     filters: MeetingMinuteFilters;
 };
 
@@ -130,6 +137,7 @@ function formatFileSize(size: number): string {
 
 export default function MeetingMinutesIndex({
     meetingMinutes,
+    canViewAll,
     filters,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
@@ -211,16 +219,21 @@ export default function MeetingMinutesIndex({
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        post(editingId ? `/meeting-minutes/${editingId}` : '/meeting-minutes', {
-            forceFormData: true,
-            preserveScroll: true,
-            preserveState: true,
-            onSuccess: () => {
-                setDialogOpen(false);
-                setFileInputKey((current) => current + 1);
-                clearErrors();
+        post(
+            editingId
+                ? updateMeetingMinute.url(editingId)
+                : storeMeetingMinute.url(),
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => {
+                    setDialogOpen(false);
+                    setFileInputKey((current) => current + 1);
+                    clearErrors();
+                },
             },
-        });
+        );
     };
 
     const confirmDelete = (meeting: MeetingMinute) => {
@@ -228,8 +241,11 @@ export default function MeetingMinutesIndex({
     };
 
     const handleDelete = () => {
-        if (!deleteTarget) return;
-        router.delete(`/meeting-minutes/${deleteTarget.id}`, {
+        if (!deleteTarget) {
+            return;
+        }
+
+        router.delete(destroyMeetingMinute.url(deleteTarget.id), {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => setDeleteTarget(null),
@@ -241,7 +257,10 @@ export default function MeetingMinutesIndex({
     };
 
     const removeItem = (index: number) => {
-        if (data.items.length <= 1) return;
+        if (data.items.length <= 1) {
+            return;
+        }
+
         setData(
             'items',
             data.items.filter((_, i) => i !== index),
@@ -330,7 +349,10 @@ export default function MeetingMinutesIndex({
     };
 
     const formatTime = (time: string | null) => {
-        if (!time) return '-';
+        if (!time) {
+            return '-';
+        }
+
         return time.slice(0, 5);
     };
 
@@ -410,6 +432,14 @@ export default function MeetingMinutesIndex({
                                                     <span className="flex items-center gap-1.5">
                                                         <Users className="h-4 w-4" />
                                                         {meeting.attendees}
+                                                    </span>
+                                                )}
+                                                {canViewAll && (
+                                                    <span className="flex items-center gap-1.5">
+                                                        <UserRound className="h-4 w-4" />
+                                                        {meeting.creator
+                                                            ?.name ??
+                                                            'Data lama tanpa pemilik'}
                                                     </span>
                                                 )}
                                             </div>
@@ -1168,6 +1198,17 @@ export default function MeetingMinutesIndex({
                                         {reviewTarget.attendees ?? '-'}
                                     </p>
                                 </div>
+                                {canViewAll && (
+                                    <div className="sm:col-span-2">
+                                        <p className="text-xs font-medium text-muted-foreground">
+                                            Dibuat Oleh
+                                        </p>
+                                        <p className="mt-1 text-sm">
+                                            {reviewTarget.creator?.name ??
+                                                'Data lama tanpa pemilik'}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-3">
@@ -1344,7 +1385,9 @@ export default function MeetingMinutesIndex({
             <Dialog
                 open={deleteTarget !== null}
                 onOpenChange={(open) => {
-                    if (!open) setDeleteTarget(null);
+                    if (!open) {
+                        setDeleteTarget(null);
+                    }
                 }}
             >
                 <DialogContent>
