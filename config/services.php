@@ -48,4 +48,9 @@ return [
         'chat_url' => env('LUMBUNG_KMS_CHAT_URL', 'https://lumbung.sibisa.site/chat'),
     ],
 
+    'lms_apn' => [
+        'base_url' => env('LMS_APN_BASE_URL', 'https://lms.dev-agrinas.id'),
+        'sso_key' => env('LMS_APN_SSO_KEY'),
+    ],
+
 ];

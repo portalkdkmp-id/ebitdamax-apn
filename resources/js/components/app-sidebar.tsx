@@ -44,6 +44,7 @@ import { index as ebitdaTreeIndex } from '@/routes/ebitda-tree';
 import { index as ebitdaValuesIndex } from '@/routes/ebitda-values';
 import { index as importExcelIndex } from '@/routes/import-excel';
 import { index as kdkmpDashboardIndex } from '@/routes/kdkmp-dashboard';
+import { index as lmsKdkmpIndex } from '@/routes/lms-kdkmp';
 import { index as meetingMinutesIndex } from '@/routes/meeting-minutes';
 import { index as meetingActionItemsIndex } from '@/routes/meeting-minutes/action-items';
 import { index as monitoringIndex } from '@/routes/monitoring';
@@ -224,7 +225,7 @@ const kdkmpManagerNavItems: NavItem[] = [
     },
     {
         title: 'LMS KDKMP',
-        href: 'https://lms.dev-agrinas.id/',
+        href: lmsKdkmpIndex(),
         icon: GraduationCap,
     },
 ];

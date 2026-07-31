@@ -1,25 +1,25 @@
 import { Head } from '@inertiajs/react';
 
 type Props = {
-    chatUrl: string;
+    lmsUrl: string;
 };
 
 const breadcrumbs = [
     {
-        title: 'Chat Lumbung KMS',
-        href: '/lumbung-kms/chat',
+        title: 'LMS KDKMP',
+        href: '/lms-kdkmp',
     },
 ];
 
-export default function LumbungChatIndex({ chatUrl }: Props) {
+export default function LmsKdkmpIndex({ lmsUrl }: Props) {
     return (
         <>
-            <Head title="Chat Lumbung KMS" />
+            <Head title="LMS KDKMP" />
 
             <div className="flex min-h-0 flex-1 flex-col p-4">
                 <iframe
-                    src={chatUrl}
-                    title="Chat Lumbung KMS"
+                    src={lmsUrl}
+                    title="LMS KDKMP"
                     className="min-h-[640px] w-full flex-1 rounded-xl border border-sidebar-border bg-white shadow-sm"
                     allow="clipboard-read; clipboard-write"
                     referrerPolicy="strict-origin-when-cross-origin"
@@ -29,6 +29,6 @@ export default function LumbungChatIndex({ chatUrl }: Props) {
     );
 }
 
-LumbungChatIndex.layout = {
+LmsKdkmpIndex.layout = {
     breadcrumbs,
 };
