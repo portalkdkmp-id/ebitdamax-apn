@@ -1,7 +1,4 @@
 import { Head } from '@inertiajs/react';
-import { ExternalLink, Info } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 
 type Props = {
     chatUrl: string;
@@ -19,29 +16,7 @@ export default function LumbungChatIndex({ chatUrl }: Props) {
         <>
             <Head title="Chat Lumbung KMS" />
 
-            <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
-                <Alert>
-                    <Info />
-                    <AlertTitle>Login Lumbung diperlukan</AlertTitle>
-                    <AlertDescription>
-                        <p>
-                            Sesi login EBITDA dan Lumbung terpisah. Silakan
-                            masuk menggunakan akun Lumbung pada tampilan di
-                            bawah.
-                        </p>
-                        <Button variant="outline" size="sm" asChild>
-                            <a
-                                href={chatUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                Buka di tab baru
-                                <ExternalLink />
-                            </a>
-                        </Button>
-                    </AlertDescription>
-                </Alert>
-
+            <div className="flex min-h-0 flex-1 flex-col p-4">
                 <iframe
                     src={chatUrl}
                     title="Chat Lumbung KMS"
