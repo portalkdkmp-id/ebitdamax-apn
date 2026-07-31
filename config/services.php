@@ -44,4 +44,8 @@ return [
         'base_url' => env('PORTAL_PEMETAAN_BASE_URL', 'https://pemetaan-lahan.portalkdkmp.id'),
     ],
 
+    'lumbung_kms' => [
+        'chat_url' => env('LUMBUNG_KMS_CHAT_URL', 'https://lumbung.sibisa.site/chat'),
+    ],
+
 ];

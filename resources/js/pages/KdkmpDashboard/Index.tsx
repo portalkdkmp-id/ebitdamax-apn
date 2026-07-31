@@ -105,12 +105,10 @@ function RupiahInput({
     id,
     value,
     onValueChange,
-    disabled = false,
 }: {
     id: string;
     value: string;
     onValueChange: (value: string) => void;
-    disabled?: boolean;
 }) {
     return (
         <div className="relative">
@@ -122,11 +120,10 @@ function RupiahInput({
                 type="text"
                 inputMode="decimal"
                 value={formatRupiahInput(value)}
-                disabled={disabled}
                 onChange={(event) =>
                     onValueChange(parseRupiahInput(event.target.value))
                 }
-                className="pl-10 disabled:cursor-not-allowed disabled:opacity-70"
+                className="pl-10"
                 placeholder="0"
             />
         </div>
@@ -409,83 +406,95 @@ export default function KdkmpDashboardIndex({
                                     >
                                         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                                             {kdkmpDashboardFields.map(
-                                                (field) => (
-                                                    <div
-                                                        key={field.key}
-                                                        className="space-y-2"
-                                                    >
-                                                        <Label
-                                                            htmlFor={field.key}
+                                                (field) => {
+                                                    const fieldValue =
+                                                        dashboardFieldValue(
+                                                            data,
+                                                            field.key,
+                                                            computedValues,
+                                                        );
+
+                                                    return (
+                                                        <div
+                                                            key={field.key}
+                                                            className="space-y-2"
                                                         >
-                                                            {field.label}
-                                                        </Label>
-                                                        {field.isRupiah ? (
-                                                            <RupiahInput
-                                                                id={field.key}
-                                                                value={dashboardFieldValue(
-                                                                    data,
-                                                                    field.key,
-                                                                    computedValues,
-                                                                )}
-                                                                onValueChange={(
-                                                                    value,
-                                                                ) => {
-                                                                    if (
-                                                                        !field.isDisabled
-                                                                    ) {
+                                                            <Label
+                                                                htmlFor={
+                                                                    field.isDisabled
+                                                                        ? undefined
+                                                                        : field.key
+                                                                }
+                                                            >
+                                                                {field.label}
+                                                            </Label>
+                                                            {field.isDisabled ? (
+                                                                <p className="py-2 text-sm font-semibold text-foreground tabular-nums">
+                                                                    {formatManualValue(
+                                                                        fieldValue,
+                                                                        field.isRupiah ===
+                                                                            true,
+                                                                    )}
+                                                                </p>
+                                                            ) : field.isRupiah ? (
+                                                                <RupiahInput
+                                                                    id={
+                                                                        field.key
+                                                                    }
+                                                                    value={
+                                                                        fieldValue
+                                                                    }
+                                                                    onValueChange={(
+                                                                        value,
+                                                                    ) =>
                                                                         setData(
                                                                             field.key,
                                                                             value,
-                                                                        );
+                                                                        )
                                                                     }
-                                                                }}
-                                                                disabled={
-                                                                    field.isDisabled
+                                                                />
+                                                            ) : (
+                                                                <Input
+                                                                    id={
+                                                                        field.key
+                                                                    }
+                                                                    type="text"
+                                                                    value={
+                                                                        fieldValue
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        setData(
+                                                                            field.key,
+                                                                            event
+                                                                                .target
+                                                                                .value,
+                                                                        )
+                                                                    }
+                                                                    placeholder={
+                                                                        field.placeholder
+                                                                    }
+                                                                />
+                                                            )}
+                                                            {field.description && (
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    {
+                                                                        field.description
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                            <InputError
+                                                                message={
+                                                                    errors[
+                                                                        field
+                                                                            .key
+                                                                    ]
                                                                 }
                                                             />
-                                                        ) : (
-                                                            <Input
-                                                                id={field.key}
-                                                                type="text"
-                                                                disabled={
-                                                                    field.isDisabled
-                                                                }
-                                                                value={dashboardFieldValue(
-                                                                    data,
-                                                                    field.key,
-                                                                    computedValues,
-                                                                )}
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    setData(
-                                                                        field.key,
-                                                                        event
-                                                                            .target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                placeholder={
-                                                                    field.placeholder
-                                                                }
-                                                            />
-                                                        )}
-                                                        {field.description && (
-                                                            <p className="text-xs text-muted-foreground">
-                                                                {
-                                                                    field.description
-                                                                }
-                                                            </p>
-                                                        )}
-                                                        <InputError
-                                                            message={
-                                                                errors[
-                                                                    field.key
-                                                                ]
-                                                            }
-                                                        />
-                                                    </div>
-                                                ),
+                                                        </div>
+                                                    );
+                                                },
                                             )}
                                         </div>
 

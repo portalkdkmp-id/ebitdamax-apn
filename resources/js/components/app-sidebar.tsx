@@ -11,7 +11,9 @@ import {
     FolderCheck,
     FolderKanban,
     Gauge,
+    GraduationCap,
     LayoutDashboard,
+    MessageSquareText,
     Network,
     Radar,
     ShieldCheck,
@@ -122,12 +124,23 @@ const superadminNavItems: NavItem[] = [
     },
 ];
 
-const meetingNavItems: NavItem[] = [
+const meetingMinutesNavItems: NavItem[] = [
     {
         title: 'Minutes of Meeting',
         href: meetingMinutesIndex(),
         icon: FileText,
     },
+];
+
+const knowledgeManagementNavItems: NavItem[] = [
+    {
+        title: 'Chat Lumbung KMS',
+        href: '/lumbung-kms/chat',
+        icon: MessageSquareText,
+    },
+];
+
+const meetingActionItemNavItems: NavItem[] = [
     {
         title: 'Action Item MoM',
         href: meetingActionItemsIndex(),
@@ -209,6 +222,11 @@ const kdkmpManagerNavItems: NavItem[] = [
         href: kdkmpDashboardIndex(),
         icon: Gauge,
     },
+    {
+        title: 'LMS KDKMP',
+        href: 'https://lms.dev-agrinas.id/',
+        icon: GraduationCap,
+    },
 ];
 
 export function AppSidebar() {
@@ -216,6 +234,8 @@ export function AppSidebar() {
     const isSuperadmin = auth.user?.role?.level === 'superadmin';
     const isEbitdaKdkmp = auth.user?.role?.slug === 'ebitda_kdkmp';
     const isKdkmpManager = auth.user?.role?.slug === 'kepala-toko-manager';
+    const canAccessMeetingActionItems =
+        isSuperadmin || auth.user?.role?.level === 'manager';
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -240,7 +260,19 @@ export function AppSidebar() {
                         label="EBITDA KDKMP"
                     />
                 )}
-                <NavMain items={meetingNavItems} label="Meeting" />
+                <NavMain
+                    items={knowledgeManagementNavItems}
+                    label="Knowledge Management"
+                />
+                <NavMain
+                    items={[
+                        ...meetingMinutesNavItems,
+                        ...(canAccessMeetingActionItems
+                            ? meetingActionItemNavItems
+                            : []),
+                    ]}
+                    label="Meeting"
+                />
                 <NavMain
                     items={
                         isSuperadmin

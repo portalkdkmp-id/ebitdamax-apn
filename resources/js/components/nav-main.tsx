@@ -10,7 +10,21 @@ import {
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
+import { toUrl } from '@/lib/utils';
 import type { NavItem } from '@/types';
+
+function isExternalNavItem(item: NavItem): boolean {
+    return /^https?:\/\//i.test(toUrl(item.href));
+}
+
+function NavItemContent({ item }: { item: NavItem }) {
+    return (
+        <>
+            {item.icon && <item.icon />}
+            <span>{item.title}</span>
+        </>
+    );
+}
 
 export function NavMain({
     items = [],
@@ -21,10 +35,21 @@ export function NavMain({
 }) {
     const { isCurrentUrl, isCurrentOrParentUrl } = useCurrentUrl();
 
-    const isItemActive = (item: NavItem) =>
-        isCurrentUrl(item.href) ||
-        (item.items?.some((child) => isCurrentOrParentUrl(child.href)) ??
-            false);
+    const isItemActive = (item: NavItem) => {
+        if (isExternalNavItem(item)) {
+            return false;
+        }
+
+        return (
+            isCurrentUrl(item.href) ||
+            (item.items?.some(
+                (child) =>
+                    !isExternalNavItem(child) &&
+                    isCurrentOrParentUrl(child.href),
+            ) ??
+                false)
+        );
+    };
 
     return (
         <SidebarGroup className="px-2 py-0">
@@ -37,10 +62,19 @@ export function NavMain({
                             isActive={isItemActive(item)}
                             tooltip={{ children: item.title }}
                         >
-                            <Link href={item.href} prefetch>
-                                {item.icon && <item.icon />}
-                                <span>{item.title}</span>
-                            </Link>
+                            {isExternalNavItem(item) ? (
+                                <a
+                                    href={toUrl(item.href)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <NavItemContent item={item} />
+                                </a>
+                            ) : (
+                                <Link href={item.href} prefetch>
+                                    <NavItemContent item={item} />
+                                </Link>
+                            )}
                         </SidebarMenuButton>
                         {item.items && item.items.length > 0 && (
                             <SidebarMenuSub>
@@ -48,12 +82,31 @@ export function NavMain({
                                     <SidebarMenuSubItem key={child.title}>
                                         <SidebarMenuSubButton
                                             asChild
-                                            isActive={isCurrentUrl(child.href)}
+                                            isActive={
+                                                !isExternalNavItem(child) &&
+                                                isCurrentUrl(child.href)
+                                            }
                                         >
-                                            <Link href={child.href} prefetch>
-                                                {child.icon && <child.icon />}
-                                                <span>{child.title}</span>
-                                            </Link>
+                                            {isExternalNavItem(child) ? (
+                                                <a
+                                                    href={toUrl(child.href)}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    <NavItemContent
+                                                        item={child}
+                                                    />
+                                                </a>
+                                            ) : (
+                                                <Link
+                                                    href={child.href}
+                                                    prefetch
+                                                >
+                                                    <NavItemContent
+                                                        item={child}
+                                                    />
+                                                </Link>
+                                            )}
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                 ))}

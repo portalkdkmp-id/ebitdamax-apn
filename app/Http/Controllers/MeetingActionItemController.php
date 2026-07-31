@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\RoleLevel;
 use App\Http\Requests\UpdateMeetingMinuteItemStatusRequest;
 use App\Models\MeetingMinuteItem;
 use App\Models\MeetingMinuteItemStatusHistory;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -19,6 +21,10 @@ class MeetingActionItemController extends Controller
 {
     public function index(Request $request): Response
     {
+        $user = $request->user();
+
+        abort_unless($user instanceof User, 401);
+
         $search = trim((string) $request->input('search', ''));
         $requestedStatus = (string) $request->input('status', '');
         $status = in_array($requestedStatus, MeetingMinuteItem::STATUSES, true)
@@ -27,7 +33,7 @@ class MeetingActionItemController extends Controller
         $overdue = $request->boolean('overdue');
         $today = today()->toDateString();
 
-        $actionItems = MeetingMinuteItem::query()
+        $actionItems = $this->visibleActionItemsQuery($user)
             ->with([
                 'meetingMinute:id,title,meeting_date,created_by',
                 'meetingMinute.creator:id,name',
@@ -68,7 +74,7 @@ class MeetingActionItemController extends Controller
 
         return Inertia::render('MeetingMinutes/ActionItems', [
             'actionItems' => $actionItems,
-            'summary' => $this->summary($today),
+            'summary' => $this->summary($today, $user),
             'filters' => [
                 'search' => $search,
                 'status' => $status,
@@ -84,6 +90,8 @@ class MeetingActionItemController extends Controller
         $actor = $request->user();
 
         abort_unless($actor instanceof User, 401);
+
+        Gate::authorize('update', $meetingMinuteItem->meetingMinute);
 
         $status = (string) $request->validated('status');
         $remarks = $request->validated('remarks');
@@ -120,9 +128,9 @@ class MeetingActionItemController extends Controller
     /**
      * @return array{total: int, open: int, in_progress: int, completed: int, overdue: int}
      */
-    private function summary(string $today): array
+    private function summary(string $today, User $user): array
     {
-        $summary = MeetingMinuteItem::query()
+        $summary = $this->visibleActionItemsQuery($user)
             ->selectRaw('COUNT(*) AS total_count')
             ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS open_count', [MeetingMinuteItem::STATUS_OPEN])
             ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS in_progress_count', [MeetingMinuteItem::STATUS_IN_PROGRESS])
@@ -140,6 +148,19 @@ class MeetingActionItemController extends Controller
             'completed' => (int) $summary->completed_count,
             'overdue' => (int) $summary->overdue_count,
         ];
+    }
+
+    private function visibleActionItemsQuery(User $user): Builder
+    {
+        return MeetingMinuteItem::query()
+            ->when(
+                $user->role?->level !== RoleLevel::Superadmin,
+                fn (Builder $query): Builder => $query->whereHas(
+                    'meetingMinute',
+                    fn (Builder $meetingMinuteQuery): Builder => $meetingMinuteQuery
+                        ->whereBelongsTo($user, 'creator')
+                )
+            );
     }
 
     /**

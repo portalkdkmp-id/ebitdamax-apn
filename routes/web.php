@@ -8,6 +8,7 @@ use App\Http\Controllers\EbitdaValueController;
 use App\Http\Controllers\ExcelImportController;
 use App\Http\Controllers\KdkmpDashboardController;
 use App\Http\Controllers\KdkmpDashboardMonitoringController;
+use App\Http\Controllers\LumbungChatController;
 use App\Http\Controllers\MeetingActionItemController;
 use App\Http\Controllers\MeetingMinuteController;
 use App\Http\Controllers\MonitoringDashboardController;
@@ -31,6 +32,9 @@ Route::redirect('/', '/dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardRedirectController::class)->name('dashboard');
+
+    Route::get('/lumbung-kms/chat', LumbungChatController::class)
+        ->name('lumbung-kms.chat');
 
     Route::get('/dashboard/kdkmp', [KdkmpDashboardController::class, 'index'])
         ->name('kdkmp-dashboard.index');
@@ -111,6 +115,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         [MeetingMinuteController::class, 'downloadAttachment']
     )->name('meeting-minutes.attachments.download');
 
+    Route::middleware('role.level:manager,superadmin')->group(function () {
+        Route::get('/meeting-minutes/action-items', [MeetingActionItemController::class, 'index'])
+            ->name('meeting-minutes.action-items.index');
+
+        Route::patch('/meeting-minutes/action-items/{meetingMinuteItem}', [MeetingActionItemController::class, 'update'])
+            ->name('meeting-minutes.action-items.update');
+    });
+
     Route::middleware('role.level:superadmin')->group(function () {
         Route::get('/admin-dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
 
@@ -182,11 +194,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('sdm-data', SdmKdkmpEntryController::class, ['parameters' => ['sdm-data' => 'sdm_data']])
             ->only(['index', 'update']);
 
-        Route::get('/meeting-minutes/action-items', [MeetingActionItemController::class, 'index'])
-            ->name('meeting-minutes.action-items.index');
-
-        Route::patch('/meeting-minutes/action-items/{meetingMinuteItem}', [MeetingActionItemController::class, 'update'])
-            ->name('meeting-minutes.action-items.update');
     });
 });
 

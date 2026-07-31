@@ -73,6 +73,7 @@ type TaskActionFormData = {
 
 const MAX_DOCUMENT_COUNT = 10;
 const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024;
+const MOBILE_DESCRIPTION_PREVIEW_LENGTH = 50;
 
 function formatFileSize(size: number): string {
     if (size < 1024) {
@@ -91,6 +92,72 @@ function fieldsFor(task: DashboardTask | null, showWhen: 'start' | 'finish') {
         task?.additional_fields.filter(
             (field) => field.show_when === showWhen,
         ) ?? []
+    );
+}
+
+function TaskActionButton({
+    task,
+    onStart,
+    onFinish,
+}: {
+    task: DashboardTask;
+    onStart: (task: DashboardTask) => void;
+    onFinish: (task: DashboardTask) => void;
+}) {
+    if (task.status === 'pending') {
+        return (
+            <Button type="button" size="sm" onClick={() => onStart(task)}>
+                <Play className="size-4" />
+                Mulai Task
+            </Button>
+        );
+    }
+
+    if (task.status === 'in_progress') {
+        return (
+            <Button type="button" size="sm" onClick={() => onFinish(task)}>
+                <CheckCircle2 className="size-4" />
+                Selesaikan Task
+            </Button>
+        );
+    }
+
+    return null;
+}
+
+function MobileTaskDescription({
+    description,
+}: {
+    description: string | null;
+}) {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const fullDescription = description?.trim() || '-';
+    const descriptionCharacters = Array.from(fullDescription);
+    const canExpand =
+        descriptionCharacters.length > MOBILE_DESCRIPTION_PREVIEW_LENGTH;
+    const previewDescription = canExpand
+        ? `${descriptionCharacters
+              .slice(0, MOBILE_DESCRIPTION_PREVIEW_LENGTH)
+              .join('')
+              .trimEnd()}…`
+        : fullDescription;
+
+    return (
+        <div className="mt-1 hidden max-[430px]:block">
+            <p className="text-xs break-words text-muted-foreground">
+                {isExpanded ? fullDescription : previewDescription}
+            </p>
+            {canExpand && (
+                <button
+                    type="button"
+                    className="mt-1 rounded-sm text-left text-[11px] font-medium text-primary underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    aria-expanded={isExpanded}
+                    onClick={() => setIsExpanded((current) => !current)}
+                >
+                    {isExpanded ? 'Tutup' : 'Lihat selengkapnya'}
+                </button>
+            )}
+        </div>
     );
 }
 
@@ -311,19 +378,19 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
                                         <TableHead className="min-w-[280px] p-4">
                                             Nama Task
                                         </TableHead>
-                                        <TableHead className="p-4">
+                                        <TableHead className="p-4 max-[430px]:hidden">
                                             Kategori
                                         </TableHead>
-                                        <TableHead className="p-4">
+                                        <TableHead className="p-4 max-[430px]:hidden">
                                             PIC Roles
                                         </TableHead>
-                                        <TableHead className="p-4 text-right">
+                                        <TableHead className="p-4 text-right max-[430px]:hidden">
                                             Estimasi Waktu
                                         </TableHead>
-                                        <TableHead className="p-4">
+                                        <TableHead className="p-4 max-[430px]:hidden">
                                             Status
                                         </TableHead>
-                                        <TableHead className="w-[190px] p-4 text-right">
+                                        <TableHead className="w-[190px] p-4 text-right max-[430px]:hidden">
                                             Aksi
                                         </TableHead>
                                     </TableRow>
@@ -342,26 +409,91 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
 
                                     {tasks.map((task) => (
                                         <TableRow key={task.uuid}>
-                                            <TableCell className="p-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                            <TableCell className="p-4 max-[430px]:whitespace-normal">
+                                                <div className="flex items-center gap-3 max-[430px]:items-start">
+                                                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                                         <ClipboardList className="size-5" />
                                                     </div>
-                                                    <div>
+                                                    <div className="min-w-0">
                                                         <p className="font-medium text-foreground">
                                                             {task.name}
                                                         </p>
-                                                        <p className="text-xs text-muted-foreground">
+                                                        <p className="mt-0.5 hidden text-[11px] text-muted-foreground/70 max-[430px]:block">
+                                                            {
+                                                                task
+                                                                    .task_category
+                                                                    .name
+                                                            }
+                                                        </p>
+                                                        <p className="text-xs break-words text-muted-foreground max-[430px]:hidden">
                                                             {task.description ??
                                                                 '-'}
                                                         </p>
+                                                        <MobileTaskDescription
+                                                            description={
+                                                                task.description
+                                                            }
+                                                        />
+                                                        <div className="mt-4 hidden space-y-3 border-t pt-3 max-[430px]:block">
+                                                            <div className="grid grid-cols-2 gap-3">
+                                                                <div>
+                                                                    <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                        Estimasi
+                                                                        Waktu
+                                                                    </p>
+                                                                    <p className="mt-1 text-xs font-medium text-foreground">
+                                                                        {
+                                                                            task.time_require
+                                                                        }{' '}
+                                                                        menit
+                                                                    </p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                        Status
+                                                                    </p>
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="mt-1"
+                                                                    >
+                                                                        {
+                                                                            task.status_label
+                                                                        }
+                                                                    </Badge>
+                                                                </div>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                    Aksi
+                                                                </p>
+                                                                {task.status ===
+                                                                'completed' ? (
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        Tidak
+                                                                        ada aksi
+                                                                    </p>
+                                                                ) : (
+                                                                    <TaskActionButton
+                                                                        task={
+                                                                            task
+                                                                        }
+                                                                        onStart={
+                                                                            setStartTask
+                                                                        }
+                                                                        onFinish={
+                                                                            setFinishTask
+                                                                        }
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="p-4">
+                                            <TableCell className="p-4 max-[430px]:hidden">
                                                 {task.task_category.name}
                                             </TableCell>
-                                            <TableCell className="p-4">
+                                            <TableCell className="p-4 max-[430px]:hidden">
                                                 <div className="flex flex-wrap gap-2">
                                                     {task.roles.map((role) => (
                                                         <Badge key={role.id}>
@@ -370,46 +502,21 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
                                                     ))}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="p-4 text-right">
+                                            <TableCell className="p-4 text-right max-[430px]:hidden">
                                                 {task.time_require} menit
                                             </TableCell>
-                                            <TableCell className="p-4">
+                                            <TableCell className="p-4 max-[430px]:hidden">
                                                 <Badge variant="outline">
                                                     {task.status_label}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="p-4">
+                                            <TableCell className="p-4 max-[430px]:hidden">
                                                 <div className="flex justify-end gap-2">
-                                                    {task.status ===
-                                                        'pending' && (
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                setStartTask(
-                                                                    task,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Play className="size-4" />
-                                                            Mulai Task
-                                                        </Button>
-                                                    )}
-                                                    {task.status ===
-                                                        'in_progress' && (
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                setFinishTask(
-                                                                    task,
-                                                                )
-                                                            }
-                                                        >
-                                                            <CheckCircle2 className="size-4" />
-                                                            Selesaikan Task
-                                                        </Button>
-                                                    )}
+                                                    <TaskActionButton
+                                                        task={task}
+                                                        onStart={setStartTask}
+                                                        onFinish={setFinishTask}
+                                                    />
                                                 </div>
                                             </TableCell>
                                         </TableRow>
