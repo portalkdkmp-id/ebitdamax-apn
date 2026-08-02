@@ -790,9 +790,7 @@ export default function ValueChainJobdeskIndex({
                                                             profile,
                                                         )
                                                     }
-                                                    onEditProfile={
-                                                        openEditForm
-                                                    }
+                                                    onEditProfile={openEditForm}
                                                     onDeleteProfile={
                                                         deleteProfile
                                                     }
@@ -863,9 +861,7 @@ export default function ValueChainJobdeskIndex({
                                         </option>
                                     ))}
                                 </select>
-                                <FieldError
-                                    message={errors.organization_id}
-                                />
+                                <FieldError message={errors.organization_id} />
                             </div>
 
                             <TextAreaField

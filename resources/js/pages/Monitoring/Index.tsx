@@ -696,10 +696,10 @@ export default function MonitoringIndex({
                             availability={produkSubsidi.availability}
                         />
                         <p className="text-xs text-muted-foreground">
-                            Availability menunjukkan persentase gerai KDKMP
-                            yang memiliki SKU subsidi tersedia pada saat
-                            snapshot. Saat ini menggunakan data dummy menunggu
-                            integrasi Odoo.
+                            Availability menunjukkan persentase gerai KDKMP yang
+                            memiliki SKU subsidi tersedia pada saat snapshot.
+                            Saat ini menggunakan data dummy menunggu integrasi
+                            Odoo.
                         </p>
                     </section>
                 </div>

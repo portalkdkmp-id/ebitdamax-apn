@@ -47,12 +47,16 @@ export default function KdkmpSkuDistributionChart({
 
     const height = Math.max(360, sorted.length * 0.6);
     const showAllTicks = sorted.length <= 30;
-    const tickInterval = showAllTicks ? 0 : Math.max(1, Math.floor(sorted.length / 12));
+    const tickInterval = showAllTicks
+        ? 0
+        : Math.max(1, Math.floor(sorted.length / 12));
 
     return (
         <Card className="border bg-card shadow-sm">
             <CardHeader>
-                <CardTitle className="text-base text-foreground">{title}</CardTitle>
+                <CardTitle className="text-base text-foreground">
+                    {title}
+                </CardTitle>
                 {description && (
                     <CardDescription>{description}</CardDescription>
                 )}
@@ -71,7 +75,10 @@ export default function KdkmpSkuDistributionChart({
                         <XAxis
                             dataKey="label"
                             interval={tickInterval}
-                            tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+                            tick={{
+                                fill: 'var(--muted-foreground)',
+                                fontSize: 11,
+                            }}
                             label={{
                                 value: 'KDKMP (urut SKU terkecil ke terbesar)',
                                 position: 'insideBottom',
@@ -81,7 +88,10 @@ export default function KdkmpSkuDistributionChart({
                             }}
                         />
                         <YAxis
-                            tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+                            tick={{
+                                fill: 'var(--muted-foreground)',
+                                fontSize: 11,
+                            }}
                             tickFormatter={(value) => compactNumber(value)}
                             label={{
                                 value: 'Jumlah SKU',
@@ -102,8 +112,7 @@ export default function KdkmpSkuDistributionChart({
                             labelStyle={{ color: 'var(--muted-foreground)' }}
                             formatter={(_value, _name, context) => {
                                 const point = context?.payload as
-                                    | (typeof chartData)[number]
-                                    | undefined;
+                                    (typeof chartData)[number] | undefined;
 
                                 return [
                                     `${context.value} SKU`,

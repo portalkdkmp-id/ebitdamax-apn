@@ -47,10 +47,7 @@ export default function DashboardIndex({
                         </div>
                     </div>
 
-                    <DashboardFilter
-                        year={year}
-                        action={dashboard.url()}
-                    />
+                    <DashboardFilter year={year} action={dashboard.url()} />
 
                     <DashboardKpiCards summary={summary} />
 
