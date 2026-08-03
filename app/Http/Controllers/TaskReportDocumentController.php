@@ -45,6 +45,42 @@ class TaskReportDocumentController extends Controller
         );
     }
 
+    public function previewPhoto(TaskReport $taskReport, string $phase): StreamedResponse
+    {
+        Gate::authorize('view', $taskReport);
+
+        $photo = $this->photo($taskReport, $phase);
+        $storage = Storage::disk($photo['disk']);
+
+        abort_unless($storage->exists($photo['path']), 404);
+
+        return $storage->response(
+            $photo['path'],
+            $photo['original_name'],
+            [
+                'Content-Type' => $storage->mimeType($photo['path']) ?: 'application/octet-stream',
+                'X-Content-Type-Options' => 'nosniff',
+            ],
+            'inline'
+        );
+    }
+
+    public function downloadPhoto(TaskReport $taskReport, string $phase): StreamedResponse
+    {
+        Gate::authorize('view', $taskReport);
+
+        $photo = $this->photo($taskReport, $phase);
+        $storage = Storage::disk($photo['disk']);
+
+        abort_unless($storage->exists($photo['path']), 404);
+
+        return $storage->download(
+            $photo['path'],
+            $photo['original_name'],
+            ['Content-Type' => $storage->mimeType($photo['path']) ?: 'application/octet-stream']
+        );
+    }
+
     /**
      * @return array{disk: string, path: string, original_name: string, mime_type: string|null, size: int}
      */
@@ -70,6 +106,29 @@ class TaskReportDocumentController extends Controller
             'original_name' => (string) $document['original_name'],
             'mime_type' => isset($document['mime_type']) ? (string) $document['mime_type'] : null,
             'size' => (int) $document['size'],
+        ];
+    }
+
+    /**
+     * @return array{disk: string, path: string, original_name: string}
+     */
+    private function photo(TaskReport $taskReport, string $phase): array
+    {
+        $path = match ($phase) {
+            'start' => $taskReport->started_photo,
+            'finish' => $taskReport->finished_photo,
+            default => abort(404),
+        };
+
+        abort_unless(is_string($path) && $path !== '', 404);
+
+        $phaseLabel = $phase === 'start' ? 'mulai' : 'selesai';
+        $extension = pathinfo($path, PATHINFO_EXTENSION);
+
+        return [
+            'disk' => (string) config('filesystems.default', 'local'),
+            'path' => $path,
+            'original_name' => "foto-{$phaseLabel}-{$taskReport->uuid}".($extension !== '' ? ".{$extension}" : ''),
         ];
     }
 }

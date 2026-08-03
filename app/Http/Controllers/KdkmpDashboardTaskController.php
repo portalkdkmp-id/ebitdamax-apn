@@ -6,7 +6,7 @@ use App\Enums\TaskReportStatus;
 use App\Models\Role;
 use App\Models\SdmKdkmpEntry;
 use App\Models\TaskReport;
-use Carbon\CarbonImmutable;
+use App\Models\TaskReportValue;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -16,19 +16,19 @@ class KdkmpDashboardTaskController extends Controller
     public function index(Request $request, SdmKdkmpEntry $kdkmpEntry, string $date): Response
     {
         $managerUser = $kdkmpEntry->managerUser;
-        
+
         $reports = collect();
-        
+
         if ($managerUser) {
             // Kita ambil task report milik managerUser di mana period_key sama dengan date, ATAU diselesaikan pada tanggal tersebut.
             $reports = TaskReport::query()
-                ->with(['task.taskCategory', 'task.roles', 'user'])
+                ->with(['task.taskCategory', 'task.roles', 'values.additionalField'])
                 ->where('user_id', $managerUser->id)
                 ->where('status', TaskReportStatus::Completed->value)
                 ->where(function ($query) use ($date) {
                     $query->where('period_key', $date)
-                          ->orWhereDate('finished_at', $date)
-                          ->orWhereDate('started_at', $date);
+                        ->orWhereDate('finished_at', $date)
+                        ->orWhereDate('started_at', $date);
                 })
                 ->latest('finished_at')
                 ->get()
@@ -39,7 +39,9 @@ class KdkmpDashboardTaskController extends Controller
                     'finished_at' => $report->finished_at?->toIso8601String(),
                     'duration_minutes' => $report->duration_minutes,
                     'status_label' => $report->status->label(),
+                    'photos' => $this->transformPhotos($report),
                     'documents' => $this->transformDocuments($report),
+                    'values' => $this->transformValues($report),
                     'task' => [
                         'id' => $report->task->id,
                         'uuid' => $report->task->uuid,
@@ -79,6 +81,45 @@ class KdkmpDashboardTaskController extends Controller
             'date' => $date,
             'reports' => $reports,
         ]);
+    }
+
+    /**
+     * @return array<int, array{phase: string, phase_label: string, name: string, preview_url: string, download_url: string}>
+     */
+    private function transformPhotos(TaskReport $taskReport): array
+    {
+        return collect([
+            'start' => $taskReport->started_photo,
+            'finish' => $taskReport->finished_photo,
+        ])->map(function (?string $path, string $phase) use ($taskReport): ?array {
+            if (! $path) {
+                return null;
+            }
+
+            $phaseLabel = $phase === 'start' ? 'Mulai' : 'Selesai';
+            $extension = pathinfo($path, PATHINFO_EXTENSION);
+            $name = "Foto {$phaseLabel}".($extension !== '' ? ".{$extension}" : '');
+            $routeParameters = [
+                'taskReport' => $taskReport,
+                'phase' => $phase,
+            ];
+
+            return [
+                'phase' => $phase,
+                'phase_label' => $phaseLabel,
+                'name' => $name,
+                'preview_url' => route(
+                    'task-reports.photos.preview',
+                    $routeParameters,
+                    absolute: false
+                ),
+                'download_url' => route(
+                    'task-reports.photos.download',
+                    $routeParameters,
+                    absolute: false
+                ),
+            ];
+        })->filter()->values()->all();
     }
 
     /**
@@ -124,5 +165,27 @@ class KdkmpDashboardTaskController extends Controller
                 ->values()
                 ->all();
         })->values()->all();
+    }
+
+    /**
+     * @return array<int, array{phase: string, phase_label: string, label: string, value: string|null}>
+     */
+    private function transformValues(TaskReport $taskReport): array
+    {
+        return $taskReport->values
+            ->filter(fn (TaskReportValue $value): bool => $value->additionalField !== null)
+            ->sortBy(fn (TaskReportValue $value): array => [
+                $value->additionalField->show_when->value,
+                $value->additionalField->sort_order,
+                $value->id,
+            ])
+            ->map(fn (TaskReportValue $value): array => [
+                'phase' => $value->additionalField->show_when->value,
+                'phase_label' => $value->additionalField->show_when->label(),
+                'label' => $value->additionalField->label,
+                'value' => $value->value,
+            ])
+            ->values()
+            ->all();
     }
 }

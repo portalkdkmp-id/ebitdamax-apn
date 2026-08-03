@@ -39,6 +39,21 @@ export type TaskReportDocument = {
     download_url: string;
 };
 
+export type TaskReportPhoto = {
+    phase: 'start' | 'finish';
+    phase_label: string;
+    name: string;
+    preview_url: string;
+    download_url: string;
+};
+
+export type TaskReportValue = {
+    phase: 'start' | 'finish';
+    phase_label: string;
+    label: string;
+    value: string | null;
+};
+
 export type TaskAdditionalFieldItem = {
     id?: number;
     uuid?: string;

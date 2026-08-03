@@ -8,6 +8,7 @@ use App\Http\Controllers\EbitdaValueController;
 use App\Http\Controllers\ExcelImportController;
 use App\Http\Controllers\KdkmpDashboardController;
 use App\Http\Controllers\KdkmpDashboardMonitoringController;
+use App\Http\Controllers\KdkmpDashboardTaskController;
 use App\Http\Controllers\LumbungChatController;
 use App\Http\Controllers\MeetingActionItemController;
 use App\Http\Controllers\MeetingMinuteController;
@@ -74,6 +75,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->whereNumber('documentIndex')
         ->name('task-reports.documents.download');
 
+    Route::get(
+        '/task-reports/{taskReport}/photos/{phase}/preview',
+        [TaskReportDocumentController::class, 'previewPhoto']
+    )
+        ->whereIn('phase', ['start', 'finish'])
+        ->name('task-reports.photos.preview');
+
+    Route::get(
+        '/task-reports/{taskReport}/photos/{phase}/download',
+        [TaskReportDocumentController::class, 'downloadPhoto']
+    )
+        ->whereIn('phase', ['start', 'finish'])
+        ->name('task-reports.photos.download');
+
     Route::resource('meeting-minutes', MeetingMinuteController::class)
         ->except(['create', 'edit', 'show']);
 
@@ -129,7 +144,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/admin/kdkmp-dashboard', KdkmpDashboardMonitoringController::class)
             ->name('admin.kdkmp-dashboard.index');
 
-        Route::get('/admin/kdkmp-dashboard/{kdkmpEntry}/tasks/{date}', [\App\Http\Controllers\KdkmpDashboardTaskController::class, 'index'])
+        Route::get('/admin/kdkmp-dashboard/{kdkmpEntry}/tasks/{date}', [KdkmpDashboardTaskController::class, 'index'])
             ->name('admin.kdkmp-dashboard.tasks');
 
         Route::resource('organizations', OrganizationController::class)

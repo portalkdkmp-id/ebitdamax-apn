@@ -7,9 +7,16 @@ import {
     Eye,
     FileText,
 } from 'lucide-react';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     Table,
     TableBody,
@@ -79,6 +86,9 @@ export default function CompletedTaskDashboard({
     reports,
     isSuperadmin,
 }: Props) {
+    const [selectedReport, setSelectedReport] =
+        useState<CompletedTaskReport | null>(null);
+
     return (
         <>
             <Head title="Tugas sudah selesai" />
@@ -123,19 +133,10 @@ export default function CompletedTaskDashboard({
                                             </TableHead>
                                         )}
                                         <TableHead className="p-4">
-                                            Mulai
-                                        </TableHead>
-                                        <TableHead className="p-4">
-                                            Selesai
+                                            Status
                                         </TableHead>
                                         <TableHead className="p-4 text-right">
-                                            Durasi
-                                        </TableHead>
-                                        <TableHead className="min-w-[220px] p-4">
-                                            Dokumen
-                                        </TableHead>
-                                        <TableHead className="p-4">
-                                            Status
+                                            Aksi
                                         </TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -143,7 +144,7 @@ export default function CompletedTaskDashboard({
                                     {reports.data.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={isSuperadmin ? 9 : 8}
+                                                colSpan={isSuperadmin ? 6 : 5}
                                                 className="p-8 text-center text-muted-foreground"
                                             >
                                                 Belum ada tugas selesai.
@@ -204,100 +205,23 @@ export default function CompletedTaskDashboard({
                                                 </TableCell>
                                             )}
                                             <TableCell className="p-4">
-                                                {formatDateTime(
-                                                    report.started_at,
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="p-4">
-                                                {formatDateTime(
-                                                    report.finished_at,
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="p-4 text-right">
-                                                <span className="inline-flex items-center gap-1">
-                                                    <Clock className="size-4 text-muted-foreground" />
-                                                    {report.duration_minutes ??
-                                                        0}{' '}
-                                                    menit
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="p-4">
-                                                {report.documents.length ===
-                                                0 ? (
-                                                    <span className="text-sm text-muted-foreground">
-                                                        -
-                                                    </span>
-                                                ) : (
-                                                    <div className="space-y-2">
-                                                        {report.documents.map(
-                                                            (
-                                                                document,
-                                                                index,
-                                                            ) => (
-                                                                <div
-                                                                    key={`${document.phase}-${document.name}-${index}`}
-                                                                    className="flex items-center justify-between gap-2 rounded-md border p-2"
-                                                                >
-                                                                    <div className="flex min-w-0 items-center gap-2">
-                                                                        <FileText className="size-4 shrink-0 text-muted-foreground" />
-                                                                        <div className="min-w-0">
-                                                                            <p className="max-w-32 truncate text-xs font-medium">
-                                                                                {
-                                                                                    document.name
-                                                                                }
-                                                                            </p>
-                                                                            <p className="text-[11px] text-muted-foreground">
-                                                                                {
-                                                                                    document.phase_label
-                                                                                }
-                                                                            </p>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex shrink-0">
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            asChild
-                                                                        >
-                                                                            <a
-                                                                                href={
-                                                                                    document.preview_url
-                                                                                }
-                                                                                target="_blank"
-                                                                                rel="noreferrer"
-                                                                                aria-label={`Preview ${document.name}`}
-                                                                            >
-                                                                                <Eye className="size-4" />
-                                                                            </a>
-                                                                        </Button>
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            asChild
-                                                                        >
-                                                                            <a
-                                                                                href={
-                                                                                    document.download_url
-                                                                                }
-                                                                                aria-label={`Download ${document.name}`}
-                                                                            >
-                                                                                <Download className="size-4" />
-                                                                            </a>
-                                                                        </Button>
-                                                                    </div>
-                                                                </div>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="p-4">
                                                 <Badge>
                                                     <CheckCircle2 className="size-3" />
                                                     {report.status_label}
                                                 </Badge>
+                                            </TableCell>
+                                            <TableCell className="p-4 text-right">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        setSelectedReport(
+                                                            report,
+                                                        )
+                                                    }
+                                                >
+                                                    Detail
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -343,6 +267,155 @@ export default function CompletedTaskDashboard({
                     )}
                 </div>
             </main>
+
+            <Dialog
+                open={selectedReport !== null}
+                onOpenChange={(open) => !open && setSelectedReport(null)}
+            >
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Detail Laporan Tugas</DialogTitle>
+                    </DialogHeader>
+
+                    {selectedReport && (
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="font-semibold text-foreground">
+                                    {selectedReport.task.name}
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                    {selectedReport.task.description ??
+                                        'Tidak ada deskripsi.'}
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 rounded-lg bg-muted/30 p-4">
+                                <div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Waktu Mulai
+                                    </p>
+                                    <p className="font-medium">
+                                        {formatDateTime(
+                                            selectedReport.started_at,
+                                        )}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Waktu Selesai
+                                    </p>
+                                    <p className="font-medium">
+                                        {formatDateTime(
+                                            selectedReport.finished_at,
+                                        )}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Durasi
+                                    </p>
+                                    <p className="inline-flex items-center gap-1 font-medium">
+                                        <Clock className="size-4 text-muted-foreground" />
+                                        {selectedReport.duration_minutes ??
+                                            0}{' '}
+                                        menit
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Status
+                                    </p>
+                                    <Badge className="mt-1">
+                                        {selectedReport.status_label}
+                                    </Badge>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 className="mb-3 text-sm font-semibold">
+                                    Dokumen & Foto Terlampir
+                                </h4>
+                                {selectedReport.documents.length === 0 ? (
+                                    <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                                        Tidak ada dokumen atau foto yang
+                                        dilampirkan.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {selectedReport.documents.map(
+                                            (document, index) => (
+                                                <div
+                                                    key={`${document.phase}-${document.name}-${index}`}
+                                                    className="flex items-center justify-between gap-3 rounded-md border bg-card p-3 shadow-sm"
+                                                >
+                                                    <div className="flex min-w-0 items-center gap-3">
+                                                        <div className="flex size-8 shrink-0 items-center justify-center rounded bg-primary/10 text-primary">
+                                                            <FileText className="size-4" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="truncate text-sm font-medium">
+                                                                {document.name}
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                Fase:{' '}
+                                                                {
+                                                                    document.phase_label
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex shrink-0 gap-1">
+                                                        <Button
+                                                            type="button"
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <a
+                                                                href={
+                                                                    document.preview_url
+                                                                }
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                aria-label={`Preview ${document.name}`}
+                                                                className="flex items-center gap-1"
+                                                            >
+                                                                <Eye className="size-3.5" />
+                                                                <span className="hidden sm:inline">
+                                                                    Preview
+                                                                </span>
+                                                            </a>
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <a
+                                                                href={
+                                                                    document.download_url
+                                                                }
+                                                                aria-label={`Download ${document.name}`}
+                                                                className="flex items-center gap-1"
+                                                            >
+                                                                <Download className="size-3.5" />
+                                                                <span className="hidden sm:inline">
+                                                                    Unduh
+                                                                </span>
+                                                            </a>
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ),
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
