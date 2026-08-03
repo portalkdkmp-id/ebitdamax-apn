@@ -420,19 +420,12 @@ export default function KdkmpDashboardTaskReports({
                                                 key={photo.phase}
                                                 className="overflow-hidden rounded-lg border bg-card"
                                             >
-                                                <a
-                                                    href={photo.preview_url}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    aria-label={`Preview ${photo.name}`}
-                                                >
-                                                    <img
-                                                        src={photo.preview_url}
-                                                        alt={photo.name}
-                                                        className="aspect-video w-full bg-muted object-cover"
-                                                    />
-                                                </a>
-                                                <div className="flex items-center justify-between gap-3 p-3">
+                                                <img
+                                                    src={photo.preview_url}
+                                                    alt={photo.name}
+                                                    className="aspect-video w-full bg-muted object-cover"
+                                                />
+                                                <div className="p-3">
                                                     <div className="min-w-0">
                                                         <p className="truncate text-sm font-medium">
                                                             {photo.name}
@@ -441,40 +434,6 @@ export default function KdkmpDashboardTaskReports({
                                                             Tahap{' '}
                                                             {photo.phase_label}
                                                         </p>
-                                                    </div>
-                                                    <div className="flex shrink-0 gap-1">
-                                                        <Button
-                                                            type="button"
-                                                            variant="secondary"
-                                                            size="icon"
-                                                            asChild
-                                                        >
-                                                            <a
-                                                                href={
-                                                                    photo.preview_url
-                                                                }
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                aria-label={`Preview ${photo.name}`}
-                                                            >
-                                                                <Eye className="size-4" />
-                                                            </a>
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            variant="secondary"
-                                                            size="icon"
-                                                            asChild
-                                                        >
-                                                            <a
-                                                                href={
-                                                                    photo.download_url
-                                                                }
-                                                                aria-label={`Download ${photo.name}`}
-                                                            >
-                                                                <Download className="size-4" />
-                                                            </a>
-                                                        </Button>
                                                     </div>
                                                 </div>
                                             </article>
