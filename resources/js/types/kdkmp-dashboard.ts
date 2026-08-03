@@ -51,6 +51,9 @@ export type KdkmpMonitoringEntry = KdkmpIdentity & {
         email: string;
         username: string | null;
     } | null;
+    metrics: {
+        task_completion_rate: number;
+    };
     daily_entry:
         | (KdkmpDashboardFields &
               Pick<

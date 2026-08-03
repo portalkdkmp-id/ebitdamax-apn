@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,7 +30,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { kdkmpDashboardFields } from '@/lib/kdkmp-dashboard-fields';
-import { index as monitoringIndex } from '@/routes/admin/kdkmp-dashboard';
+import { index as monitoringIndex, tasks as monitoringTasks } from '@/routes/admin/kdkmp-dashboard';
 import type {
     KdkmpMonitoringEntry,
     KdkmpMonitoringProps,
@@ -270,6 +271,7 @@ export default function KdkmpDashboardMonitoring({
                                                 ),
                                             )}
                                             <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Aksi</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -278,7 +280,7 @@ export default function KdkmpDashboardMonitoring({
                                                 <TableCell
                                                     colSpan={
                                                         kdkmpDashboardFields.length +
-                                                        3
+                                                        4
                                                     }
                                                     className="py-10 text-center text-muted-foreground"
                                                 >
@@ -336,6 +338,30 @@ export default function KdkmpDashboardMonitoring({
                                                             entry.daily_entry
                                                         }
                                                     />
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={!entry.manager}
+                                                        onClick={() => {
+                                                            if (!entry.manager) return;
+
+                                                            if (entry.metrics.task_completion_rate < 100) {
+                                                                toast.error('Task belum selesai semua atau belum ada.');
+                                                                return;
+                                                            }
+
+                                                            router.get(
+                                                                monitoringTasks.url({
+                                                                    kdkmpEntry: entry.id,
+                                                                    date: filters.date,
+                                                                })
+                                                            );
+                                                        }}
+                                                    >
+                                                        Lihat Task
+                                                    </Button>
                                                 </TableCell>
                                             </TableRow>
                                         ))}

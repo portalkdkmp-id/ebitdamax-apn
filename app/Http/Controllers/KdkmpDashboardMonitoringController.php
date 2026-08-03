@@ -180,6 +180,9 @@ class KdkmpDashboardMonitoringController extends Controller
                 'email' => $entry->managerUser->email,
                 'username' => $entry->managerUser->username,
             ] : null,
+            'metrics' => [
+                'task_completion_rate' => (float) ($overrides['task_completion_rate'] ?? 0),
+            ],
             'daily_entry' => $dailyEntryData,
         ];
     }

@@ -46,11 +46,12 @@ class TaskDashboardController extends Controller
             ->keyBy(fn (TaskReport $report): string => $report->task_id.'|'.$report->period_key);
 
         $tasks = $tasks
-            ->map(function (Task $task) use ($periodKeysByTaskId, $reportByTaskAndPeriod): ?array {
+            ->map(function (Task $task) use ($periodKeysByTaskId, $reportByTaskAndPeriod, $user): ?array {
                 $periodKey = $periodKeysByTaskId->get($task->id);
                 $report = $reportByTaskAndPeriod->get($task->id.'|'.$periodKey);
 
-                if ($task->period === TaskPeriod::Once && $report?->status === TaskReportStatus::Completed) {
+                $isSuperadmin = $user?->role?->level === RoleLevel::Superadmin;
+                if (!$isSuperadmin && $report?->status === TaskReportStatus::Completed) {
                     return null;
                 }
 

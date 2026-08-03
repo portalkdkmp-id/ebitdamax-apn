@@ -129,6 +129,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/admin/kdkmp-dashboard', KdkmpDashboardMonitoringController::class)
             ->name('admin.kdkmp-dashboard.index');
 
+        Route::get('/admin/kdkmp-dashboard/{kdkmpEntry}/tasks/{date}', [\App\Http\Controllers\KdkmpDashboardTaskController::class, 'index'])
+            ->name('admin.kdkmp-dashboard.tasks');
+
         Route::resource('organizations', OrganizationController::class)
             ->except(['create', 'edit', 'show']);
 
