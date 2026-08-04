@@ -33,16 +33,23 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { kdkmpDashboardFields } from '@/lib/kdkmp-dashboard-fields';
+import {
+    kdkmpDashboardFields,
+    kdkmpPlanRevenueCategories,
+} from '@/lib/kdkmp-dashboard-fields';
 import { upsert } from '@/routes/kdkmp-dashboard';
 import type {
     KdkmpDailyEntry,
     KdkmpDashboardFields,
     KdkmpManagerDashboardProps,
+    KdkmpPlanRevenueCategoryFields,
 } from '@/types/kdkmp-dashboard';
 
 type DailyForm = {
-    [Field in keyof KdkmpDashboardFields]: string;
+    actual_revenue: string;
+    plan_cost: string;
+} & {
+    [Field in keyof KdkmpPlanRevenueCategoryFields]: string;
 };
 
 const ACTUAL_EBITDA_MARGIN_FIXED_COST = 17_477_716;
@@ -130,22 +137,41 @@ function RupiahInput({
     );
 }
 
-function formDataFrom(
-    entry: KdkmpDailyEntry | null,
-    computedValues: KdkmpManagerDashboardProps['computedValues'],
-): DailyForm {
+function formDataFrom(entry: KdkmpDailyEntry | null): DailyForm {
     return {
-        target_revenue: inputValue(computedValues.target_revenue),
-        plan_revenue: inputValue(entry?.plan_revenue),
         actual_revenue: inputValue(entry?.actual_revenue),
         plan_cost: inputValue(entry?.plan_cost),
-        actual_cost: inputValue(computedValues.actual_cost),
-        actual_ebitda_margin: calculateActualEbitdaMargin(
-            inputValue(entry?.actual_revenue),
-        ),
-        total_duration: inputValue(computedValues.total_duration),
-        performance_scoring: inputValue(computedValues.performance_scoring),
+        plan_revenue_makanan: inputValue(entry?.plan_revenue_makanan),
+        plan_revenue_minuman: inputValue(entry?.plan_revenue_minuman),
+        plan_revenue_rumahan: inputValue(entry?.plan_revenue_rumahan),
+        plan_revenue_subsidi: inputValue(entry?.plan_revenue_subsidi),
+        plan_revenue_expenses: inputValue(entry?.plan_revenue_expenses),
+        plan_revenue_obat_obatan: inputValue(entry?.plan_revenue_obat_obatan),
     };
+}
+
+function hasCompletePlanRevenueBreakdown(data: DailyForm): boolean {
+    return kdkmpPlanRevenueCategories.every(
+        ({ key }) => data[key].trim() !== '',
+    );
+}
+
+function calculatePlanRevenue(data: DailyForm): string {
+    if (!hasCompletePlanRevenueBreakdown(data)) {
+        return '';
+    }
+
+    const total = kdkmpPlanRevenueCategories.reduce(
+        (sum, { key }) => sum + Number(data[key]),
+        0,
+    );
+
+    return Number.isFinite(total)
+        ? total
+              .toFixed(2)
+              .replace(/\.00$/, '')
+              .replace(/(\.\d)0$/, '$1')
+        : '';
 }
 
 function calculateActualEbitdaMargin(actualRevenue: string): string {
@@ -204,20 +230,32 @@ function dashboardFieldValue(
     field: keyof KdkmpDashboardFields,
     computedValues: KdkmpManagerDashboardProps['computedValues'],
 ): string {
+    if (field === 'target_revenue') {
+        return inputValue(computedValues.target_revenue);
+    }
+
+    if (field === 'plan_revenue') {
+        return calculatePlanRevenue(data);
+    }
+
+    if (field === 'actual_revenue' || field === 'plan_cost') {
+        return data[field];
+    }
+
     if (field === 'actual_ebitda_margin') {
         return calculateActualEbitdaMargin(data.actual_revenue);
     }
 
     if (field === 'performance_scoring') {
         return calculatePerformanceScoring(
-            data.plan_revenue,
+            calculatePlanRevenue(data),
             data.actual_revenue,
             computedValues.task_completion_rate,
             computedValues.time_compliance_rate,
         );
     }
 
-    return data[field];
+    return inputValue(computedValues[field]);
 }
 
 function formatDate(value: string): string {
@@ -269,7 +307,7 @@ export default function KdkmpDashboardIndex({
     history,
 }: KdkmpManagerDashboardProps) {
     const { data, setData, put, processing, errors } = useForm<DailyForm>(
-        formDataFrom(todayEntry, computedValues),
+        formDataFrom(todayEntry),
     );
     const [showLowPlanRevenueConfirmation, setShowLowPlanRevenueConfirmation] =
         useState(false);
@@ -282,11 +320,11 @@ export default function KdkmpDashboardIndex({
     const submit = (event: FormEvent) => {
         event.preventDefault();
 
-        const planRevenue = Number(data.plan_revenue);
+        const planRevenue = Number(calculatePlanRevenue(data));
         const targetRevenue = Number(computedValues.target_revenue);
 
         if (
-            data.plan_revenue !== '' &&
+            hasCompletePlanRevenueBreakdown(data) &&
             Number.isFinite(planRevenue) &&
             planRevenue < targetRevenue
         ) {
@@ -404,9 +442,90 @@ export default function KdkmpDashboardIndex({
                                         onSubmit={submit}
                                         className="space-y-6"
                                     >
+                                        <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                                            <div>
+                                                <h2 className="font-semibold text-foreground">
+                                                    Breakdown Plan Revenue
+                                                </h2>
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    Isi seluruh kategori. Nilai
+                                                    0 diperbolehkan dan ikut
+                                                    dihitung dalam total Plan
+                                                    Revenue.
+                                                </p>
+                                            </div>
+
+                                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                                {kdkmpPlanRevenueCategories.map(
+                                                    (category) => (
+                                                        <div
+                                                            key={category.key}
+                                                            className="space-y-2"
+                                                        >
+                                                            <Label
+                                                                htmlFor={
+                                                                    category.key
+                                                                }
+                                                            >
+                                                                {category.label}
+                                                            </Label>
+                                                            <RupiahInput
+                                                                id={
+                                                                    category.key
+                                                                }
+                                                                value={
+                                                                    data[
+                                                                        category
+                                                                            .key
+                                                                    ]
+                                                                }
+                                                                onValueChange={(
+                                                                    value,
+                                                                ) =>
+                                                                    setData(
+                                                                        category.key,
+                                                                        value,
+                                                                    )
+                                                                }
+                                                            />
+                                                            <InputError
+                                                                message={
+                                                                    errors[
+                                                                        category
+                                                                            .key
+                                                                    ]
+                                                                }
+                                                            />
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+
+                                            <div className="flex flex-col gap-1 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                                                <p className="text-sm font-medium text-foreground">
+                                                    Total Plan Revenue
+                                                </p>
+                                                <p className="text-lg font-bold text-primary tabular-nums">
+                                                    {formatManualValue(
+                                                        calculatePlanRevenue(
+                                                            data,
+                                                        ) || null,
+                                                        true,
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </section>
+
                                         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                                             {kdkmpDashboardFields.map(
                                                 (field) => {
+                                                    const editableField =
+                                                        field.key ===
+                                                            'actual_revenue' ||
+                                                        field.key ===
+                                                            'plan_cost'
+                                                            ? field.key
+                                                            : null;
                                                     const fieldValue =
                                                         dashboardFieldValue(
                                                             data,
@@ -446,37 +565,18 @@ export default function KdkmpDashboardIndex({
                                                                     }
                                                                     onValueChange={(
                                                                         value,
-                                                                    ) =>
-                                                                        setData(
-                                                                            field.key,
-                                                                            value,
-                                                                        )
-                                                                    }
+                                                                    ) => {
+                                                                        if (
+                                                                            editableField
+                                                                        ) {
+                                                                            setData(
+                                                                                editableField,
+                                                                                value,
+                                                                            );
+                                                                        }
+                                                                    }}
                                                                 />
-                                                            ) : (
-                                                                <Input
-                                                                    id={
-                                                                        field.key
-                                                                    }
-                                                                    type="text"
-                                                                    value={
-                                                                        fieldValue
-                                                                    }
-                                                                    onChange={(
-                                                                        event,
-                                                                    ) =>
-                                                                        setData(
-                                                                            field.key,
-                                                                            event
-                                                                                .target
-                                                                                .value,
-                                                                        )
-                                                                    }
-                                                                    placeholder={
-                                                                        field.placeholder
-                                                                    }
-                                                                />
-                                                            )}
+                                                            ) : null}
                                                             {field.description && (
                                                                 <p className="text-xs text-muted-foreground">
                                                                     {
@@ -486,10 +586,11 @@ export default function KdkmpDashboardIndex({
                                                             )}
                                                             <InputError
                                                                 message={
-                                                                    errors[
-                                                                        field
-                                                                            .key
-                                                                    ]
+                                                                    editableField
+                                                                        ? errors[
+                                                                              editableField
+                                                                          ]
+                                                                        : undefined
                                                                 }
                                                             />
                                                         </div>
@@ -500,9 +601,9 @@ export default function KdkmpDashboardIndex({
 
                                         <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
                                             <p className="text-sm text-muted-foreground">
-                                                Nilai 0 maupun kolom yang belum
-                                                tersedia tetap dapat disimpan
-                                                sebagai data lengkap.
+                                                Keenam kategori Plan Revenue
+                                                wajib diisi. Nilai 0 tetap
+                                                dianggap sebagai data valid.
                                             </p>
                                             <Button
                                                 type="submit"
@@ -652,7 +753,10 @@ export default function KdkmpDashboardIndex({
                         <DialogDescription>
                             Plan Revenue yang dimasukkan adalah{' '}
                             <span className="font-semibold text-foreground">
-                                {formatManualValue(data.plan_revenue, true)}
+                                {formatManualValue(
+                                    calculatePlanRevenue(data),
+                                    true,
+                                )}
                             </span>
                             , lebih rendah dari Target Revenue{' '}
                             <span className="font-semibold text-foreground">

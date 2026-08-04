@@ -21,6 +21,15 @@ export type KdkmpDashboardFields = {
     performance_scoring: string | null;
 };
 
+export type KdkmpPlanRevenueCategoryFields = {
+    plan_revenue_makanan: string | null;
+    plan_revenue_minuman: string | null;
+    plan_revenue_rumahan: string | null;
+    plan_revenue_subsidi: string | null;
+    plan_revenue_expenses: string | null;
+    plan_revenue_obat_obatan: string | null;
+};
+
 export type KdkmpComputedValues = Pick<
     KdkmpDashboardFields,
     'target_revenue' | 'actual_cost' | 'total_duration' | 'performance_scoring'
@@ -29,12 +38,20 @@ export type KdkmpComputedValues = Pick<
     time_compliance_rate: number;
 };
 
-export type KdkmpDailyEntry = KdkmpDashboardFields & {
-    id: number;
-    report_date: string;
-    is_complete: boolean;
-    plan_revenue_requires_review: boolean;
-    updated_at: string | null;
+export type KdkmpDailyEntry = KdkmpDashboardFields &
+    KdkmpPlanRevenueCategoryFields & {
+        id: number;
+        report_date: string;
+        is_complete: boolean;
+        plan_revenue_requires_review: boolean;
+        updated_at: string | null;
+    };
+
+export type KdkmpRevenueGapPoint = {
+    date: string;
+    plan_revenue: number | null;
+    actual_revenue: number | null;
+    gap: number | null;
 };
 
 export type KdkmpManagerDashboardProps = {
@@ -65,6 +82,13 @@ export type KdkmpMonitoringEntry = KdkmpIdentity & {
 
 export type KdkmpMonitoringProps = {
     businessDate: string;
+    revenueGap: {
+        period: {
+            start_date: string;
+            end_date: string;
+        };
+        trend: KdkmpRevenueGapPoint[];
+    };
     entries: PaginatedResponse<KdkmpMonitoringEntry>;
     summary: {
         total: number;

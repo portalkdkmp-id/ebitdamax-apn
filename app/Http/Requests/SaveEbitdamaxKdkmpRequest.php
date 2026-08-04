@@ -20,11 +20,24 @@ class SaveEbitdamaxKdkmpRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'plan_revenue' => ['nullable', 'string', 'regex:/^\d+(?:\.\d{1,2})?$/', 'max:255'],
+        $rules = [
             'actual_revenue' => ['nullable', 'string', 'regex:/^\d+(?:\.\d{1,2})?$/', 'max:255'],
             'plan_cost' => ['nullable', 'string', 'max:255'],
         ];
+
+        foreach (array_keys(EbitdamaxKdkmp::PLAN_REVENUE_CATEGORIES) as $field) {
+            $rules[$field] = ['required', 'string', 'regex:/^\d+(?:\.\d{1,2})?$/', 'max:255'];
+        }
+
+        return $rules;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function planRevenueCategories(): array
+    {
+        return $this->safe()->only(array_keys(EbitdamaxKdkmp::PLAN_REVENUE_CATEGORIES));
     }
 
     /**
@@ -34,10 +47,15 @@ class SaveEbitdamaxKdkmpRequest extends FormRequest
      */
     public function attributes(): array
     {
-        return [
-            'plan_revenue' => 'plan revenue',
+        $attributes = [
             'actual_revenue' => 'actual revenue',
             'plan_cost' => 'plan cost',
         ];
+
+        foreach (EbitdamaxKdkmp::PLAN_REVENUE_CATEGORIES as $field => $label) {
+            $attributes[$field] = "plan revenue {$label}";
+        }
+
+        return $attributes;
     }
 }

@@ -30,7 +30,11 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { kdkmpDashboardFields } from '@/lib/kdkmp-dashboard-fields';
-import { index as monitoringIndex, tasks as monitoringTasks } from '@/routes/admin/kdkmp-dashboard';
+import {
+    index as monitoringIndex,
+    tasks as monitoringTasks,
+} from '@/routes/admin/kdkmp-dashboard';
+import KdkmpRevenueGapChart from '@/components/monitoring/KdkmpRevenueGapChart';
 import type {
     KdkmpMonitoringEntry,
     KdkmpMonitoringProps,
@@ -114,6 +118,7 @@ function SummaryCard({
 
 export default function KdkmpDashboardMonitoring({
     businessDate,
+    revenueGap,
     entries,
     summary,
     filters,
@@ -175,6 +180,10 @@ export default function KdkmpDashboardMonitoring({
                             icon={<AlertTriangle className="size-5" />}
                             tone="bg-rose-500/10 text-rose-600"
                         />
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <KdkmpRevenueGapChart data={revenueGap.trend} />
                     </div>
 
                     <Card>
@@ -271,7 +280,9 @@ export default function KdkmpDashboardMonitoring({
                                                 ),
                                             )}
                                             <TableHead>Status</TableHead>
-                                            <TableHead className="text-right">Aksi</TableHead>
+                                            <TableHead className="text-right">
+                                                Aksi
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -340,28 +351,46 @@ export default function KdkmpDashboardMonitoring({
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        disabled={!entry.manager}
-                                                        onClick={() => {
-                                                            if (!entry.manager) return;
-
-                                                            if (entry.metrics.task_completion_rate < 100) {
-                                                                toast.error('Task belum selesai semua atau belum ada.');
-                                                                return;
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={
+                                                                !entry.manager
                                                             }
+                                                            onClick={() => {
+                                                                if (
+                                                                    !entry.manager
+                                                                ) {
+                                                                    return;
+                                                                }
 
-                                                            router.get(
-                                                                monitoringTasks.url({
-                                                                    kdkmpEntry: entry.id,
-                                                                    date: filters.date,
-                                                                })
-                                                            );
-                                                        }}
-                                                    >
-                                                        Lihat Task
-                                                    </Button>
+                                                                if (
+                                                                    entry
+                                                                        .metrics
+                                                                        .task_completion_rate <
+                                                                    100
+                                                                ) {
+                                                                    toast.error(
+                                                                        'Task belum selesai semua atau belum ada.',
+                                                                    );
+                                                                    return;
+                                                                }
+
+                                                                router.get(
+                                                                    monitoringTasks.url(
+                                                                        {
+                                                                            kdkmpEntry:
+                                                                                entry.id,
+                                                                            date: filters.date,
+                                                                        },
+                                                                    ),
+                                                                );
+                                                            }}
+                                                        >
+                                                            Lihat Task
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}

@@ -7,6 +7,7 @@ use App\Models\EbitdamaxKdkmp;
 use App\Models\Role;
 use App\Models\SdmKdkmpEntry;
 use App\Services\KdkmpDashboardMetricsService;
+use App\Services\KdkmpRevenueAnalyticsService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Inertia\Inertia;
@@ -16,6 +17,7 @@ class KdkmpDashboardMonitoringController extends Controller
 {
     public function __construct(
         private readonly KdkmpDashboardMetricsService $dashboardMetrics,
+        private readonly KdkmpRevenueAnalyticsService $revenueAnalytics,
     ) {}
 
     public function __invoke(MonitorEbitdamaxKdkmpRequest $request): Response
@@ -105,6 +107,7 @@ class KdkmpDashboardMonitoringController extends Controller
                 ...$metrics,
             ]);
         });
+        $revenueGap = $this->revenueAnalytics->forAllKdkmp($today);
 
         return Inertia::render('KdkmpDashboard/Monitoring', [
             'entries' => $entries,
@@ -120,6 +123,13 @@ class KdkmpDashboardMonitoringController extends Controller
                 'status' => $status,
             ],
             'businessDate' => $today->toDateString(),
+            'revenueGap' => [
+                'period' => [
+                    'start_date' => $revenueGap['start_date'],
+                    'end_date' => $revenueGap['end_date'],
+                ],
+                'trend' => $revenueGap['points'],
+            ],
         ]);
     }
 
