@@ -27,10 +27,12 @@ class TaskController extends Controller
         $categoryId = $request->input('task_category_id');
         $roleId = $request->input('role_id');
         $status = (string) $request->input('status', 'active');
-        $sort = (string) $request->input('sort', 'name');
+        $sort = (string) $request->input('sort', 'sort_order');
         $direction = (string) $request->input('direction', 'asc');
 
-        $sort = in_array($sort, ['name', 'time_require', 'created_at'], true) ? $sort : 'name';
+        $sort = in_array($sort, ['sort_order', 'name', 'execution_time', 'time_require', 'created_at'], true)
+            ? $sort
+            : 'sort_order';
         $direction = $direction === 'desc' ? 'desc' : 'asc';
 
         $tasks = Task::query()
@@ -48,8 +50,16 @@ class TaskController extends Controller
                         ->orWhereHas('roles', fn ($roleQuery) => $roleQuery->where('name', 'like', "%{$search}%"));
                 });
             })
-            ->orderBy($sort, $direction)
-            ->orderBy('id')
+            ->when(
+                $sort === 'sort_order',
+                fn ($query) => $query
+                    ->orderByRaw('CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END')
+                    ->orderBy('sort_order', $direction)
+                    ->orderBy('id'),
+                fn ($query) => $query
+                    ->orderBy($sort, $direction)
+                    ->orderBy('id')
+            )
             ->paginate(15)
             ->through(fn (Task $task): array => $this->transformTask($task))
             ->appends($request->only(['search', 'task_category_id', 'role_id', 'status', 'sort', 'direction']));
@@ -115,8 +125,10 @@ class TaskController extends Controller
     {
         return [
             'task_category_id' => $payload['task_category_id'],
+            'sort_order' => $payload['sort_order'] ?? null,
             'name' => $payload['name'],
             'description' => $payload['description'] ?? null,
+            'execution_time' => $payload['execution_time'] ?? null,
             'time_require' => $payload['time_require'],
             'lower_time_threshold_minutes' => $payload['lower_time_threshold_minutes'] ?? null,
             'upper_time_threshold_minutes' => $payload['upper_time_threshold_minutes'] ?? null,
@@ -244,10 +256,14 @@ class TaskController extends Controller
             'id' => $task->id,
             'uuid' => $task->uuid,
             'task_category_id' => $task->task_category_id,
+            'sort_order' => $task->sort_order,
             'role_id' => $firstRole?->id,
             'role_ids' => $task->roles->pluck('id')->values()->all(),
             'name' => $task->name,
             'description' => $task->description,
+            'execution_time' => $task->execution_time
+                ? substr((string) $task->execution_time, 0, 5)
+                : null,
             'time_require' => $task->time_require,
             'lower_time_threshold_minutes' => $task->lower_time_threshold_minutes,
             'upper_time_threshold_minutes' => $task->upper_time_threshold_minutes,

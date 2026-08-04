@@ -20,8 +20,10 @@ class Task extends Model
     protected $fillable = [
         'uuid',
         'task_category_id',
+        'sort_order',
         'name',
         'description',
+        'execution_time',
         'time_require',
         'lower_time_threshold_minutes',
         'upper_time_threshold_minutes',
@@ -30,6 +32,7 @@ class Task extends Model
     ];
 
     protected $casts = [
+        'sort_order' => 'integer',
         'time_require' => 'integer',
         'lower_time_threshold_minutes' => 'integer',
         'upper_time_threshold_minutes' => 'integer',

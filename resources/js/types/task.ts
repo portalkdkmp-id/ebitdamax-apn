@@ -74,8 +74,10 @@ export type TaskItem = {
     task_category_id: number;
     role_id: number | null;
     role_ids: number[];
+    sort_order: number | null;
     name: string;
     description: string | null;
+    execution_time: string | null;
     time_require: number;
     lower_time_threshold_minutes: number | null;
     upper_time_threshold_minutes: number | null;

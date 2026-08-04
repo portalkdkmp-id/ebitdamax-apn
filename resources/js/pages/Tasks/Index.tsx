@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,8 +73,10 @@ type Props = {
 type TaskFormData = {
     task_category_id: string;
     role_ids: string[];
+    sort_order: string;
     name: string;
     description: string;
+    execution_time: string;
     time_require: string;
     lower_time_threshold_minutes: string;
     upper_time_threshold_minutes: string;
@@ -95,8 +98,10 @@ const emptyField = (): TaskAdditionalFieldItem => ({
 const defaultForm: TaskFormData = {
     task_category_id: '',
     role_ids: [],
+    sort_order: '',
     name: '',
     description: '',
+    execution_time: '',
     time_require: '30',
     lower_time_threshold_minutes: '',
     upper_time_threshold_minutes: '',
@@ -142,8 +147,10 @@ function toFormData(task: TaskItem): TaskFormData {
     return {
         task_category_id: String(task.task_category_id),
         role_ids: task.role_ids.map((roleId) => String(roleId)),
+        sort_order: task.sort_order === null ? '' : String(task.sort_order),
         name: task.name,
         description: task.description ?? '',
+        execution_time: task.execution_time ?? '',
         time_require: String(task.time_require),
         lower_time_threshold_minutes:
             task.lower_time_threshold_minutes === null
@@ -186,7 +193,7 @@ export default function TasksIndex({
             : 'all',
         role_id: filters.role_id ? String(filters.role_id) : 'all',
         status: filters.status ?? 'active',
-        sort: filters.sort ?? 'name',
+        sort: filters.sort ?? 'sort_order',
         direction: filters.direction ?? 'asc',
     });
 
@@ -247,6 +254,11 @@ export default function TasksIndex({
         const options = {
             preserveScroll: true,
             onSuccess: closeForm,
+            onError: (formErrors: Record<string, string>) => {
+                if (formErrors.sort_order) {
+                    toast.error(formErrors.sort_order);
+                }
+            },
         };
 
         if (selectedTask) {
@@ -458,7 +470,15 @@ export default function TasksIndex({
                                     }
                                     includeAll={false}
                                     items={[
+                                        {
+                                            value: 'sort_order',
+                                            label: 'Nomor urut',
+                                        },
                                         { value: 'name', label: 'Nama' },
+                                        {
+                                            value: 'execution_time',
+                                            label: 'Jam pelaksanaan',
+                                        },
                                         {
                                             value: 'time_require',
                                             label: 'Waktu',
@@ -511,6 +531,9 @@ export default function TasksIndex({
                             <Table>
                                 <TableHeader>
                                     <TableRow className="bg-muted/40">
+                                        <TableHead className="w-[100px] p-4 text-center">
+                                            No. Urut
+                                        </TableHead>
                                         <TableHead className="min-w-[280px] p-4">
                                             Task
                                         </TableHead>
@@ -522,6 +545,9 @@ export default function TasksIndex({
                                         </TableHead>
                                         <TableHead className="p-4">
                                             Periode
+                                        </TableHead>
+                                        <TableHead className="p-4">
+                                            Jam Pelaksanaan
                                         </TableHead>
                                         <TableHead className="p-4 text-right">
                                             Estimasi
@@ -538,7 +564,7 @@ export default function TasksIndex({
                                     {tasks.data.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={7}
+                                                colSpan={9}
                                                 className="p-8 text-center text-muted-foreground"
                                             >
                                                 Data task belum tersedia.
@@ -548,6 +574,9 @@ export default function TasksIndex({
 
                                     {tasks.data.map((task) => (
                                         <TableRow key={task.uuid}>
+                                            <TableCell className="p-4 text-center font-medium">
+                                                {task.sort_order ?? '-'}
+                                            </TableCell>
                                             <TableCell className="p-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -584,6 +613,9 @@ export default function TasksIndex({
                                                 <Badge variant="outline">
                                                     {task.period_label}
                                                 </Badge>
+                                            </TableCell>
+                                            <TableCell className="p-4">
+                                                {task.execution_time ?? '-'}
                                             </TableCell>
                                             <TableCell className="p-4 text-right">
                                                 <p>{task.time_require} menit</p>
@@ -752,7 +784,7 @@ export default function TasksIndex({
                             </div>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+                        <div className="grid gap-4 md:grid-cols-[1fr_180px_160px]">
                             <div className="space-y-2">
                                 <Label>Nama Task</Label>
                                 <Input
@@ -775,6 +807,24 @@ export default function TasksIndex({
                                 items={periodOptions}
                                 error={errors.period}
                             />
+
+                            <div className="space-y-2">
+                                <Label>Nomor Urut</Label>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={data.sort_order}
+                                    onChange={(event) =>
+                                        setData(
+                                            'sort_order',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Contoh: 1"
+                                />
+                                <FieldError message={errors.sort_order} />
+                            </div>
                         </div>
 
                         <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
@@ -783,14 +833,32 @@ export default function TasksIndex({
                                     Pengaturan Waktu
                                 </h2>
                                 <p className="text-sm text-muted-foreground">
-                                    Seluruh nilai waktu menggunakan satuan
+                                    Jam pelaksanaan menggunakan format 24 jam.
+                                    Estimasi dan ambang batas menggunakan satuan
                                     menit. Ambang batas bersifat opsional,
                                     tetapi batas bawah dan atas harus diisi
                                     berpasangan.
                                 </p>
                             </div>
 
-                            <div className="grid gap-4 md:grid-cols-3">
+                            <div className="grid gap-4 md:grid-cols-4">
+                                <div className="space-y-2">
+                                    <Label>Jam Pelaksanaan</Label>
+                                    <Input
+                                        type="time"
+                                        value={data.execution_time}
+                                        onChange={(event) =>
+                                            setData(
+                                                'execution_time',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                    <FieldError
+                                        message={errors.execution_time}
+                                    />
+                                </div>
+
                                 <div className="space-y-2">
                                     <Label>Estimasi Waktu</Label>
                                     <Input
@@ -1097,6 +1165,14 @@ export default function TasksIndex({
                                     value={detailTask.name}
                                 />
                                 <DetailItem
+                                    label="Nomor Urut"
+                                    value={
+                                        detailTask.sort_order === null
+                                            ? 'Belum ditentukan'
+                                            : String(detailTask.sort_order)
+                                    }
+                                />
+                                <DetailItem
                                     label="Kategori"
                                     value={detailTask.task_category.name}
                                 />
@@ -1111,6 +1187,13 @@ export default function TasksIndex({
                                 <DetailItem
                                     label="Estimasi Waktu"
                                     value={`${detailTask.time_require} menit`}
+                                />
+                                <DetailItem
+                                    label="Jam Pelaksanaan"
+                                    value={
+                                        detailTask.execution_time ??
+                                        'Belum ditentukan'
+                                    }
                                 />
                                 <DetailItem
                                     label="Ambang Waktu Bawah"

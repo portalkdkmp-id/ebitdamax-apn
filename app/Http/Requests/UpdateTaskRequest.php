@@ -17,12 +17,21 @@ class UpdateTaskRequest extends FormRequest
 
     public function rules(): array
     {
+        $taskId = $this->route('task')?->id;
+
         return [
             'task_category_id' => ['required', 'exists:task_categories,id'],
             'role_ids' => ['required', 'array', 'min:1'],
             'role_ids.*' => ['required', 'integer', 'distinct', 'exists:roles,id'],
+            'sort_order' => [
+                'nullable',
+                'integer',
+                'min:1',
+                Rule::unique('tasks', 'sort_order')->ignore($taskId),
+            ],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'execution_time' => ['nullable', 'date_format:H:i'],
             'time_require' => ['required', 'integer', 'min:1'],
             'lower_time_threshold_minutes' => [
                 'nullable',
@@ -57,8 +66,20 @@ class UpdateTaskRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'sort_order' => 'nomor urut',
+            'execution_time' => 'jam pelaksanaan',
             'lower_time_threshold_minutes' => 'ambang waktu bawah',
             'upper_time_threshold_minutes' => 'ambang waktu atas',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'sort_order.unique' => 'Nomor urut tersebut sudah digunakan oleh task lain.',
         ];
     }
 }

@@ -143,7 +143,7 @@ function MobileTaskDescription({
         : fullDescription;
 
     return (
-        <div className="mt-1 hidden max-[430px]:block">
+        <div className="mt-1 hidden max-[650px]:block">
             <p className="text-xs break-words text-muted-foreground">
                 {isExpanded ? fullDescription : previewDescription}
             </p>
@@ -375,22 +375,28 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
                             <Table>
                                 <TableHeader>
                                     <TableRow className="bg-muted/40">
+                                        <TableHead className="w-[72px] p-4 text-center max-[650px]:hidden">
+                                            No.
+                                        </TableHead>
                                         <TableHead className="min-w-[280px] p-4">
                                             Nama Task
                                         </TableHead>
-                                        <TableHead className="p-4 max-[430px]:hidden">
+                                        <TableHead className="p-4 max-[650px]:hidden">
                                             Kategori
                                         </TableHead>
-                                        <TableHead className="p-4 max-[430px]:hidden">
+                                        <TableHead className="p-4 max-[650px]:hidden">
                                             PIC Roles
                                         </TableHead>
-                                        <TableHead className="p-4 text-right max-[430px]:hidden">
+                                        <TableHead className="p-4 max-[650px]:hidden">
+                                            Jam Pelaksanaan
+                                        </TableHead>
+                                        <TableHead className="p-4 text-right max-[650px]:hidden">
                                             Estimasi Waktu
                                         </TableHead>
-                                        <TableHead className="p-4 max-[430px]:hidden">
+                                        <TableHead className="p-4 max-[650px]:hidden">
                                             Status
                                         </TableHead>
-                                        <TableHead className="w-[190px] p-4 text-right max-[430px]:hidden">
+                                        <TableHead className="w-[190px] p-4 text-right max-[650px]:hidden">
                                             Aksi
                                         </TableHead>
                                     </TableRow>
@@ -399,7 +405,7 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
                                     {tasks.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={6}
+                                                colSpan={8}
                                                 className="p-8 text-center text-muted-foreground"
                                             >
                                                 Belum ada task untuk role ini.
@@ -407,10 +413,13 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
                                         </TableRow>
                                     )}
 
-                                    {tasks.map((task) => (
+                                    {tasks.map((task, taskIndex) => (
                                         <TableRow key={task.uuid}>
-                                            <TableCell className="p-4 max-[430px]:whitespace-normal">
-                                                <div className="flex items-center gap-3 max-[430px]:items-start">
+                                            <TableCell className="p-4 text-center font-medium max-[650px]:hidden">
+                                                {taskIndex + 1}
+                                            </TableCell>
+                                            <TableCell className="p-4 max-[650px]:whitespace-normal">
+                                                <div className="flex items-center gap-3 max-[650px]:items-start">
                                                     <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                                         <ClipboardList className="size-5" />
                                                     </div>
@@ -418,14 +427,14 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
                                                         <p className="font-medium text-foreground">
                                                             {task.name}
                                                         </p>
-                                                        <p className="mt-0.5 hidden text-[11px] text-muted-foreground/70 max-[430px]:block">
+                                                        <p className="mt-0.5 hidden text-[11px] text-muted-foreground/70 max-[650px]:block">
                                                             {
                                                                 task
                                                                     .task_category
                                                                     .name
                                                             }
                                                         </p>
-                                                        <p className="text-xs break-words text-muted-foreground max-[430px]:hidden">
+                                                        <p className="text-xs break-words text-muted-foreground max-[650px]:hidden">
                                                             {task.description ??
                                                                 '-'}
                                                         </p>
@@ -434,8 +443,27 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
                                                                 task.description
                                                             }
                                                         />
-                                                        <div className="mt-4 hidden space-y-3 border-t pt-3 max-[430px]:block">
+                                                        <div className="mt-4 hidden space-y-3 border-t pt-3 max-[650px]:block">
                                                             <div className="grid grid-cols-2 gap-3">
+                                                                <div>
+                                                                    <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                        No.
+                                                                    </p>
+                                                                    <p className="mt-1 text-xs font-medium text-foreground">
+                                                                        {taskIndex +
+                                                                            1}
+                                                                    </p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                        Jam
+                                                                        Pelaksanaan
+                                                                    </p>
+                                                                    <p className="mt-1 text-xs font-medium text-foreground">
+                                                                        {task.execution_time ??
+                                                                            '-'}
+                                                                    </p>
+                                                                </div>
                                                                 <div>
                                                                     <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
                                                                         Estimasi
@@ -490,10 +518,10 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="p-4 max-[430px]:hidden">
+                                            <TableCell className="p-4 max-[650px]:hidden">
                                                 {task.task_category.name}
                                             </TableCell>
-                                            <TableCell className="p-4 max-[430px]:hidden">
+                                            <TableCell className="p-4 max-[650px]:hidden">
                                                 <div className="flex flex-wrap gap-2">
                                                     {task.roles.map((role) => (
                                                         <Badge key={role.id}>
@@ -502,15 +530,18 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
                                                     ))}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="p-4 text-right max-[430px]:hidden">
+                                            <TableCell className="p-4 max-[650px]:hidden">
+                                                {task.execution_time ?? '-'}
+                                            </TableCell>
+                                            <TableCell className="p-4 text-right max-[650px]:hidden">
                                                 {task.time_require} menit
                                             </TableCell>
-                                            <TableCell className="p-4 max-[430px]:hidden">
+                                            <TableCell className="p-4 max-[650px]:hidden">
                                                 <Badge variant="outline">
                                                     {task.status_label}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="p-4 max-[430px]:hidden">
+                                            <TableCell className="p-4 max-[650px]:hidden">
                                                 <div className="flex justify-end gap-2">
                                                     <TaskActionButton
                                                         task={task}

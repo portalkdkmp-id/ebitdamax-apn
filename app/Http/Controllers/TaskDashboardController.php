@@ -28,7 +28,9 @@ class TaskDashboardController extends Controller
                 fn ($query) => $query->whereHas('roles', fn ($roleQuery) => $roleQuery->whereKey($user->role_id)),
                 fn ($query) => $query->whereRaw('1 = 0')
             )
-            ->orderBy('name')
+            ->orderByRaw('CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->get();
 
         $periodKeysByTaskId = $tasks
@@ -51,7 +53,7 @@ class TaskDashboardController extends Controller
                 $report = $reportByTaskAndPeriod->get($task->id.'|'.$periodKey);
 
                 $isSuperadmin = $user?->role?->level === RoleLevel::Superadmin;
-                if (!$isSuperadmin && $report?->status === TaskReportStatus::Completed) {
+                if (! $isSuperadmin && $report?->status === TaskReportStatus::Completed) {
                     return null;
                 }
 
@@ -139,8 +141,12 @@ class TaskDashboardController extends Controller
         return [
             'id' => $task->id,
             'uuid' => $task->uuid,
+            'sort_order' => $task->sort_order,
             'name' => $task->name,
             'description' => $task->description,
+            'execution_time' => $task->execution_time
+                ? substr((string) $task->execution_time, 0, 5)
+                : null,
             'time_require' => $task->time_require,
             'lower_time_threshold_minutes' => $task->lower_time_threshold_minutes,
             'upper_time_threshold_minutes' => $task->upper_time_threshold_minutes,
