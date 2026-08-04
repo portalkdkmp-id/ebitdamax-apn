@@ -7,7 +7,7 @@ import {
     Store,
 } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,9 +38,13 @@ import KdkmpRevenueGapChart from '@/components/monitoring/KdkmpRevenueGapChart';
 import type {
     KdkmpMonitoringEntry,
     KdkmpMonitoringProps,
+    KdkmpRegionOption,
 } from '@/types/kdkmp-dashboard';
 
 type MonitoringStatus = KdkmpMonitoringProps['filters']['status'];
+type RegionOptionField = keyof KdkmpRegionOption;
+
+const ALL_REGION_VALUE = '__all_regions__';
 
 function formatDate(value: string): string {
     return new Intl.DateTimeFormat('id-ID', {
@@ -67,6 +71,19 @@ function formatManualValue(
         currency: 'IDR',
         maximumFractionDigits: 2,
     }).format(Number(value));
+}
+
+function uniqueSorted(values: string[]): string[] {
+    return [...new Set(values)].sort((first, second) =>
+        first.localeCompare(second, 'id'),
+    );
+}
+
+function regionValues(
+    regionOptions: KdkmpRegionOption[],
+    field: RegionOptionField,
+): string[] {
+    return uniqueSorted(regionOptions.map((option) => option[field]));
 }
 
 function StatusBadge({
@@ -119,6 +136,7 @@ function SummaryCard({
 export default function KdkmpDashboardMonitoring({
     businessDate,
     revenueGap,
+    regionOptions,
     entries,
     summary,
     filters,
@@ -126,12 +144,66 @@ export default function KdkmpDashboardMonitoring({
     const [date, setDate] = useState(filters.date);
     const [search, setSearch] = useState(filters.search);
     const [status, setStatus] = useState<MonitoringStatus>(filters.status);
+    const [provinsi, setProvinsi] = useState(filters.provinsi ?? '');
+    const [kotaKabupaten, setKotaKabupaten] = useState(
+        filters.kota_kabupaten ?? '',
+    );
+    const [kecamatan, setKecamatan] = useState(filters.kecamatan ?? '');
+    const [desa, setDesa] = useState(filters.desa ?? '');
+
+    const provinsiOptions = useMemo(
+        () => regionValues(regionOptions, 'provinsi'),
+        [regionOptions],
+    );
+    const kotaKabupatenOptions = useMemo(
+        () =>
+            regionValues(
+                regionOptions.filter(
+                    (option) => !provinsi || option.provinsi === provinsi,
+                ),
+                'kota_kabupaten',
+            ),
+        [provinsi, regionOptions],
+    );
+    const kecamatanOptions = useMemo(
+        () =>
+            regionValues(
+                regionOptions.filter(
+                    (option) =>
+                        option.provinsi === provinsi &&
+                        option.kota_kabupaten === kotaKabupaten,
+                ),
+                'kecamatan',
+            ),
+        [kotaKabupaten, provinsi, regionOptions],
+    );
+    const desaOptions = useMemo(
+        () =>
+            regionValues(
+                regionOptions.filter(
+                    (option) =>
+                        option.provinsi === provinsi &&
+                        option.kota_kabupaten === kotaKabupaten &&
+                        option.kecamatan === kecamatan,
+                ),
+                'desa',
+            ),
+        [kecamatan, kotaKabupaten, provinsi, regionOptions],
+    );
 
     const submitFilters = (event: FormEvent) => {
         event.preventDefault();
         router.get(
             monitoringIndex.url(),
-            { date, search, status },
+            {
+                date,
+                search,
+                status,
+                provinsi,
+                kota_kabupaten: kotaKabupaten,
+                kecamatan,
+                desa,
+            },
             { preserveState: true, preserveScroll: true },
         );
     };
@@ -190,70 +262,259 @@ export default function KdkmpDashboardMonitoring({
                         <CardContent className="space-y-5 p-5">
                             <form
                                 onSubmit={submitFilters}
-                                className="grid gap-4 md:grid-cols-2 xl:grid-cols-[190px_220px_minmax(280px,1fr)_auto] xl:items-end"
+                                className="space-y-5"
                             >
-                                <div className="space-y-2">
-                                    <Label htmlFor="monitoring-date">
-                                        Tanggal
-                                    </Label>
-                                    <Input
-                                        id="monitoring-date"
-                                        type="date"
-                                        max={businessDate}
-                                        value={date}
-                                        onChange={(event) =>
-                                            setDate(event.target.value)
-                                        }
-                                    />
-                                </div>
+                                <div className="space-y-4 rounded-md border bg-muted/20 p-4">
+                                    <div>
+                                        <h2 className="font-medium text-foreground">
+                                            Filter Wilayah
+                                        </h2>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            Pilih wilayah secara bertingkat dari
+                                            provinsi hingga desa.
+                                        </p>
+                                    </div>
 
-                                <div className="space-y-2">
-                                    <Label>Status Pengisian</Label>
-                                    <Select
-                                        value={status}
-                                        onValueChange={(value) =>
-                                            setStatus(value as MonitoringStatus)
-                                        }
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                Semua status
-                                            </SelectItem>
-                                            <SelectItem value="complete">
-                                                Lengkap
-                                            </SelectItem>
-                                            <SelectItem value="not_filled">
-                                                Belum diisi
-                                            </SelectItem>
-                                            <SelectItem value="requires_review">
-                                                Plan Revenue perlu review
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                                        <div className="space-y-2">
+                                            <Label>Provinsi</Label>
+                                            <Select
+                                                value={
+                                                    provinsi || ALL_REGION_VALUE
+                                                }
+                                                onValueChange={(value) => {
+                                                    setProvinsi(
+                                                        value ===
+                                                            ALL_REGION_VALUE
+                                                            ? ''
+                                                            : value,
+                                                    );
+                                                    setKotaKabupaten('');
+                                                    setKecamatan('');
+                                                    setDesa('');
+                                                }}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem
+                                                        value={ALL_REGION_VALUE}
+                                                    >
+                                                        Semua provinsi
+                                                    </SelectItem>
+                                                    {provinsiOptions.map(
+                                                        (option) => (
+                                                            <SelectItem
+                                                                key={option}
+                                                                value={option}
+                                                            >
+                                                                {option}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="monitoring-search">
-                                        Cari KDKMP
-                                    </Label>
-                                    <div className="relative">
-                                        <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                                        <Input
-                                            id="monitoring-search"
-                                            value={search}
-                                            onChange={(event) =>
-                                                setSearch(event.target.value)
-                                            }
-                                            placeholder="Nama koperasi, NIK, manager, atau wilayah..."
-                                            className="pl-9"
-                                        />
+                                        <div className="space-y-2">
+                                            <Label>Kota/Kabupaten</Label>
+                                            <Select
+                                                disabled={!provinsi}
+                                                value={
+                                                    kotaKabupaten ||
+                                                    ALL_REGION_VALUE
+                                                }
+                                                onValueChange={(value) => {
+                                                    setKotaKabupaten(
+                                                        value ===
+                                                            ALL_REGION_VALUE
+                                                            ? ''
+                                                            : value,
+                                                    );
+                                                    setKecamatan('');
+                                                    setDesa('');
+                                                }}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem
+                                                        value={ALL_REGION_VALUE}
+                                                    >
+                                                        Semua kota/kabupaten
+                                                    </SelectItem>
+                                                    {kotaKabupatenOptions.map(
+                                                        (option) => (
+                                                            <SelectItem
+                                                                key={option}
+                                                                value={option}
+                                                            >
+                                                                {option}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Kecamatan</Label>
+                                            <Select
+                                                disabled={
+                                                    !provinsi || !kotaKabupaten
+                                                }
+                                                value={
+                                                    kecamatan ||
+                                                    ALL_REGION_VALUE
+                                                }
+                                                onValueChange={(value) => {
+                                                    setKecamatan(
+                                                        value ===
+                                                            ALL_REGION_VALUE
+                                                            ? ''
+                                                            : value,
+                                                    );
+                                                    setDesa('');
+                                                }}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem
+                                                        value={ALL_REGION_VALUE}
+                                                    >
+                                                        Semua kecamatan
+                                                    </SelectItem>
+                                                    {kecamatanOptions.map(
+                                                        (option) => (
+                                                            <SelectItem
+                                                                key={option}
+                                                                value={option}
+                                                            >
+                                                                {option}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Desa</Label>
+                                            <Select
+                                                disabled={
+                                                    !provinsi ||
+                                                    !kotaKabupaten ||
+                                                    !kecamatan
+                                                }
+                                                value={desa || ALL_REGION_VALUE}
+                                                onValueChange={(value) =>
+                                                    setDesa(
+                                                        value ===
+                                                            ALL_REGION_VALUE
+                                                            ? ''
+                                                            : value,
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem
+                                                        value={ALL_REGION_VALUE}
+                                                    >
+                                                        Semua desa
+                                                    </SelectItem>
+                                                    {desaOptions.map(
+                                                        (option) => (
+                                                            <SelectItem
+                                                                key={option}
+                                                                value={option}
+                                                            >
+                                                                {option}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <Button type="submit">Terapkan Filter</Button>
+                                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[190px_220px_minmax(280px,1fr)_auto] xl:items-end">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="monitoring-date">
+                                            Tanggal
+                                        </Label>
+                                        <Input
+                                            id="monitoring-date"
+                                            type="date"
+                                            max={businessDate}
+                                            value={date}
+                                            onChange={(event) =>
+                                                setDate(event.target.value)
+                                            }
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Status Pengisian</Label>
+                                        <Select
+                                            value={status}
+                                            onValueChange={(value) =>
+                                                setStatus(
+                                                    value as MonitoringStatus,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">
+                                                    Semua status
+                                                </SelectItem>
+                                                <SelectItem value="complete">
+                                                    Lengkap
+                                                </SelectItem>
+                                                <SelectItem value="not_filled">
+                                                    Belum diisi
+                                                </SelectItem>
+                                                <SelectItem value="requires_review">
+                                                    Plan Revenue perlu review
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="monitoring-search">
+                                            Cari KDKMP
+                                        </Label>
+                                        <div className="relative">
+                                            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                                            <Input
+                                                id="monitoring-search"
+                                                value={search}
+                                                onChange={(event) =>
+                                                    setSearch(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Nama koperasi, NIK, manager, atau wilayah..."
+                                                className="pl-9"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <Button type="submit">
+                                        Terapkan Filter
+                                    </Button>
+                                </div>
                             </form>
 
                             <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">

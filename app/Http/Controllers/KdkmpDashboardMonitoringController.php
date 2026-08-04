@@ -26,13 +26,14 @@ class KdkmpDashboardMonitoringController extends Controller
         $reportDate = (string) ($request->validated('date') ?? $today->toDateString());
         $search = trim((string) ($request->validated('search') ?? ''));
         $status = (string) ($request->validated('status') ?? 'all');
+        $regionFilters = $this->regionFilters($request);
         $selectedBusinessDate = CarbonImmutable::createFromFormat(
             'Y-m-d',
             $reportDate,
             (string) config('app.kdkmp_business_timezone')
         )->startOfDay();
 
-        $baseQuery = $this->managerKdkmpQuery();
+        $baseQuery = $this->managerKdkmpQuery($regionFilters);
         $total = (clone $baseQuery)->count();
         $filled = (clone $baseQuery)
             ->whereHas('dailyEbitdaRecords', function (Builder $query) use ($reportDate): void {
@@ -46,7 +47,7 @@ class KdkmpDashboardMonitoringController extends Controller
             })
             ->count();
 
-        $entries = $this->managerKdkmpQuery()
+        $entries = $this->managerKdkmpQuery($regionFilters)
             ->with([
                 'managerUser:id,sdm_kdkmp_entry_id,name,email,username',
                 'dailyEbitdaRecords' => function ($query) use ($reportDate): void {
@@ -107,7 +108,7 @@ class KdkmpDashboardMonitoringController extends Controller
                 ...$metrics,
             ]);
         });
-        $revenueGap = $this->revenueAnalytics->forAllKdkmp($today);
+        $revenueGap = $this->revenueAnalytics->forAllKdkmp($today, $regionFilters);
 
         return Inertia::render('KdkmpDashboard/Monitoring', [
             'entries' => $entries,
@@ -121,7 +122,9 @@ class KdkmpDashboardMonitoringController extends Controller
                 'date' => $reportDate,
                 'search' => $search,
                 'status' => $status,
+                ...$regionFilters,
             ],
+            'regionOptions' => $this->regionOptions(),
             'businessDate' => $today->toDateString(),
             'revenueGap' => [
                 'period' => [
@@ -133,12 +136,67 @@ class KdkmpDashboardMonitoringController extends Controller
         ]);
     }
 
-    private function managerKdkmpQuery(): Builder
+    /**
+     * @param  array{provinsi?: string|null, kota_kabupaten?: string|null, kecamatan?: string|null, desa?: string|null}  $regionFilters
+     */
+    private function managerKdkmpQuery(array $regionFilters = []): Builder
     {
         return SdmKdkmpEntry::query()
+            ->forRegions($regionFilters)
             ->whereHas('managerUser.role', function (Builder $query): void {
                 $query->where('slug', Role::SLUG_KDKMP_MANAGER);
             });
+    }
+
+    /**
+     * @return array<int, array{provinsi: string, kota_kabupaten: string, kecamatan: string, desa: string}>
+     */
+    private function regionOptions(): array
+    {
+        $query = $this->managerKdkmpQuery()
+            ->select(SdmKdkmpEntry::REGION_FIELDS)
+            ->distinct();
+
+        foreach (SdmKdkmpEntry::REGION_FIELDS as $field) {
+            $query
+                ->whereNotNull($field)
+                ->where($field, '<>', '')
+                ->orderBy($field);
+        }
+
+        return $query
+            ->get()
+            ->map(fn (SdmKdkmpEntry $entry): array => [
+                'provinsi' => (string) $entry->provinsi,
+                'kota_kabupaten' => (string) $entry->kota_kabupaten,
+                'kecamatan' => (string) $entry->kecamatan,
+                'desa' => (string) $entry->desa,
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array{provinsi: string|null, kota_kabupaten: string|null, kecamatan: string|null, desa: string|null}
+     */
+    private function regionFilters(MonitorEbitdamaxKdkmpRequest $request): array
+    {
+        return [
+            'provinsi' => $this->nullableString($request->validated('provinsi')),
+            'kota_kabupaten' => $this->nullableString($request->validated('kota_kabupaten')),
+            'kecamatan' => $this->nullableString($request->validated('kecamatan')),
+            'desa' => $this->nullableString($request->validated('desa')),
+        ];
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
     }
 
     private function forDate(Builder $query, string $reportDate): void

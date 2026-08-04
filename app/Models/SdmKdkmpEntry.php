@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,13 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SdmKdkmpEntry extends Model
 {
+    public const REGION_FIELDS = [
+        'provinsi',
+        'kota_kabupaten',
+        'kecamatan',
+        'desa',
+    ];
+
     protected $fillable = [
         'nik',
         'nama_koperasi',
@@ -48,5 +56,23 @@ class SdmKdkmpEntry extends Model
     public function dailyEbitdaRecords(): HasMany
     {
         return $this->hasMany(EbitdamaxKdkmp::class);
+    }
+
+    /**
+     * @param  array{provinsi?: string|null, kota_kabupaten?: string|null, kecamatan?: string|null, desa?: string|null}  $filters
+     */
+    public function scopeForRegions(Builder $query, array $filters): Builder
+    {
+        foreach (self::REGION_FIELDS as $field) {
+            $value = $filters[$field] ?? null;
+
+            if (! is_string($value) || $value === '') {
+                continue;
+            }
+
+            $query->where($field, $value);
+        }
+
+        return $query;
     }
 }

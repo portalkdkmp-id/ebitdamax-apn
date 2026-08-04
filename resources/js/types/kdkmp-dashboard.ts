@@ -54,6 +54,20 @@ export type KdkmpRevenueGapPoint = {
     gap: number | null;
 };
 
+export type KdkmpRegionFilters = {
+    provinsi: string | null;
+    kota_kabupaten: string | null;
+    kecamatan: string | null;
+    desa: string | null;
+};
+
+export type KdkmpRegionOption = {
+    provinsi: string;
+    kota_kabupaten: string;
+    kecamatan: string;
+    desa: string;
+};
+
 export type KdkmpManagerDashboardProps = {
     businessDate: string;
     kdkmp: KdkmpIdentity | null;
@@ -82,6 +96,7 @@ export type KdkmpMonitoringEntry = KdkmpIdentity & {
 
 export type KdkmpMonitoringProps = {
     businessDate: string;
+    regionOptions: KdkmpRegionOption[];
     revenueGap: {
         period: {
             start_date: string;
@@ -100,5 +115,5 @@ export type KdkmpMonitoringProps = {
         date: string;
         search: string;
         status: 'all' | 'complete' | 'not_filled' | 'requires_review';
-    };
+    } & KdkmpRegionFilters;
 };
