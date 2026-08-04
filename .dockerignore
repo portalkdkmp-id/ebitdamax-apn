@@ -1,0 +1,9 @@
+.git
+.github
+.env
+.env.docker
+.DS_Store
+node_modules
+vendor
+public/build
+storage/logs

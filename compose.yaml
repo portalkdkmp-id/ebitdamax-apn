@@ -1,0 +1,92 @@
+name: ebitdamax-apn
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    working_dir: /var/www/html
+    command:
+      - sh
+      - -lc
+      - |
+        [ -f .env ] || cp .env.example .env
+        composer install --no-interaction --prefer-dist
+        php artisan serve --host=0.0.0.0 --port=8000
+    environment:
+      APP_ENV: "${APP_ENV:-local}"
+      APP_DEBUG: "${APP_DEBUG:-true}"
+      APP_URL: "http://localhost:${APP_PORT:-8000}"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: "${DB_DATABASE:-ebitdamax}"
+      DB_USERNAME: "${DB_USERNAME:-ebitdamax}"
+      DB_PASSWORD: "${DB_PASSWORD:-change-me-local-only}"
+      DB_SSLMODE: disable
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CACHE_STORE: "${CACHE_STORE:-database}"
+      SESSION_DRIVER: "${SESSION_DRIVER:-database}"
+      QUEUE_CONNECTION: "${QUEUE_CONNECTION:-database}"
+    volumes:
+      - ./:/var/www/html
+      - vendor:/var/www/html/vendor
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  node:
+    image: node:22-bookworm-slim
+    working_dir: /var/www/html
+    command:
+      - sh
+      - -lc
+      - npm ci && npm run dev -- --host 0.0.0.0
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./:/var/www/html
+      - node_modules:/var/www/html/node_modules
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: "${DB_DATABASE:-ebitdamax}"
+      POSTGRES_USER: "${DB_USERNAME:-ebitdamax}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-change-me-local-only}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${DB_FORWARD_PORT:-54329}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:${REDIS_FORWARD_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  node_modules:
+  postgres_data:
+  redis_data:
+  vendor:
