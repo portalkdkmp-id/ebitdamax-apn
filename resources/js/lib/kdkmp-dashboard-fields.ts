@@ -56,7 +56,7 @@ export const kdkmpDashboardFields: KdkmpDashboardField[] = [
         label: 'Actual EBITDA Margin (%)',
         isDisabled: true,
         description:
-            'Dihitung otomatis: ((Actual Revenue - Rp17.477.716) / Actual Revenue) x 100%.',
+            'Dihitung otomatis: ((Actual Revenue - Rp9.172.133) / Actual Revenue) x 100%.',
     },
     {
         key: 'total_duration',

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\RegionalScopeLevel;
+use App\Enums\RoleLevel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -74,5 +76,41 @@ class SdmKdkmpEntry extends Model
         }
 
         return $query;
+    }
+
+    public function scopeAccessibleBy(Builder $query, User $user): Builder
+    {
+        if ($user->role?->level === RoleLevel::Superadmin) {
+            return $query;
+        }
+
+        $assignments = $user->relationLoaded('regionalAssignments')
+            ? $user->regionalAssignments
+            : $user->regionalAssignments()->get();
+        $hasOwnKdkmp = $user->sdm_kdkmp_entry_id !== null;
+
+        if (! $hasOwnKdkmp && $assignments->isEmpty()) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $accessibleQuery) use ($assignments, $hasOwnKdkmp, $user): void {
+            if ($hasOwnKdkmp) {
+                $accessibleQuery->orWhereKey($user->sdm_kdkmp_entry_id);
+            }
+
+            foreach ($assignments as $assignment) {
+                $accessibleQuery->orWhere(function (Builder $assignmentQuery) use ($assignment): void {
+                    $assignmentQuery->where('provinsi', $assignment->provinsi);
+
+                    if ($assignment->scope_level !== RegionalScopeLevel::Province) {
+                        $assignmentQuery->where('kota_kabupaten', $assignment->kota_kabupaten);
+                    }
+
+                    if ($assignment->scope_level === RegionalScopeLevel::District) {
+                        $assignmentQuery->where('kecamatan', $assignment->kecamatan);
+                    }
+                });
+            }
+        });
     }
 }

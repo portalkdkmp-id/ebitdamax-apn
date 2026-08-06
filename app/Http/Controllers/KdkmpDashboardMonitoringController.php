@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\MonitorEbitdamaxKdkmpRequest;
 use App\Models\EbitdamaxKdkmp;
-use App\Models\Role;
 use App\Models\SdmKdkmpEntry;
+use App\Models\User;
+use App\Services\KdkmpConsolidationService;
 use App\Services\KdkmpDashboardMetricsService;
 use App\Services\KdkmpRevenueAnalyticsService;
+use App\Services\RegionalAccessService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Inertia\Inertia;
@@ -18,22 +20,36 @@ class KdkmpDashboardMonitoringController extends Controller
     public function __construct(
         private readonly KdkmpDashboardMetricsService $dashboardMetrics,
         private readonly KdkmpRevenueAnalyticsService $revenueAnalytics,
+        private readonly KdkmpConsolidationService $consolidation,
+        private readonly RegionalAccessService $regionalAccess,
     ) {}
 
     public function __invoke(MonitorEbitdamaxKdkmpRequest $request): Response
     {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
         $today = CarbonImmutable::now((string) config('app.kdkmp_business_timezone'));
         $reportDate = (string) ($request->validated('date') ?? $today->toDateString());
         $search = trim((string) ($request->validated('search') ?? ''));
         $status = (string) ($request->validated('status') ?? 'all');
         $regionFilters = $this->regionFilters($request);
+        $regionalAccess = $this->regionalAccess->filterContext($user);
+        $consolidationLevel = (string) ($request->validated('consolidation_level') ?? 'national');
+
+        if (! $regionalAccess['is_national'] && $consolidationLevel === 'national') {
+            $consolidationLevel = 'province';
+        }
         $selectedBusinessDate = CarbonImmutable::createFromFormat(
             'Y-m-d',
             $reportDate,
             (string) config('app.kdkmp_business_timezone')
         )->startOfDay();
 
-        $baseQuery = $this->managerKdkmpQuery($regionFilters);
+        $baseQuery = $this->regionalAccess->accessibleManagedKdkmpQuery(
+            $user,
+            $regionFilters,
+        );
         $total = (clone $baseQuery)->count();
         $filled = (clone $baseQuery)
             ->whereHas('dailyEbitdaRecords', function (Builder $query) use ($reportDate): void {
@@ -47,7 +63,7 @@ class KdkmpDashboardMonitoringController extends Controller
             })
             ->count();
 
-        $entries = $this->managerKdkmpQuery($regionFilters)
+        $entries = (clone $baseQuery)
             ->with([
                 'managerUser:id,sdm_kdkmp_entry_id,name,email,username',
                 'dailyEbitdaRecords' => function ($query) use ($reportDate): void {
@@ -108,7 +124,15 @@ class KdkmpDashboardMonitoringController extends Controller
                 ...$metrics,
             ]);
         });
-        $revenueGap = $this->revenueAnalytics->forAllKdkmp($today, $regionFilters);
+        $revenueGap = $this->revenueAnalytics->forKdkmpEntries(
+            $selectedBusinessDate,
+            clone $baseQuery,
+        );
+        $consolidation = $this->consolidation->forEntries(
+            clone $baseQuery,
+            $reportDate,
+            $consolidationLevel,
+        );
 
         return Inertia::render('KdkmpDashboard/Monitoring', [
             'entries' => $entries,
@@ -122,10 +146,16 @@ class KdkmpDashboardMonitoringController extends Controller
                 'date' => $reportDate,
                 'search' => $search,
                 'status' => $status,
+                'consolidation_level' => $consolidationLevel,
                 ...$regionFilters,
             ],
-            'regionOptions' => $this->regionOptions(),
+            'regionOptions' => $this->regionalAccess->regionOptions($user),
+            'regionalAccess' => $regionalAccess,
             'businessDate' => $today->toDateString(),
+            'consolidation' => [
+                'level' => $consolidationLevel,
+                'rows' => $consolidation,
+            ],
             'revenueGap' => [
                 'period' => [
                     'start_date' => $revenueGap['start_date'],
@@ -134,45 +164,6 @@ class KdkmpDashboardMonitoringController extends Controller
                 'trend' => $revenueGap['points'],
             ],
         ]);
-    }
-
-    /**
-     * @param  array{provinsi?: string|null, kota_kabupaten?: string|null, kecamatan?: string|null, desa?: string|null}  $regionFilters
-     */
-    private function managerKdkmpQuery(array $regionFilters = []): Builder
-    {
-        return SdmKdkmpEntry::query()
-            ->forRegions($regionFilters)
-            ->whereHas('managerUser.role', function (Builder $query): void {
-                $query->where('slug', Role::SLUG_KDKMP_MANAGER);
-            });
-    }
-
-    /**
-     * @return array<int, array{provinsi: string, kota_kabupaten: string, kecamatan: string, desa: string}>
-     */
-    private function regionOptions(): array
-    {
-        $query = $this->managerKdkmpQuery()
-            ->select(SdmKdkmpEntry::REGION_FIELDS)
-            ->distinct();
-
-        foreach (SdmKdkmpEntry::REGION_FIELDS as $field) {
-            $query
-                ->whereNotNull($field)
-                ->where($field, '<>', '')
-                ->orderBy($field);
-        }
-
-        return $query
-            ->get()
-            ->map(fn (SdmKdkmpEntry $entry): array => [
-                'provinsi' => (string) $entry->provinsi,
-                'kota_kabupaten' => (string) $entry->kota_kabupaten,
-                'kecamatan' => (string) $entry->kecamatan,
-                'desa' => (string) $entry->desa,
-            ])
-            ->all();
     }
 
     /**

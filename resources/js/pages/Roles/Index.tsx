@@ -50,11 +50,13 @@ type Props = {
 };
 
 type RoleFormData = {
+    domain: 'apn' | 'kdkmp';
     name: string;
     level: string;
 };
 
 const defaultForm: RoleFormData = {
+    domain: 'apn',
     name: '',
     level: 'staff',
 };
@@ -94,6 +96,8 @@ function paginationLabel(label: string) {
 }
 
 export default function RolesIndex({ roles, levelOptions, filters }: Props) {
+    const domainLabel =
+        filters.domain === 'kdkmp' ? 'EBITDAMAX KDKMP' : 'EBITDAMAX APN';
     const [selectedRole, setSelectedRole] = useState<RoleItem | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<RoleItem | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -105,22 +109,26 @@ export default function RolesIndex({ roles, levelOptions, filters }: Props) {
     });
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
-        useForm<RoleFormData>(defaultForm);
+        useForm<RoleFormData>({ ...defaultForm, domain: filters.domain });
 
     const submitFilters = (event: FormEvent) => {
         event.preventDefault();
 
-        router.get(rolesIndex.url(), filterForm, {
-            preserveState: true,
-            preserveScroll: true,
-        });
+        router.get(
+            rolesIndex.url(),
+            { ...filterForm, domain: filters.domain },
+            {
+                preserveState: true,
+                preserveScroll: true,
+            },
+        );
     };
 
     const openCreateForm = () => {
         setSelectedRole(null);
         clearErrors();
         reset();
-        setData(defaultForm);
+        setData({ ...defaultForm, domain: filters.domain });
         setIsFormOpen(true);
     };
 
@@ -128,6 +136,7 @@ export default function RolesIndex({ roles, levelOptions, filters }: Props) {
         setSelectedRole(role);
         clearErrors();
         setData({
+            domain: filters.domain,
             name: role.name,
             level: role.level,
         });
@@ -165,32 +174,37 @@ export default function RolesIndex({ roles, levelOptions, filters }: Props) {
 
         setIsDeleting(true);
 
-        router.delete(destroyRole.url(deleteTarget.slug), {
-            preserveScroll: true,
-            onFinish: () => {
-                setIsDeleting(false);
-                setDeleteTarget(null);
+        router.delete(
+            destroyRole.url(deleteTarget.slug, {
+                query: { domain: filters.domain },
+            }),
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setIsDeleting(false);
+                    setDeleteTarget(null);
+                },
             },
-        });
+        );
     };
 
     return (
         <>
-            <Head title="Roles" />
+            <Head title={`Role ${domainLabel}`} />
 
             <main className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
                 <div className="mx-auto w-full max-w-7xl space-y-6">
                     <section className="flex flex-col gap-4 rounded-lg border bg-card p-6 shadow-sm lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <p className="text-sm font-semibold text-primary uppercase">
-                                Master Data
+                                {domainLabel}
                             </p>
                             <h1 className="mt-1 text-2xl font-semibold text-foreground">
-                                Roles
+                                Role{' '}
+                                {filters.domain === 'kdkmp' ? 'KDKMP' : 'APN'}
                             </h1>
                             <p className="mt-2 max-w-3xl text-muted-foreground">
-                                Kelola jabatan atau posisi kerja yang akan
-                                digunakan sebagai PIC task.
+                                Kelola role untuk domain {domainLabel}.
                             </p>
                         </div>
 
@@ -292,7 +306,12 @@ export default function RolesIndex({ roles, levelOptions, filters }: Props) {
                     <Card className="rounded-lg border bg-card shadow-sm">
                         <CardHeader className="border-b">
                             <div className="flex items-center justify-between gap-4">
-                                <CardTitle>Data Role</CardTitle>
+                                <CardTitle>
+                                    Data Role{' '}
+                                    {filters.domain === 'kdkmp'
+                                        ? 'KDKMP'
+                                        : 'APN'}
+                                </CardTitle>
                                 <Badge variant="outline">
                                     {roles.total} role
                                 </Badge>
@@ -434,7 +453,8 @@ export default function RolesIndex({ roles, levelOptions, filters }: Props) {
                                 {selectedRole ? 'Edit Role' : 'Tambah Role'}
                             </DialogTitle>
                             <DialogDescription>
-                                Lengkapi nama dan level role.
+                                Lengkapi nama dan level role untuk {domainLabel}
+                                .
                             </DialogDescription>
                         </DialogHeader>
 

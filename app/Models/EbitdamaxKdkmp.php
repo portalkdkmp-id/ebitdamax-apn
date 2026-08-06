@@ -12,7 +12,7 @@ class EbitdamaxKdkmp extends Model
 {
     public const TARGET_REVENUE = '20000000';
 
-    public const ACTUAL_EBITDA_MARGIN_FIXED_COST = 17_477_716;
+    public const ACTUAL_EBITDA_MARGIN_FIXED_COST = 9_172_133;
 
     public const TASK_COMPLETION_WEIGHT = 55;
 

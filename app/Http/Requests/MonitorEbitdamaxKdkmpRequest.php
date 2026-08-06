@@ -39,6 +39,10 @@ class MonitorEbitdamaxKdkmpRequest extends FormRequest
             ],
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', $this->statusRule()],
+            'consolidation_level' => [
+                'nullable',
+                Rule::in(['national', 'province', 'regency', 'district']),
+            ],
             'provinsi' => ['nullable', 'string', 'max:255'],
             'kota_kabupaten' => ['nullable', 'string', 'max:255'],
             'kecamatan' => ['nullable', 'string', 'max:255'],

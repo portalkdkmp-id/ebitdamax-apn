@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\RoleDomain;
 use App\Enums\RoleLevel;
 use App\Models\BusinessProcess;
 use App\Models\Role;
@@ -17,6 +18,7 @@ class KdkmpGeraiBusinessProcessSeeder extends Seeder
             [
                 'name' => Role::SLUG_EBITDA_KDKMP,
                 'level' => RoleLevel::Staff,
+                'domain' => RoleDomain::Kdkmp,
             ]
         );
 

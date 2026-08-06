@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\RoleDomain;
 use App\Enums\RoleLevel;
 use App\Models\Role;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -26,6 +27,7 @@ class RoleFactory extends Factory
             'name' => $name,
             'slug' => Str::slug($name),
             'level' => fake()->randomElement(RoleLevel::cases())->value,
+            'domain' => fake()->randomElement(RoleDomain::cases())->value,
         ];
     }
 }

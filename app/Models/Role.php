@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\RoleDomain;
 use App\Enums\RoleLevel;
 use Database\Factories\RoleFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,6 +18,8 @@ class Role extends Model
 
     public const SLUG_KDKMP_MANAGER = 'kepala-toko-manager';
 
+    public const SLUG_REGIONAL_MANAGER = 'manager-wilayah';
+
     /** @use HasFactory<RoleFactory> */
     use HasFactory;
 
@@ -25,10 +28,16 @@ class Role extends Model
         'name',
         'slug',
         'level',
+        'domain',
     ];
 
     protected $casts = [
         'level' => RoleLevel::class,
+        'domain' => RoleDomain::class,
+    ];
+
+    protected $attributes = [
+        'domain' => RoleDomain::Apn->value,
     ];
 
     protected static function booted(): void

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,30 +51,51 @@ import type {
     UserFilters,
     UserItem,
     UserPaginatedResponse,
+    UserRegionOption,
     UserRole,
 } from '@/types/user';
 
 type Props = {
     users: UserPaginatedResponse;
     roles: UserRole[];
+    regionOptions: UserRegionOption[];
     filters: UserFilters;
 };
 
+type RegionalAssignmentForm = {
+    scope_level: 'province' | 'regency' | 'district';
+    provinsi: string;
+    kota_kabupaten: string;
+    kecamatan: string;
+};
+
 type UserFormData = {
+    domain: 'apn' | 'kdkmp';
     role_id: string;
     name: string;
     email: string;
     password: string;
     password_confirmation: string;
+    regional_assignments: RegionalAssignmentForm[];
 };
 
 const defaultForm: UserFormData = {
+    domain: 'apn',
     role_id: '',
     name: '',
     email: '',
     password: '',
     password_confirmation: '',
+    regional_assignments: [],
 };
+
+const EMPTY_REGION_VALUE = '__empty_region__';
+
+function uniqueSorted(values: string[]): string[] {
+    return [...new Set(values)].sort((first, second) =>
+        first.localeCompare(second, 'id'),
+    );
+}
 
 function FieldError({ message }: { message?: string }) {
     if (!message) {
@@ -95,7 +117,14 @@ function paginationLabel(label: string) {
     return label;
 }
 
-export default function UsersIndex({ users, roles, filters }: Props) {
+export default function UsersIndex({
+    users,
+    roles,
+    regionOptions,
+    filters,
+}: Props) {
+    const domainLabel =
+        filters.domain === 'kdkmp' ? 'EBITDAMAX KDKMP' : 'EBITDAMAX APN';
     const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
     const [detailUser, setDetailUser] = useState<UserItem | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<UserItem | null>(null);
@@ -111,7 +140,51 @@ export default function UsersIndex({ users, roles, filters }: Props) {
     });
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
-        useForm<UserFormData>(defaultForm);
+        useForm<UserFormData>({ ...defaultForm, domain: filters.domain });
+    const selectedRole = roles.find((role) => role.id === Number(data.role_id));
+    const canConfigureRegionalAccess =
+        filters.domain === 'kdkmp' &&
+        (selectedRole?.slug === 'manager-wilayah' ||
+            selectedRole?.slug === 'ebitda_kdkmp');
+    const isKdkmpRole = selectedRole?.slug === 'ebitda_kdkmp';
+    const provinsiOptions = uniqueSorted(
+        regionOptions.map((option) => option.provinsi),
+    );
+
+    const updateRegionalAssignment = (
+        index: number,
+        changes: Partial<RegionalAssignmentForm>,
+    ) => {
+        setData(
+            'regional_assignments',
+            data.regional_assignments.map((assignment, assignmentIndex) =>
+                assignmentIndex === index
+                    ? { ...assignment, ...changes }
+                    : assignment,
+            ),
+        );
+    };
+
+    const addRegionalAssignment = () => {
+        setData('regional_assignments', [
+            ...data.regional_assignments,
+            {
+                scope_level: 'province',
+                provinsi: '',
+                kota_kabupaten: '',
+                kecamatan: '',
+            },
+        ]);
+    };
+
+    const removeRegionalAssignment = (index: number) => {
+        setData(
+            'regional_assignments',
+            data.regional_assignments.filter(
+                (_, assignmentIndex) => assignmentIndex !== index,
+            ),
+        );
+    };
 
     const submitFilters = (event: FormEvent) => {
         event.preventDefault();
@@ -126,6 +199,7 @@ export default function UsersIndex({ users, roles, filters }: Props) {
                         : filterForm.role_id,
                 sort: filterForm.sort,
                 direction: filterForm.direction,
+                domain: filters.domain,
             },
             {
                 preserveState: true,
@@ -138,7 +212,7 @@ export default function UsersIndex({ users, roles, filters }: Props) {
         setSelectedUser(null);
         clearErrors();
         reset();
-        setData(defaultForm);
+        setData({ ...defaultForm, domain: filters.domain });
         setShowPassword(false);
         setShowPasswordConfirmation(false);
         setIsFormOpen(true);
@@ -148,11 +222,20 @@ export default function UsersIndex({ users, roles, filters }: Props) {
         setSelectedUser(user);
         clearErrors();
         setData({
+            domain: filters.domain,
             role_id: user.role_id ? String(user.role_id) : '',
             name: user.name,
             email: user.email,
             password: '',
             password_confirmation: '',
+            regional_assignments: user.regional_assignments.map(
+                (assignment) => ({
+                    scope_level: assignment.scope_level,
+                    provinsi: assignment.provinsi,
+                    kota_kabupaten: assignment.kota_kabupaten ?? '',
+                    kecamatan: assignment.kecamatan ?? '',
+                }),
+            ),
         });
         setShowPassword(false);
         setShowPasswordConfirmation(false);
@@ -174,6 +257,11 @@ export default function UsersIndex({ users, roles, filters }: Props) {
         const options = {
             preserveScroll: true,
             onSuccess: closeForm,
+            onError: (formErrors: Record<string, string>) => {
+                const message = Object.values(formErrors)[0];
+
+                toast.error(message ?? 'User tidak dapat disimpan.');
+            },
         };
 
         if (selectedUser) {
@@ -196,7 +284,9 @@ export default function UsersIndex({ users, roles, filters }: Props) {
         }
 
         router.delete(
-            destroyUser.url(deleteTarget.username ?? String(deleteTarget.id)),
+            destroyUser.url(deleteTarget.username ?? String(deleteTarget.id), {
+                query: { domain: filters.domain },
+            }),
             {
                 preserveScroll: true,
                 onSuccess: () => setDeleteTarget(null),
@@ -206,21 +296,21 @@ export default function UsersIndex({ users, roles, filters }: Props) {
 
     return (
         <>
-            <Head title="Users" />
+            <Head title={`User ${domainLabel}`} />
 
             <main className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
                 <div className="mx-auto w-full max-w-7xl space-y-6">
                     <section className="flex flex-col gap-4 rounded-lg border bg-card p-6 shadow-sm lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <p className="text-sm font-semibold text-primary uppercase">
-                                Master Data
+                                {domainLabel}
                             </p>
                             <h1 className="mt-1 text-2xl font-semibold text-foreground">
-                                Users
+                                User{' '}
+                                {filters.domain === 'kdkmp' ? 'KDKMP' : 'APN'}
                             </h1>
                             <p className="mt-2 max-w-3xl text-muted-foreground">
-                                Kelola user aplikasi, username otomatis, dan
-                                role yang digunakan untuk assignment task.
+                                Kelola user untuk domain {domainLabel}.
                             </p>
                         </div>
 
@@ -352,7 +442,12 @@ export default function UsersIndex({ users, roles, filters }: Props) {
                     <Card className="rounded-lg border bg-card shadow-sm">
                         <CardHeader className="border-b">
                             <div className="flex items-center justify-between gap-4">
-                                <CardTitle>Data User</CardTitle>
+                                <CardTitle>
+                                    Data User{' '}
+                                    {filters.domain === 'kdkmp'
+                                        ? 'KDKMP'
+                                        : 'APN'}
+                                </CardTitle>
                                 <Badge variant="outline">
                                     {users.total} user
                                 </Badge>
@@ -511,7 +606,7 @@ export default function UsersIndex({ users, roles, filters }: Props) {
             </main>
 
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                <DialogContent className="sm:max-w-xl">
+                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
                     <form onSubmit={submit} className="space-y-5">
                         <DialogHeader>
                             <DialogTitle>
@@ -546,6 +641,366 @@ export default function UsersIndex({ users, roles, filters }: Props) {
                             </Select>
                             <FieldError message={errors.role_id} />
                         </div>
+
+                        {canConfigureRegionalAccess && (
+                            <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <h3 className="font-medium text-foreground">
+                                            Cakupan Wilayah Dashboard KDKMP
+                                        </h3>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            Tetapkan satu atau beberapa wilayah
+                                            yang boleh dilihat user. Tanpa
+                                            cakupan atau relasi KDKMP, user
+                                            tidak dapat membuka Consolidated
+                                            View. Pengaturan ini hanya tersedia
+                                            untuk role Manager Wilayah dan
+                                            KDKMP.
+                                        </p>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={addRegionalAssignment}
+                                    >
+                                        <Plus className="size-4" />
+                                        Tambah Cakupan
+                                    </Button>
+                                </div>
+
+                                {data.regional_assignments.length === 0 && (
+                                    <p className="rounded-md border border-dashed bg-background px-3 py-4 text-sm text-muted-foreground">
+                                        Belum ada cakupan wilayah tambahan.
+                                    </p>
+                                )}
+
+                                {data.regional_assignments.map(
+                                    (assignment, index) => {
+                                        const kotaKabupatenOptions =
+                                            uniqueSorted(
+                                                regionOptions
+                                                    .filter(
+                                                        (option) =>
+                                                            option.provinsi ===
+                                                            assignment.provinsi,
+                                                    )
+                                                    .map(
+                                                        (option) =>
+                                                            option.kota_kabupaten,
+                                                    ),
+                                            );
+                                        const kecamatanOptions = uniqueSorted(
+                                            regionOptions
+                                                .filter(
+                                                    (option) =>
+                                                        option.provinsi ===
+                                                            assignment.provinsi &&
+                                                        option.kota_kabupaten ===
+                                                            assignment.kota_kabupaten,
+                                                )
+                                                .map(
+                                                    (option) =>
+                                                        option.kecamatan,
+                                                ),
+                                        );
+
+                                        return (
+                                            <div
+                                                key={index}
+                                                className="space-y-4 rounded-md border bg-background p-4"
+                                            >
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <p className="text-sm font-medium text-foreground">
+                                                        Cakupan {index + 1}
+                                                    </p>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="text-destructive hover:text-destructive"
+                                                        onClick={() =>
+                                                            removeRegionalAssignment(
+                                                                index,
+                                                            )
+                                                        }
+                                                    >
+                                                        <Trash2 className="size-4" />
+                                                        Hapus
+                                                    </Button>
+                                                </div>
+
+                                                <div className="grid gap-4 sm:grid-cols-2">
+                                                    <div className="space-y-2">
+                                                        <Label>
+                                                            Level Cakupan
+                                                        </Label>
+                                                        <Select
+                                                            value={
+                                                                assignment.scope_level
+                                                            }
+                                                            onValueChange={(
+                                                                value,
+                                                            ) =>
+                                                                updateRegionalAssignment(
+                                                                    index,
+                                                                    {
+                                                                        scope_level:
+                                                                            value as RegionalAssignmentForm['scope_level'],
+                                                                        kota_kabupaten:
+                                                                            '',
+                                                                        kecamatan:
+                                                                            '',
+                                                                    },
+                                                                )
+                                                            }
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {!isKdkmpRole && (
+                                                                    <SelectItem value="province">
+                                                                        Provinsi
+                                                                    </SelectItem>
+                                                                )}
+                                                                <SelectItem value="regency">
+                                                                    Kabupaten/Kota
+                                                                </SelectItem>
+                                                                <SelectItem value="district">
+                                                                    Kecamatan
+                                                                </SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FieldError
+                                                            message={
+                                                                errors[
+                                                                    `regional_assignments.${index}.scope_level`
+                                                                ]
+                                                            }
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        <Label>Provinsi</Label>
+                                                        <Select
+                                                            value={
+                                                                assignment.provinsi ||
+                                                                EMPTY_REGION_VALUE
+                                                            }
+                                                            onValueChange={(
+                                                                value,
+                                                            ) =>
+                                                                updateRegionalAssignment(
+                                                                    index,
+                                                                    {
+                                                                        provinsi:
+                                                                            value ===
+                                                                            EMPTY_REGION_VALUE
+                                                                                ? ''
+                                                                                : value,
+                                                                        kota_kabupaten:
+                                                                            '',
+                                                                        kecamatan:
+                                                                            '',
+                                                                    },
+                                                                )
+                                                            }
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Pilih provinsi" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem
+                                                                    value={
+                                                                        EMPTY_REGION_VALUE
+                                                                    }
+                                                                >
+                                                                    Pilih
+                                                                    provinsi
+                                                                </SelectItem>
+                                                                {provinsiOptions.map(
+                                                                    (
+                                                                        option,
+                                                                    ) => (
+                                                                        <SelectItem
+                                                                            key={
+                                                                                option
+                                                                            }
+                                                                            value={
+                                                                                option
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                option
+                                                                            }
+                                                                        </SelectItem>
+                                                                    ),
+                                                                )}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FieldError
+                                                            message={
+                                                                errors[
+                                                                    `regional_assignments.${index}.provinsi`
+                                                                ]
+                                                            }
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {assignment.scope_level !==
+                                                    'province' && (
+                                                    <div className="grid gap-4 sm:grid-cols-2">
+                                                        <div className="space-y-2">
+                                                            <Label>
+                                                                Kabupaten/Kota
+                                                            </Label>
+                                                            <Select
+                                                                disabled={
+                                                                    !assignment.provinsi
+                                                                }
+                                                                value={
+                                                                    assignment.kota_kabupaten ||
+                                                                    EMPTY_REGION_VALUE
+                                                                }
+                                                                onValueChange={(
+                                                                    value,
+                                                                ) =>
+                                                                    updateRegionalAssignment(
+                                                                        index,
+                                                                        {
+                                                                            kota_kabupaten:
+                                                                                value ===
+                                                                                EMPTY_REGION_VALUE
+                                                                                    ? ''
+                                                                                    : value,
+                                                                            kecamatan:
+                                                                                '',
+                                                                        },
+                                                                    )
+                                                                }
+                                                            >
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Pilih kabupaten/kota" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem
+                                                                        value={
+                                                                            EMPTY_REGION_VALUE
+                                                                        }
+                                                                    >
+                                                                        Pilih
+                                                                        kabupaten/kota
+                                                                    </SelectItem>
+                                                                    {kotaKabupatenOptions.map(
+                                                                        (
+                                                                            option,
+                                                                        ) => (
+                                                                            <SelectItem
+                                                                                key={
+                                                                                    option
+                                                                                }
+                                                                                value={
+                                                                                    option
+                                                                                }
+                                                                            >
+                                                                                {
+                                                                                    option
+                                                                                }
+                                                                            </SelectItem>
+                                                                        ),
+                                                                    )}
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <FieldError
+                                                                message={
+                                                                    errors[
+                                                                        `regional_assignments.${index}.kota_kabupaten`
+                                                                    ]
+                                                                }
+                                                            />
+                                                        </div>
+
+                                                        {assignment.scope_level ===
+                                                            'district' && (
+                                                            <div className="space-y-2">
+                                                                <Label>
+                                                                    Kecamatan
+                                                                </Label>
+                                                                <Select
+                                                                    disabled={
+                                                                        !assignment.kota_kabupaten
+                                                                    }
+                                                                    value={
+                                                                        assignment.kecamatan ||
+                                                                        EMPTY_REGION_VALUE
+                                                                    }
+                                                                    onValueChange={(
+                                                                        value,
+                                                                    ) =>
+                                                                        updateRegionalAssignment(
+                                                                            index,
+                                                                            {
+                                                                                kecamatan:
+                                                                                    value ===
+                                                                                    EMPTY_REGION_VALUE
+                                                                                        ? ''
+                                                                                        : value,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <SelectTrigger>
+                                                                        <SelectValue placeholder="Pilih kecamatan" />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        <SelectItem
+                                                                            value={
+                                                                                EMPTY_REGION_VALUE
+                                                                            }
+                                                                        >
+                                                                            Pilih
+                                                                            kecamatan
+                                                                        </SelectItem>
+                                                                        {kecamatanOptions.map(
+                                                                            (
+                                                                                option,
+                                                                            ) => (
+                                                                                <SelectItem
+                                                                                    key={
+                                                                                        option
+                                                                                    }
+                                                                                    value={
+                                                                                        option
+                                                                                    }
+                                                                                >
+                                                                                    {
+                                                                                        option
+                                                                                    }
+                                                                                </SelectItem>
+                                                                            ),
+                                                                        )}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                                <FieldError
+                                                                    message={
+                                                                        errors[
+                                                                            `regional_assignments.${index}.kecamatan`
+                                                                        ]
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    },
+                                )}
+                            </div>
+                        )}
 
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
@@ -657,6 +1112,9 @@ export default function UsersIndex({ users, roles, filters }: Props) {
                                         )}
                                     </Button>
                                 </div>
+                                <FieldError
+                                    message={errors.password_confirmation}
+                                />
                             </div>
                         </div>
 
@@ -723,6 +1181,36 @@ export default function UsersIndex({ users, roles, filters }: Props) {
                                         {detailUser.role?.level_label ?? '-'}
                                     </p>
                                 </div>
+                            </div>
+                            <div className="rounded-lg border bg-background p-4">
+                                <p className="text-sm text-muted-foreground">
+                                    Cakupan Wilayah KDKMP
+                                </p>
+                                {detailUser.regional_assignments.length ===
+                                0 ? (
+                                    <p className="mt-2 text-sm text-muted-foreground">
+                                        Tidak ada cakupan tambahan.
+                                    </p>
+                                ) : (
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {detailUser.regional_assignments.map(
+                                            (assignment) => (
+                                                <Badge
+                                                    key={assignment.id}
+                                                    variant="outline"
+                                                >
+                                                    {assignment.scope_level ===
+                                                    'province'
+                                                        ? assignment.provinsi
+                                                        : assignment.scope_level ===
+                                                            'regency'
+                                                          ? `${assignment.provinsi} · ${assignment.kota_kabupaten}`
+                                                          : `${assignment.provinsi} · ${assignment.kota_kabupaten} · ${assignment.kecamatan}`}
+                                                </Badge>
+                                            ),
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

@@ -72,14 +72,4 @@ class UpdateTaskRequest extends FormRequest
             'upper_time_threshold_minutes' => 'ambang waktu atas',
         ];
     }
-
-    /**
-     * @return array<string, string>
-     */
-    public function messages(): array
-    {
-        return [
-            'sort_order.unique' => 'Nomor urut tersebut sudah digunakan oleh task lain.',
-        ];
-    }
 }

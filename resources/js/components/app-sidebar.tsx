@@ -1,10 +1,8 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
-    Calculator,
     ChartColumn,
     CircleCheckBig,
     ClipboardList,
-    Coins,
     Database,
     FileSpreadsheet,
     FileText,
@@ -18,8 +16,6 @@ import {
     Radar,
     ShieldCheck,
     SquareCheckBig,
-    TableProperties,
-    TrendingUp,
     UserCog,
     Users,
 } from 'lucide-react';
@@ -38,8 +34,6 @@ import {
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import { index as adminKdkmpDashboardIndex } from '@/routes/admin/kdkmp-dashboard';
-import { index as kdkmpGeraiBusinessProcessIndex } from '@/routes/business-processes/kdkmp-gerai';
-import { index as calculationsIndex } from '@/routes/calculations';
 import { index as ebitdaTreeIndex } from '@/routes/ebitda-tree';
 import { index as ebitdaValuesIndex } from '@/routes/ebitda-values';
 import { index as importExcelIndex } from '@/routes/import-excel';
@@ -48,39 +42,21 @@ import { index as meetingMinutesIndex } from '@/routes/meeting-minutes';
 import { index as meetingActionItemsIndex } from '@/routes/meeting-minutes/action-items';
 import { index as monitoringIndex } from '@/routes/monitoring';
 import { index as organizationsIndex } from '@/routes/organizations';
-import { index as kdkmpGeraiPlanEbitdaMatrixIndex } from '@/routes/plan-ebitda-matrices/kdkmp-gerai';
-import { index as kdkmpGeraiRevenuePlanIndex } from '@/routes/revenue-plans/kdkmp-gerai';
 import { index as rolesIndex } from '@/routes/roles';
 import { index as sdmDataIndex } from '@/routes/sdm-data';
 import { index as taskCategoriesIndex } from '@/routes/task-categories';
 import { completed as taskDashboardCompleted } from '@/routes/task-dashboard';
 import { index as taskDashboardIndex } from '@/routes/task-dashboard';
 import { index as tasksIndex } from '@/routes/tasks';
-import { index as kdkmpGeraiUnitCostAssumptionIndex } from '@/routes/unit-cost-assumptions/kdkmp-gerai';
 import { index as usersIndex } from '@/routes/users';
 import { index as valueChainJobdeskIndex } from '@/routes/value-chain-jobdesk';
 import type { NavItem } from '@/types';
 
-const superadminNavItems: NavItem[] = [
+const superadminApnNavItems: NavItem[] = [
     {
         title: 'Dashboard',
         href: adminDashboard(),
         icon: LayoutDashboard,
-    },
-    {
-        title: 'Dashboard Monitoring',
-        href: monitoringIndex(),
-        icon: Radar,
-    },
-    {
-        title: 'Dashboard KDKMP',
-        href: adminKdkmpDashboardIndex(),
-        icon: Gauge,
-    },
-    {
-        title: 'Data SDM',
-        href: sdmDataIndex(),
-        icon: Users,
     },
     {
         title: 'Pohon EBITDA',
@@ -93,29 +69,68 @@ const superadminNavItems: NavItem[] = [
         icon: Database,
     },
     {
-        title: 'Kalkulasi',
-        href: calculationsIndex(),
-        icon: Calculator,
-    },
-    {
         title: 'Organizations',
         href: organizationsIndex(),
         icon: Network,
     },
     {
-        title: 'Roles',
-        href: rolesIndex(),
+        title: 'Role APN',
+        href: rolesIndex({ query: { domain: 'apn' } }),
         icon: ShieldCheck,
     },
     {
-        title: 'Users',
-        href: usersIndex(),
+        title: 'User APN',
+        href: usersIndex({ query: { domain: 'apn' } }),
         icon: UserCog,
     },
     {
         title: 'Value Chain & Jobdesk',
         href: valueChainJobdeskIndex(),
         icon: ClipboardList,
+    },
+];
+
+const superadminKdkmpNavItems: NavItem[] = [
+    {
+        title: 'Dashboard KDKMP',
+        href: adminKdkmpDashboardIndex(),
+        icon: Gauge,
+    },
+    {
+        title: 'Role KDKMP',
+        href: rolesIndex({ query: { domain: 'kdkmp' } }),
+        icon: ShieldCheck,
+    },
+    {
+        title: 'User KDKMP',
+        href: usersIndex({ query: { domain: 'kdkmp' } }),
+        icon: UserCog,
+    },
+    {
+        title: 'Data SDM KDKMP',
+        href: sdmDataIndex(),
+        icon: Users,
+    },
+];
+
+const apnViewerNavItems: NavItem[] = [
+    {
+        title: 'Dashboard',
+        href: adminDashboard(),
+        icon: LayoutDashboard,
+    },
+    {
+        title: 'Pohon EBITDA',
+        href: ebitdaTreeIndex(),
+        icon: ChartColumn,
+    },
+];
+
+const sharedOperationalNavItems: NavItem[] = [
+    {
+        title: 'Dashboard Monitoring',
+        href: monitoringIndex(),
+        icon: Radar,
     },
     {
         title: 'Import Excel',
@@ -145,29 +160,6 @@ const meetingActionItemNavItems: NavItem[] = [
         title: 'Action Item MoM',
         href: meetingActionItemsIndex(),
         icon: CircleCheckBig,
-    },
-];
-
-const kdkmpBusinessProcessNavItems: NavItem[] = [
-    {
-        title: 'Business Process',
-        href: kdkmpGeraiBusinessProcessIndex(),
-        icon: TableProperties,
-    },
-    {
-        title: 'Unit Cost Assumption',
-        href: kdkmpGeraiUnitCostAssumptionIndex(),
-        icon: Coins,
-    },
-    {
-        title: 'Rencana Pendapatan',
-        href: kdkmpGeraiRevenuePlanIndex(),
-        icon: TrendingUp,
-    },
-    {
-        title: 'Plan EBITDA Matrix',
-        href: kdkmpGeraiPlanEbitdaMatrixIndex(),
-        icon: ChartColumn,
     },
 ];
 
@@ -229,11 +221,28 @@ const kdkmpManagerNavItems: NavItem[] = [
     },
 ];
 
+const regionalManagerNavItems: NavItem[] = [
+    {
+        title: 'Dashboard KDKMP',
+        href: adminKdkmpDashboardIndex(),
+        icon: Gauge,
+    },
+];
+
 export function AppSidebar() {
     const { auth } = usePage().props;
     const isSuperadmin = auth.user?.role?.level === 'superadmin';
-    const isEbitdaKdkmp = auth.user?.role?.slug === 'ebitda_kdkmp';
-    const isKdkmpManager = auth.user?.role?.slug === 'kepala-toko-manager';
+    const isKdkmpSuperadmin =
+        isSuperadmin && auth.user?.role?.domain === 'kdkmp';
+    const isKdkmpManager =
+        auth.user?.role?.domain === 'kdkmp' &&
+        auth.user.role.slug === 'kepala-toko-manager';
+    const isRegionalManager =
+        auth.user?.role?.domain === 'kdkmp' &&
+        auth.user.role.slug === 'manager-wilayah';
+    const isApnUser = auth.user?.role?.domain === 'apn';
+    const canViewKdkmpMonitoring =
+        auth.user?.can_view_kdkmp_monitoring === true;
     const canAccessMeetingActionItems =
         isSuperadmin || auth.user?.role?.level === 'manager';
 
@@ -252,35 +261,73 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                {isSuperadmin && <NavMain items={superadminNavItems} />}
-                {isKdkmpManager && <NavMain items={kdkmpManagerNavItems} />}
-                {(isSuperadmin || isEbitdaKdkmp) && (
+                {isKdkmpSuperadmin ? (
                     <NavMain
-                        items={kdkmpBusinessProcessNavItems}
-                        label="EBITDA KDKMP"
+                        items={superadminKdkmpNavItems}
+                        label="EBITDAMAX KDKMP"
                     />
+                ) : isRegionalManager ? (
+                    <NavMain items={regionalManagerNavItems} />
+                ) : (
+                    <>
+                        {isSuperadmin && (
+                            <NavMain
+                                items={superadminApnNavItems}
+                                label="EBITDAMAX APN"
+                            />
+                        )}
+                        {!isSuperadmin && isApnUser && (
+                            <NavMain
+                                items={apnViewerNavItems}
+                                label="EBITDAMAX APN"
+                            />
+                        )}
+                        {isSuperadmin && (
+                            <NavMain
+                                items={superadminKdkmpNavItems}
+                                label="EBITDAMAX KDKMP"
+                            />
+                        )}
+                        {isKdkmpManager && (
+                            <NavMain items={kdkmpManagerNavItems} />
+                        )}
+                        {!isSuperadmin &&
+                            !isKdkmpManager &&
+                            canViewKdkmpMonitoring && (
+                                <NavMain
+                                    items={regionalManagerNavItems}
+                                    label="EBITDA KDKMP"
+                                />
+                            )}
+                        {isSuperadmin && (
+                            <NavMain
+                                items={sharedOperationalNavItems}
+                                label="Operasional Bersama"
+                            />
+                        )}
+                        <NavMain
+                            items={knowledgeManagementNavItems}
+                            label="Knowledge Management"
+                        />
+                        <NavMain
+                            items={[
+                                ...meetingMinutesNavItems,
+                                ...(canAccessMeetingActionItems
+                                    ? meetingActionItemNavItems
+                                    : []),
+                            ]}
+                            label="Meeting"
+                        />
+                        <NavMain
+                            items={
+                                isSuperadmin
+                                    ? superadminWorkReportNavItems
+                                    : staffWorkReportNavItems
+                            }
+                            label="Laporan Pekerjaan"
+                        />
+                    </>
                 )}
-                <NavMain
-                    items={knowledgeManagementNavItems}
-                    label="Knowledge Management"
-                />
-                <NavMain
-                    items={[
-                        ...meetingMinutesNavItems,
-                        ...(canAccessMeetingActionItems
-                            ? meetingActionItemNavItems
-                            : []),
-                    ]}
-                    label="Meeting"
-                />
-                <NavMain
-                    items={
-                        isSuperadmin
-                            ? superadminWorkReportNavItems
-                            : staffWorkReportNavItems
-                    }
-                    label="Laporan Pekerjaan"
-                />
             </SidebarContent>
 
             <SidebarFooter>

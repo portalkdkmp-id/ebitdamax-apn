@@ -20,6 +20,19 @@ class EbitdamaxKdkmpPolicy
 
     public function viewMonitoring(User $user): bool
     {
-        return $user->role?->level === RoleLevel::Superadmin;
+        if ($user->role?->level === RoleLevel::Superadmin) {
+            return true;
+        }
+
+        if (
+            ! $user->isRegionalManager()
+            && ! $user->isEbitdaKdkmp()
+            && ! $user->isKdkmpManager()
+        ) {
+            return false;
+        }
+
+        return $user->sdm_kdkmp_entry_id !== null
+            || $user->regionalAssignments()->exists();
     }
 }

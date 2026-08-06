@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\RoleDomain;
 use App\Enums\RoleLevel;
 use App\Models\Role;
 use App\Models\SdmKdkmpEntry;
@@ -31,6 +32,7 @@ class SdmKdkmpManagerUserSeeder extends Seeder
         $managerRole = Role::query()
             ->where('slug', Role::SLUG_KDKMP_MANAGER)
             ->where('level', RoleLevel::Manager->value)
+            ->where('domain', RoleDomain::Kdkmp->value)
             ->first();
 
         if (! $managerRole) {

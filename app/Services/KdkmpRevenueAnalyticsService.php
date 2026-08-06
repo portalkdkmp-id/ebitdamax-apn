@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\EbitdamaxKdkmp;
-use App\Models\Role;
+use App\Models\SdmKdkmpEntry;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -13,10 +13,10 @@ class KdkmpRevenueAnalyticsService
     private const TREND_DAYS = 30;
 
     /**
-     * @param  array{provinsi?: string|null, kota_kabupaten?: string|null, kecamatan?: string|null, desa?: string|null}  $regionFilters
+     * @param  Builder<SdmKdkmpEntry>  $kdkmpEntries
      * @return array{start_date: string, end_date: string, points: array<int, array{date: string, plan_revenue: float|null, actual_revenue: float|null, gap: float|null}>}
      */
-    public function forAllKdkmp(CarbonImmutable $endDate, array $regionFilters = []): array
+    public function forKdkmpEntries(CarbonImmutable $endDate, Builder $kdkmpEntries): array
     {
         $startDate = $endDate->subDays(self::TREND_DAYS - 1)->startOfDay();
         $recordsByDate = EbitdamaxKdkmp::query()
@@ -24,13 +24,7 @@ class KdkmpRevenueAnalyticsService
                 $startDate->toDateString(),
                 $endDate->toDateString(),
             ])
-            ->whereHas('sdmKdkmpEntry', function (Builder $query) use ($regionFilters): void {
-                $query
-                    ->forRegions($regionFilters)
-                    ->whereHas('managerUser.role', function (Builder $query): void {
-                        $query->where('slug', Role::SLUG_KDKMP_MANAGER);
-                    });
-            })
+            ->whereIn('sdm_kdkmp_entry_id', $kdkmpEntries->select('id'))
             ->oldest('report_date')
             ->get([
                 'id',

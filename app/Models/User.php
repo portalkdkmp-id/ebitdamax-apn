@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\RoleDomain;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -61,6 +62,11 @@ class User extends Authenticatable implements PasskeyUser
         return $this->belongsTo(SdmKdkmpEntry::class);
     }
 
+    public function regionalAssignments(): HasMany
+    {
+        return $this->hasMany(UserRegionalAssignment::class);
+    }
+
     public function businessProcesses(): HasMany
     {
         return $this->hasMany(BusinessProcess::class);
@@ -83,12 +89,20 @@ class User extends Authenticatable implements PasskeyUser
 
     public function isEbitdaKdkmp(): bool
     {
-        return $this->role?->slug === Role::SLUG_EBITDA_KDKMP;
+        return $this->role?->domain === RoleDomain::Kdkmp
+            && $this->role?->slug === Role::SLUG_EBITDA_KDKMP;
     }
 
     public function isKdkmpManager(): bool
     {
-        return $this->role?->slug === Role::SLUG_KDKMP_MANAGER;
+        return $this->role?->domain === RoleDomain::Kdkmp
+            && $this->role?->slug === Role::SLUG_KDKMP_MANAGER;
+    }
+
+    public function isRegionalManager(): bool
+    {
+        return $this->role?->domain === RoleDomain::Kdkmp
+            && $this->role?->slug === Role::SLUG_REGIONAL_MANAGER;
     }
 
     public function getRouteKeyName(): string

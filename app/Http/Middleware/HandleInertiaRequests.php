@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\EbitdamaxKdkmp;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -52,12 +53,17 @@ class HandleInertiaRequests extends Middleware
                     'two_factor_enabled' => $user->two_factor_secret !== null,
                     'created_at' => $user->created_at?->toIso8601String(),
                     'updated_at' => $user->updated_at?->toIso8601String(),
+                    'can_view_kdkmp_monitoring' => $user->can(
+                        'viewMonitoring',
+                        EbitdamaxKdkmp::class,
+                    ),
                     'role' => $user->role ? [
                         'id' => $user->role->id,
                         'name' => $user->role->name,
                         'slug' => $user->role->slug,
                         'level' => $user->role->level->value,
                         'level_label' => $user->role->level->label(),
+                        'domain' => $user->role->domain->value,
                     ] : null,
                 ] : null,
             ],

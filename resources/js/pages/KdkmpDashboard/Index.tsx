@@ -52,7 +52,7 @@ type DailyForm = {
     [Field in keyof KdkmpPlanRevenueCategoryFields]: string;
 };
 
-const ACTUAL_EBITDA_MARGIN_FIXED_COST = 17_477_716;
+const ACTUAL_EBITDA_MARGIN_FIXED_COST = 9_172_133;
 const TASK_COMPLETION_WEIGHT = 55;
 const TIME_COMPLIANCE_WEIGHT = 30;
 const REVENUE_WEIGHT = 15;
@@ -336,6 +336,63 @@ export default function KdkmpDashboardIndex({
         save();
     };
 
+    const revenueFields = kdkmpDashboardFields.filter(
+        (field) =>
+            field.key === 'target_revenue' || field.key === 'actual_revenue',
+    );
+    const costFields = kdkmpDashboardFields.filter(
+        (field) =>
+            field.key === 'plan_cost' ||
+            field.key === 'actual_cost' ||
+            field.key === 'actual_ebitda_margin',
+    );
+    const performanceFields = kdkmpDashboardFields.filter(
+        (field) =>
+            field.key === 'total_duration' ||
+            field.key === 'performance_scoring',
+    );
+
+    const renderDashboardField = (
+        field: (typeof kdkmpDashboardFields)[number],
+    ) => {
+        const editableField =
+            field.key === 'actual_revenue' || field.key === 'plan_cost'
+                ? field.key
+                : null;
+        const fieldValue = dashboardFieldValue(data, field.key, computedValues);
+
+        return (
+            <div key={field.key} className="space-y-2">
+                <Label htmlFor={field.isDisabled ? undefined : field.key}>
+                    {field.label}
+                </Label>
+                {field.isDisabled ? (
+                    <p className="py-2 text-sm font-semibold text-foreground tabular-nums">
+                        {formatManualValue(fieldValue, field.isRupiah === true)}
+                    </p>
+                ) : field.isRupiah ? (
+                    <RupiahInput
+                        id={field.key}
+                        value={fieldValue}
+                        onValueChange={(value) => {
+                            if (editableField) {
+                                setData(editableField, value);
+                            }
+                        }}
+                    />
+                ) : null}
+                {field.description && (
+                    <p className="text-xs text-muted-foreground">
+                        {field.description}
+                    </p>
+                )}
+                <InputError
+                    message={editableField ? errors[editableField] : undefined}
+                />
+            </div>
+        );
+    };
+
     return (
         <>
             <Head title="Dashboard KDKMP" />
@@ -442,162 +499,159 @@ export default function KdkmpDashboardIndex({
                                         onSubmit={submit}
                                         className="space-y-6"
                                     >
+                                        <div className="grid gap-6 lg:grid-cols-2">
+                                            <section className="space-y-5 rounded-lg border bg-muted/20 p-4">
+                                                <div>
+                                                    <h2 className="font-semibold text-foreground">
+                                                        Revenue
+                                                    </h2>
+                                                    <p className="mt-1 text-sm text-muted-foreground">
+                                                        Rencana dan realisasi
+                                                        pendapatan harian KDKMP.
+                                                    </p>
+                                                </div>
+
+                                                <div className="grid gap-5 md:grid-cols-2">
+                                                    {revenueFields.map(
+                                                        renderDashboardField,
+                                                    )}
+                                                </div>
+
+                                                <div className="space-y-4 border-t pt-5">
+                                                    <div>
+                                                        <h3 className="font-medium text-foreground">
+                                                            Breakdown Plan
+                                                            Revenue
+                                                        </h3>
+                                                        <p className="mt-1 text-sm text-muted-foreground">
+                                                            Isi seluruh
+                                                            kategori. Nilai 0
+                                                            diperbolehkan dan
+                                                            ikut dihitung dalam
+                                                            total Plan Revenue.
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="grid gap-4 sm:grid-cols-2">
+                                                        {kdkmpPlanRevenueCategories.map(
+                                                            (category) => (
+                                                                <div
+                                                                    key={
+                                                                        category.key
+                                                                    }
+                                                                    className="space-y-2"
+                                                                >
+                                                                    <Label
+                                                                        htmlFor={
+                                                                            category.key
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            category.label
+                                                                        }
+                                                                    </Label>
+                                                                    <RupiahInput
+                                                                        id={
+                                                                            category.key
+                                                                        }
+                                                                        value={
+                                                                            data[
+                                                                                category
+                                                                                    .key
+                                                                            ]
+                                                                        }
+                                                                        onValueChange={(
+                                                                            value,
+                                                                        ) =>
+                                                                            setData(
+                                                                                category.key,
+                                                                                value,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    <InputError
+                                                                        message={
+                                                                            errors[
+                                                                                category
+                                                                                    .key
+                                                                            ]
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-1 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                                                        <p className="text-sm font-medium text-foreground">
+                                                            Total Plan Revenue
+                                                        </p>
+                                                        <p className="text-lg font-bold text-primary tabular-nums">
+                                                            {formatManualValue(
+                                                                calculatePlanRevenue(
+                                                                    data,
+                                                                ) || null,
+                                                                true,
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </section>
+
+                                            <section className="space-y-5 rounded-lg border bg-muted/20 p-4">
+                                                <div>
+                                                    <h2 className="font-semibold text-foreground">
+                                                        Cost
+                                                    </h2>
+                                                    <p className="mt-1 text-sm text-muted-foreground">
+                                                        Target biaya serta
+                                                        pencapaian biaya harian
+                                                        KDKMP.
+                                                    </p>
+                                                </div>
+
+                                                <div className="grid gap-5 md:grid-cols-2">
+                                                    <div className="space-y-2">
+                                                        <Label>
+                                                            Target Cost
+                                                        </Label>
+                                                        <p className="py-2 text-sm font-semibold text-foreground tabular-nums">
+                                                            Rp9.172.133
+                                                        </p>
+                                                    </div>
+                                                    {costFields.map(
+                                                        renderDashboardField,
+                                                    )}
+                                                    <div className="space-y-2">
+                                                        <Label>
+                                                            Target EBITDA Margin
+                                                            % (Tahun)
+                                                        </Label>
+                                                        <p className="py-2 text-sm font-semibold text-foreground tabular-nums">
+                                                            12.61%
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </section>
+                                        </div>
+
                                         <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
                                             <div>
                                                 <h2 className="font-semibold text-foreground">
-                                                    Breakdown Plan Revenue
+                                                    Kinerja Operasional
                                                 </h2>
                                                 <p className="mt-1 text-sm text-muted-foreground">
-                                                    Isi seluruh kategori. Nilai
-                                                    0 diperbolehkan dan ikut
-                                                    dihitung dalam total Plan
-                                                    Revenue.
+                                                    Ringkasan penyelesaian task
+                                                    dan penilaian performa hari
+                                                    ini.
                                                 </p>
                                             </div>
-
-                                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                                {kdkmpPlanRevenueCategories.map(
-                                                    (category) => (
-                                                        <div
-                                                            key={category.key}
-                                                            className="space-y-2"
-                                                        >
-                                                            <Label
-                                                                htmlFor={
-                                                                    category.key
-                                                                }
-                                                            >
-                                                                {category.label}
-                                                            </Label>
-                                                            <RupiahInput
-                                                                id={
-                                                                    category.key
-                                                                }
-                                                                value={
-                                                                    data[
-                                                                        category
-                                                                            .key
-                                                                    ]
-                                                                }
-                                                                onValueChange={(
-                                                                    value,
-                                                                ) =>
-                                                                    setData(
-                                                                        category.key,
-                                                                        value,
-                                                                    )
-                                                                }
-                                                            />
-                                                            <InputError
-                                                                message={
-                                                                    errors[
-                                                                        category
-                                                                            .key
-                                                                    ]
-                                                                }
-                                                            />
-                                                        </div>
-                                                    ),
+                                            <div className="grid gap-5 md:grid-cols-2">
+                                                {performanceFields.map(
+                                                    renderDashboardField,
                                                 )}
                                             </div>
-
-                                            <div className="flex flex-col gap-1 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-                                                <p className="text-sm font-medium text-foreground">
-                                                    Total Plan Revenue
-                                                </p>
-                                                <p className="text-lg font-bold text-primary tabular-nums">
-                                                    {formatManualValue(
-                                                        calculatePlanRevenue(
-                                                            data,
-                                                        ) || null,
-                                                        true,
-                                                    )}
-                                                </p>
-                                            </div>
                                         </section>
-
-                                        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                                            {kdkmpDashboardFields.map(
-                                                (field) => {
-                                                    const editableField =
-                                                        field.key ===
-                                                            'actual_revenue' ||
-                                                        field.key ===
-                                                            'plan_cost'
-                                                            ? field.key
-                                                            : null;
-                                                    const fieldValue =
-                                                        dashboardFieldValue(
-                                                            data,
-                                                            field.key,
-                                                            computedValues,
-                                                        );
-
-                                                    return (
-                                                        <div
-                                                            key={field.key}
-                                                            className="space-y-2"
-                                                        >
-                                                            <Label
-                                                                htmlFor={
-                                                                    field.isDisabled
-                                                                        ? undefined
-                                                                        : field.key
-                                                                }
-                                                            >
-                                                                {field.label}
-                                                            </Label>
-                                                            {field.isDisabled ? (
-                                                                <p className="py-2 text-sm font-semibold text-foreground tabular-nums">
-                                                                    {formatManualValue(
-                                                                        fieldValue,
-                                                                        field.isRupiah ===
-                                                                            true,
-                                                                    )}
-                                                                </p>
-                                                            ) : field.isRupiah ? (
-                                                                <RupiahInput
-                                                                    id={
-                                                                        field.key
-                                                                    }
-                                                                    value={
-                                                                        fieldValue
-                                                                    }
-                                                                    onValueChange={(
-                                                                        value,
-                                                                    ) => {
-                                                                        if (
-                                                                            editableField
-                                                                        ) {
-                                                                            setData(
-                                                                                editableField,
-                                                                                value,
-                                                                            );
-                                                                        }
-                                                                    }}
-                                                                />
-                                                            ) : null}
-                                                            {field.description && (
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    {
-                                                                        field.description
-                                                                    }
-                                                                </p>
-                                                            )}
-                                                            <InputError
-                                                                message={
-                                                                    editableField
-                                                                        ? errors[
-                                                                              editableField
-                                                                          ]
-                                                                        : undefined
-                                                                }
-                                                            />
-                                                        </div>
-                                                    );
-                                                },
-                                            )}
-                                        </div>
 
                                         <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
                                             <p className="text-sm text-muted-foreground">

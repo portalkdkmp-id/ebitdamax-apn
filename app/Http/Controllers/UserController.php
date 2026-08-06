@@ -2,19 +2,29 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\RegionalScopeLevel;
+use App\Enums\RoleDomain;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\RegionalAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class UserController extends Controller
 {
+    public function __construct(
+        private readonly RegionalAccessService $regionalAccess,
+    ) {}
+
     public function index(Request $request): Response
     {
+        $domain = $this->requestedDomain($request);
         $search = trim((string) $request->input('search', ''));
         $roleId = $request->input('role_id');
         $sort = (string) $request->input('sort', 'name');
@@ -24,7 +34,11 @@ class UserController extends Controller
         $direction = $direction === 'desc' ? 'desc' : 'asc';
 
         $users = User::query()
-            ->with('role')
+            ->with(['role', 'regionalAssignments'])
+            ->whereHas(
+                'role',
+                fn (Builder $query): Builder => $query->where('domain', $domain->value),
+            )
             ->when($roleId, fn ($query) => $query->where('role_id', $roleId))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
@@ -38,24 +52,30 @@ class UserController extends Controller
             ->orderBy('id')
             ->paginate(15)
             ->through(fn (User $user): array => $this->transformUser($user))
-            ->appends($request->only(['search', 'role_id', 'sort', 'direction']));
+            ->appends($request->only(['domain', 'search', 'role_id', 'sort', 'direction']));
 
         $roles = Role::query()
+            ->where('domain', $domain->value)
             ->ordered()
-            ->get(['id', 'name', 'slug', 'level'])
+            ->get(['id', 'name', 'slug', 'level', 'domain'])
             ->map(fn (Role $role): array => [
                 'id' => $role->id,
                 'name' => $role->name,
                 'slug' => $role->slug,
                 'level' => $role->level->value,
                 'level_label' => $role->level->label(),
+                'domain' => $role->domain->value,
             ])
             ->values();
 
         return Inertia::render('Users/Index', [
             'users' => $users,
             'roles' => $roles,
+            'regionOptions' => $domain === RoleDomain::Kdkmp
+                ? $this->regionalAccess->allRegionOptions()
+                : [],
             'filters' => [
+                'domain' => $domain->value,
                 'search' => $search,
                 'role_id' => $roleId ? (int) $roleId : null,
                 'sort' => $sort,
@@ -66,27 +86,41 @@ class UserController extends Controller
 
     public function store(StoreUserRequest $request): RedirectResponse
     {
-        User::query()->create($this->prepareUserPayload($request->validated()));
+        DB::transaction(function () use ($request): void {
+            $payload = $request->validated();
+            $user = User::query()->create($this->prepareUserPayload($payload));
+
+            $this->syncRegionalAssignments($user, $payload);
+        });
 
         return back()->with('success', 'User berhasil ditambahkan.');
     }
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
-        $user->update($this->prepareUserPayload($request->validated()));
+        $this->ensureUserBelongsToDomain($user, $this->requestedDomain($request));
+
+        DB::transaction(function () use ($request, $user): void {
+            $payload = $request->validated();
+            $user->update($this->prepareUserPayload($payload));
+
+            $this->syncRegionalAssignments($user, $payload);
+        });
 
         return back()->with('success', 'User berhasil diperbarui.');
     }
 
-    public function destroy(User $user): RedirectResponse
+    public function destroy(Request $request, User $user): RedirectResponse
     {
+        $this->ensureUserBelongsToDomain($user, $this->requestedDomain($request));
+
         $user->delete();
 
         return back()->with('success', 'User berhasil dihapus.');
     }
 
     /**
-     * @param  array{role_id: int, name: string, email: string, password?: string|null}  $payload
+     * @param  array{domain: string, role_id: int, name: string, email: string, password?: string|null, regional_assignments?: array<int, array{scope_level: string, provinsi: string, kota_kabupaten?: string|null, kecamatan?: string|null}>}  $payload
      * @return array<string, mixed>
      */
     private function prepareUserPayload(array $payload): array
@@ -102,6 +136,37 @@ class UserController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * @param  array{domain: string, role_id: int, name: string, email: string, password?: string|null, regional_assignments?: array<int, array{scope_level: string, provinsi: string, kota_kabupaten?: string|null, kecamatan?: string|null}>}  $payload
+     */
+    private function syncRegionalAssignments(User $user, array $payload): void
+    {
+        $user->regionalAssignments()->delete();
+        $user->load('role');
+
+        if (
+            ! $user->isRegionalManager()
+            && ! $user->isEbitdaKdkmp()
+        ) {
+            return;
+        }
+
+        foreach ($payload['regional_assignments'] ?? [] as $assignment) {
+            $scopeLevel = RegionalScopeLevel::from($assignment['scope_level']);
+
+            $user->regionalAssignments()->create([
+                'scope_level' => $scopeLevel,
+                'provinsi' => $assignment['provinsi'],
+                'kota_kabupaten' => $scopeLevel === RegionalScopeLevel::Province
+                    ? null
+                    : $assignment['kota_kabupaten'],
+                'kecamatan' => $scopeLevel === RegionalScopeLevel::District
+                    ? $assignment['kecamatan']
+                    : null,
+            ]);
+        }
     }
 
     /**
@@ -124,7 +189,36 @@ class UserController extends Controller
                 'slug' => $user->role->slug,
                 'level' => $user->role->level->value,
                 'level_label' => $user->role->level->label(),
+                'domain' => $user->role->domain->value,
             ] : null,
+            'regional_assignments' => $user->regionalAssignments
+                ->map(fn ($assignment): array => [
+                    'id' => $assignment->id,
+                    'scope_level' => $assignment->scope_level->value,
+                    'provinsi' => $assignment->provinsi,
+                    'kota_kabupaten' => $assignment->kota_kabupaten,
+                    'kecamatan' => $assignment->kecamatan,
+                ])
+                ->values()
+                ->all(),
         ];
+    }
+
+    private function requestedDomain(Request $request): RoleDomain
+    {
+        $domain = RoleDomain::tryFrom(
+            (string) $request->input('domain', RoleDomain::Apn->value),
+        );
+
+        abort_if($domain === null, 404);
+
+        return $domain;
+    }
+
+    private function ensureUserBelongsToDomain(User $user, RoleDomain $domain): void
+    {
+        $user->loadMissing('role');
+
+        abort_unless($user->role?->domain === $domain, 404);
     }
 }

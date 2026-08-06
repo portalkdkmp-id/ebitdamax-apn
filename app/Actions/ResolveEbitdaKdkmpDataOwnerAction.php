@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\RoleDomain;
 use App\Enums\RoleLevel;
 use App\Models\Role;
 use App\Models\User;
@@ -19,7 +20,7 @@ class ResolveEbitdaKdkmpDataOwnerAction
      */
     public function handle(User $authenticatedUser, ?string $requestedUsername): array
     {
-        $authenticatedUser->loadMissing('role:id,slug,level');
+        $authenticatedUser->loadMissing('role:id,slug,level,domain');
 
         if ($authenticatedUser->isEbitdaKdkmp()) {
             return [
@@ -37,7 +38,9 @@ class ResolveEbitdaKdkmpDataOwnerAction
             ->whereNotNull('username')
             ->whereHas(
                 'role',
-                fn (Builder $query): Builder => $query->where('slug', Role::SLUG_EBITDA_KDKMP)
+                fn (Builder $query): Builder => $query
+                    ->where('domain', RoleDomain::Kdkmp->value)
+                    ->where('slug', Role::SLUG_EBITDA_KDKMP)
             )
             ->orderBy('name')
             ->orderBy('id')

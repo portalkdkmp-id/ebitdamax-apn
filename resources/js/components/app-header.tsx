@@ -137,6 +137,19 @@ const kdkmpManagerNavItems: NavItem[] = [
         href: kdkmpDashboardIndex(),
         icon: Gauge,
     },
+    {
+        title: 'Consolidated View KDKMP',
+        href: adminKdkmpDashboardIndex(),
+        icon: Gauge,
+    },
+];
+
+const regionalKdkmpNavItems: NavItem[] = [
+    {
+        title: 'Dashboard KDKMP',
+        href: adminKdkmpDashboardIndex(),
+        icon: Gauge,
+    },
 ];
 
 const rightNavItems: NavItem[] = [
@@ -162,14 +175,21 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
     const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
     const isSuperadmin = auth.user?.role?.level === 'superadmin';
     const isKdkmpManager = auth.user?.role?.slug === 'kepala-toko-manager';
+    const isRegionalManager = auth.user?.role?.slug === 'manager-wilayah';
+    const canViewKdkmpMonitoring =
+        auth.user?.can_view_kdkmp_monitoring === true;
     const mainNavItems = isSuperadmin
         ? superadminNavItems
         : isKdkmpManager
           ? kdkmpManagerNavItems
-          : [];
-    const workReportNavItems = isSuperadmin
-        ? superadminWorkReportNavItems
-        : staffWorkReportNavItems;
+          : isRegionalManager && canViewKdkmpMonitoring
+            ? regionalKdkmpNavItems
+            : [];
+    const workReportNavItems = isRegionalManager
+        ? []
+        : isSuperadmin
+          ? superadminWorkReportNavItems
+          : staffWorkReportNavItems;
 
     return (
         <>

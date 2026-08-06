@@ -68,6 +68,28 @@ export type KdkmpRegionOption = {
     desa: string;
 };
 
+export type KdkmpConsolidationLevel =
+    'national' | 'province' | 'regency' | 'district';
+
+export type KdkmpRegionalAccess = {
+    is_national: boolean;
+    scope_label: string;
+    locked_filters: KdkmpRegionFilters;
+};
+
+export type KdkmpConsolidationRow = {
+    key: string;
+    label: string;
+    provinsi: string | null;
+    kota_kabupaten: string | null;
+    kecamatan: string | null;
+    total_kdkmp: number;
+    complete_kdkmp: number;
+    plan_revenue: number | null;
+    actual_revenue: number | null;
+    gap: number | null;
+};
+
 export type KdkmpManagerDashboardProps = {
     businessDate: string;
     kdkmp: KdkmpIdentity | null;
@@ -97,6 +119,11 @@ export type KdkmpMonitoringEntry = KdkmpIdentity & {
 export type KdkmpMonitoringProps = {
     businessDate: string;
     regionOptions: KdkmpRegionOption[];
+    regionalAccess: KdkmpRegionalAccess;
+    consolidation: {
+        level: KdkmpConsolidationLevel;
+        rows: KdkmpConsolidationRow[];
+    };
     revenueGap: {
         period: {
             start_date: string;
@@ -115,5 +142,6 @@ export type KdkmpMonitoringProps = {
         date: string;
         search: string;
         status: 'all' | 'complete' | 'not_filled' | 'requires_review';
+        consolidation_level: KdkmpConsolidationLevel;
     } & KdkmpRegionFilters;
 };

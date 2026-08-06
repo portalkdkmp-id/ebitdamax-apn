@@ -4,6 +4,7 @@ namespace App\Actions\Fortify;
 
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
+use App\Enums\RoleDomain;
 use App\Enums\RoleLevel;
 use App\Models\Role;
 use App\Models\User;
@@ -31,6 +32,7 @@ class CreateNewUser implements CreatesNewUsers
             [
                 'name' => 'Staff',
                 'level' => RoleLevel::Staff->value,
+                'domain' => RoleDomain::Apn->value,
             ]
         );
 

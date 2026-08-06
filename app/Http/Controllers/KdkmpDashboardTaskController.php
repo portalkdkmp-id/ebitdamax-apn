@@ -3,18 +3,38 @@
 namespace App\Http\Controllers;
 
 use App\Enums\TaskReportStatus;
+use App\Models\EbitdamaxKdkmp;
 use App\Models\Role;
 use App\Models\SdmKdkmpEntry;
 use App\Models\TaskReport;
 use App\Models\TaskReportValue;
+use App\Models\User;
+use App\Services\RegionalAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class KdkmpDashboardTaskController extends Controller
 {
+    public function __construct(
+        private readonly RegionalAccessService $regionalAccess,
+    ) {}
+
     public function index(Request $request, SdmKdkmpEntry $kdkmpEntry, string $date): Response
     {
+        Gate::authorize('viewMonitoring', EbitdamaxKdkmp::class);
+
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+        abort_unless(
+            $this->regionalAccess
+                ->accessibleManagedKdkmpQuery($user)
+                ->whereKey($kdkmpEntry)
+                ->exists(),
+            404,
+        );
+
         $managerUser = $kdkmpEntry->managerUser;
 
         $reports = collect();

@@ -43,6 +43,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/dashboard/kdkmp/today', [KdkmpDashboardController::class, 'upsert'])
         ->name('kdkmp-dashboard.upsert');
 
+    Route::get('/admin/kdkmp-dashboard', KdkmpDashboardMonitoringController::class)
+        ->name('admin.kdkmp-dashboard.index');
+
+    Route::get('/admin/kdkmp-dashboard/{kdkmpEntry}/tasks/{date}', [KdkmpDashboardTaskController::class, 'index'])
+        ->name('admin.kdkmp-dashboard.tasks');
+
+    Route::middleware('ebitdamax.domain:apn')->group(function () {
+        Route::get('/admin-dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+
+        Route::get('/ebitda-tree', [EbitdaTreeController::class, 'index'])->name('ebitda-tree.index');
+
+        Route::get('/dashboard/directorates/{organization}', [DashboardController::class, 'showDirectorate'])
+            ->name('dashboard.directorates.show');
+    });
+
     Route::get('/dashboard/tasks', [TaskDashboardController::class, 'index'])
         ->middleware('role.level:staff,manager,superadmin')
         ->name('task-dashboard.index');
@@ -139,14 +154,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('role.level:superadmin')->group(function () {
-        Route::get('/admin-dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
-
-        Route::get('/admin/kdkmp-dashboard', KdkmpDashboardMonitoringController::class)
-            ->name('admin.kdkmp-dashboard.index');
-
-        Route::get('/admin/kdkmp-dashboard/{kdkmpEntry}/tasks/{date}', [KdkmpDashboardTaskController::class, 'index'])
-            ->name('admin.kdkmp-dashboard.tasks');
-
         Route::resource('organizations', OrganizationController::class)
             ->except(['create', 'edit', 'show']);
 
@@ -162,16 +169,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('tasks', TaskController::class)
             ->except(['create', 'edit', 'show']);
 
-        Route::get('/ebitda-tree', [EbitdaTreeController::class, 'index'])->name('ebitda-tree.index');
-
         Route::get('/import-excel', [ExcelImportController::class, 'index'])
             ->name('import-excel.index');
 
         Route::post('/import-excel', [ExcelImportController::class, 'store'])
             ->name('import-excel.store');
-
-        Route::get('/dashboard/directorates/{organization}', [DashboardController::class, 'showDirectorate'])
-            ->name('dashboard.directorates.show');
 
         Route::resource('ebitda-values', EbitdaValueController::class)
             ->except(['create', 'edit', 'show']);

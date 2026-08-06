@@ -2,9 +2,12 @@ import type { PaginatedResponse } from '@/types/ebitda';
 
 export type RoleLevel = 'staff' | 'manager' | 'superadmin';
 
+export type RoleDomain = 'apn' | 'kdkmp';
+
 export type RoleItem = {
     id: number;
     uuid: string;
+    domain: RoleDomain;
     name: string;
     slug: string;
     level: RoleLevel;
@@ -20,6 +23,7 @@ export type RoleOption = {
 };
 
 export type RoleFilters = {
+    domain: RoleDomain;
     search: string;
     sort: string;
     direction: 'asc' | 'desc';

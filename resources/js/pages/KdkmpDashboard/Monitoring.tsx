@@ -2,7 +2,10 @@ import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle2,
+    ChevronRight,
     CircleDashed,
+    LockKeyhole,
+    MapPinned,
     Search,
     Store,
 } from 'lucide-react';
@@ -73,6 +76,18 @@ function formatManualValue(
     }).format(Number(value));
 }
 
+function formatRupiah(value: number | null): string {
+    if (value === null) {
+        return '-';
+    }
+
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        maximumFractionDigits: 2,
+    }).format(value);
+}
+
 function uniqueSorted(values: string[]): string[] {
     return [...new Set(values)].sort((first, second) =>
         first.localeCompare(second, 'id'),
@@ -133,6 +148,15 @@ function SummaryCard({
     );
 }
 
+function LockedRegionValue({ value }: { value: string }) {
+    return (
+        <div className="flex min-h-9 items-center justify-between rounded-md border bg-muted/40 px-3 text-sm text-foreground">
+            <span className="truncate">{value}</span>
+            <LockKeyhole className="size-4 shrink-0 text-muted-foreground" />
+        </div>
+    );
+}
+
 export default function KdkmpDashboardMonitoring({
     businessDate,
     revenueGap,
@@ -140,16 +164,29 @@ export default function KdkmpDashboardMonitoring({
     entries,
     summary,
     filters,
+    regionalAccess,
+    consolidation,
 }: KdkmpMonitoringProps) {
     const [date, setDate] = useState(filters.date);
     const [search, setSearch] = useState(filters.search);
     const [status, setStatus] = useState<MonitoringStatus>(filters.status);
-    const [provinsi, setProvinsi] = useState(filters.provinsi ?? '');
-    const [kotaKabupaten, setKotaKabupaten] = useState(
-        filters.kota_kabupaten ?? '',
+    const [provinsi, setProvinsi] = useState(
+        filters.provinsi ?? regionalAccess.locked_filters.provinsi ?? '',
     );
-    const [kecamatan, setKecamatan] = useState(filters.kecamatan ?? '');
-    const [desa, setDesa] = useState(filters.desa ?? '');
+    const [kotaKabupaten, setKotaKabupaten] = useState(
+        filters.kota_kabupaten ??
+            regionalAccess.locked_filters.kota_kabupaten ??
+            '',
+    );
+    const [kecamatan, setKecamatan] = useState(
+        filters.kecamatan ?? regionalAccess.locked_filters.kecamatan ?? '',
+    );
+    const [desa, setDesa] = useState(
+        filters.desa ?? regionalAccess.locked_filters.desa ?? '',
+    );
+    const [consolidationLevel, setConsolidationLevel] = useState(
+        consolidation.level,
+    );
 
     const provinsiOptions = useMemo(
         () => regionValues(regionOptions, 'provinsi'),
@@ -199,6 +236,7 @@ export default function KdkmpDashboardMonitoring({
                 date,
                 search,
                 status,
+                consolidation_level: consolidationLevel,
                 provinsi,
                 kota_kabupaten: kotaKabupaten,
                 kecamatan,
@@ -206,6 +244,81 @@ export default function KdkmpDashboardMonitoring({
             },
             { preserveState: true, preserveScroll: true },
         );
+    };
+
+    const visitConsolidation = (
+        level: KdkmpMonitoringProps['consolidation']['level'],
+        region: {
+            provinsi?: string | null;
+            kota_kabupaten?: string | null;
+            kecamatan?: string | null;
+        } = {},
+    ) => {
+        const nextProvinsi =
+            region.provinsi ??
+            regionalAccess.locked_filters.provinsi ??
+            provinsi;
+        const nextKotaKabupaten =
+            region.kota_kabupaten ??
+            regionalAccess.locked_filters.kota_kabupaten ??
+            kotaKabupaten;
+        const nextKecamatan =
+            region.kecamatan ??
+            regionalAccess.locked_filters.kecamatan ??
+            kecamatan;
+
+        setConsolidationLevel(level);
+        setProvinsi(nextProvinsi);
+        setKotaKabupaten(nextKotaKabupaten);
+        setKecamatan(nextKecamatan);
+        setDesa(regionalAccess.locked_filters.desa ?? '');
+
+        router.get(
+            monitoringIndex.url(),
+            {
+                date,
+                search,
+                status,
+                consolidation_level: level,
+                provinsi: nextProvinsi,
+                kota_kabupaten: nextKotaKabupaten,
+                kecamatan: nextKecamatan,
+                desa: regionalAccess.locked_filters.desa ?? '',
+            },
+            { preserveState: true, preserveScroll: true },
+        );
+    };
+
+    const drillDown = (
+        row: KdkmpMonitoringProps['consolidation']['rows'][number],
+    ) => {
+        if (consolidation.level === 'national') {
+            visitConsolidation('province', {
+                provinsi: regionalAccess.locked_filters.provinsi,
+                kota_kabupaten: regionalAccess.locked_filters.kota_kabupaten,
+                kecamatan: regionalAccess.locked_filters.kecamatan,
+            });
+
+            return;
+        }
+
+        if (consolidation.level === 'province') {
+            visitConsolidation('regency', {
+                provinsi: row.provinsi,
+                kota_kabupaten: regionalAccess.locked_filters.kota_kabupaten,
+                kecamatan: regionalAccess.locked_filters.kecamatan,
+            });
+
+            return;
+        }
+
+        if (consolidation.level === 'regency') {
+            visitConsolidation('district', {
+                provinsi: row.provinsi,
+                kota_kabupaten: row.kota_kabupaten,
+                kecamatan: regionalAccess.locked_filters.kecamatan,
+            });
+        }
     };
 
     return (
@@ -222,9 +335,16 @@ export default function KdkmpDashboardMonitoring({
                             Dashboard EBITDAMAX KDKMP
                         </h1>
                         <p className="mt-2 max-w-4xl text-muted-foreground">
-                            Pantau pengisian dan pencapaian harian seluruh KDKMP
-                            secara read-only.
+                            Pantau pengisian dan pencapaian harian KDKMP sesuai
+                            cakupan wilayah Anda.
                         </p>
+                        <div className="mt-4 inline-flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                            <MapPinned className="size-4 text-primary" />
+                            Cakupan akses:{' '}
+                            <span className="font-medium text-foreground">
+                                {regionalAccess.scope_label}
+                            </span>
+                        </div>
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -254,6 +374,148 @@ export default function KdkmpDashboardMonitoring({
                         />
                     </div>
 
+                    <Card>
+                        <CardContent className="space-y-5 p-5">
+                            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                                <div>
+                                    <h2 className="font-semibold text-foreground">
+                                        Consolidated View
+                                    </h2>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Data terakumulasi berdasarkan hierarki
+                                        wilayah. Gunakan drill-down untuk
+                                        melihat rincian level berikutnya.
+                                    </p>
+                                </div>
+                                <div className="w-full space-y-2 lg:w-64">
+                                    <Label>Level Konsolidasi</Label>
+                                    <Select
+                                        value={consolidationLevel}
+                                        onValueChange={(value) =>
+                                            visitConsolidation(
+                                                value as KdkmpMonitoringProps['consolidation']['level'],
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {regionalAccess.is_national && (
+                                                <SelectItem value="national">
+                                                    Nasional
+                                                </SelectItem>
+                                            )}
+                                            <SelectItem value="province">
+                                                Provinsi
+                                            </SelectItem>
+                                            <SelectItem value="regency">
+                                                Kabupaten/Kota
+                                            </SelectItem>
+                                            <SelectItem value="district">
+                                                Kecamatan
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto rounded-md border">
+                                <Table className="min-w-[960px]">
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Wilayah</TableHead>
+                                            <TableHead className="text-right">
+                                                KDKMP
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Data Lengkap
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Plan Revenue
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Actual Revenue
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Gap
+                                            </TableHead>
+                                            <TableHead className="w-36 text-right">
+                                                Aksi
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {consolidation.rows.length === 0 && (
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={7}
+                                                    className="py-8 text-center text-muted-foreground"
+                                                >
+                                                    Belum ada KDKMP pada cakupan
+                                                    wilayah ini.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                        {consolidation.rows.map((row) => (
+                                            <TableRow key={row.key}>
+                                                <TableCell className="font-medium">
+                                                    {row.label}
+                                                </TableCell>
+                                                <TableCell className="text-right tabular-nums">
+                                                    {row.total_kdkmp.toLocaleString(
+                                                        'id-ID',
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right tabular-nums">
+                                                    {row.complete_kdkmp.toLocaleString(
+                                                        'id-ID',
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right tabular-nums">
+                                                    {formatRupiah(
+                                                        row.plan_revenue,
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right tabular-nums">
+                                                    {formatRupiah(
+                                                        row.actual_revenue,
+                                                    )}
+                                                </TableCell>
+                                                <TableCell
+                                                    className={`text-right font-medium tabular-nums ${
+                                                        row.gap !== null &&
+                                                        row.gap < 0
+                                                            ? 'text-destructive'
+                                                            : 'text-emerald-600'
+                                                    }`}
+                                                >
+                                                    {formatRupiah(row.gap)}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {consolidation.level !==
+                                                        'district' && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                drillDown(row)
+                                                            }
+                                                        >
+                                                            Drill-down
+                                                            <ChevronRight className="size-4" />
+                                                        </Button>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     <div className="overflow-x-auto">
                         <KdkmpRevenueGapChart data={revenueGap.trend} />
                     </div>
@@ -270,177 +532,241 @@ export default function KdkmpDashboardMonitoring({
                                             Filter Wilayah
                                         </h2>
                                         <p className="mt-1 text-sm text-muted-foreground">
-                                            Pilih wilayah secara bertingkat dari
-                                            provinsi hingga desa.
+                                            Opsi di bawah mengikuti cakupan
+                                            akses akun. Wilayah yang sudah
+                                            ditentukan penugasan dikunci.
                                         </p>
                                     </div>
 
                                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                                         <div className="space-y-2">
                                             <Label>Provinsi</Label>
-                                            <Select
-                                                value={
-                                                    provinsi || ALL_REGION_VALUE
-                                                }
-                                                onValueChange={(value) => {
-                                                    setProvinsi(
-                                                        value ===
-                                                            ALL_REGION_VALUE
-                                                            ? ''
-                                                            : value,
-                                                    );
-                                                    setKotaKabupaten('');
-                                                    setKecamatan('');
-                                                    setDesa('');
-                                                }}
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem
-                                                        value={ALL_REGION_VALUE}
-                                                    >
-                                                        Semua provinsi
-                                                    </SelectItem>
-                                                    {provinsiOptions.map(
-                                                        (option) => (
-                                                            <SelectItem
-                                                                key={option}
-                                                                value={option}
-                                                            >
-                                                                {option}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
+                                            {regionalAccess.locked_filters
+                                                .provinsi ? (
+                                                <LockedRegionValue
+                                                    value={
+                                                        regionalAccess
+                                                            .locked_filters
+                                                            .provinsi
+                                                    }
+                                                />
+                                            ) : (
+                                                <Select
+                                                    value={
+                                                        provinsi ||
+                                                        ALL_REGION_VALUE
+                                                    }
+                                                    onValueChange={(value) => {
+                                                        setProvinsi(
+                                                            value ===
+                                                                ALL_REGION_VALUE
+                                                                ? ''
+                                                                : value,
+                                                        );
+                                                        setKotaKabupaten('');
+                                                        setKecamatan('');
+                                                        setDesa('');
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem
+                                                            value={
+                                                                ALL_REGION_VALUE
+                                                            }
+                                                        >
+                                                            Semua provinsi
+                                                        </SelectItem>
+                                                        {provinsiOptions.map(
+                                                            (option) => (
+                                                                <SelectItem
+                                                                    key={option}
+                                                                    value={
+                                                                        option
+                                                                    }
+                                                                >
+                                                                    {option}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
                                         </div>
 
                                         <div className="space-y-2">
                                             <Label>Kota/Kabupaten</Label>
-                                            <Select
-                                                disabled={!provinsi}
-                                                value={
-                                                    kotaKabupaten ||
-                                                    ALL_REGION_VALUE
-                                                }
-                                                onValueChange={(value) => {
-                                                    setKotaKabupaten(
-                                                        value ===
-                                                            ALL_REGION_VALUE
-                                                            ? ''
-                                                            : value,
-                                                    );
-                                                    setKecamatan('');
-                                                    setDesa('');
-                                                }}
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem
-                                                        value={ALL_REGION_VALUE}
-                                                    >
-                                                        Semua kota/kabupaten
-                                                    </SelectItem>
-                                                    {kotaKabupatenOptions.map(
-                                                        (option) => (
-                                                            <SelectItem
-                                                                key={option}
-                                                                value={option}
-                                                            >
-                                                                {option}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
+                                            {regionalAccess.locked_filters
+                                                .kota_kabupaten ? (
+                                                <LockedRegionValue
+                                                    value={
+                                                        regionalAccess
+                                                            .locked_filters
+                                                            .kota_kabupaten
+                                                    }
+                                                />
+                                            ) : (
+                                                <Select
+                                                    disabled={!provinsi}
+                                                    value={
+                                                        kotaKabupaten ||
+                                                        ALL_REGION_VALUE
+                                                    }
+                                                    onValueChange={(value) => {
+                                                        setKotaKabupaten(
+                                                            value ===
+                                                                ALL_REGION_VALUE
+                                                                ? ''
+                                                                : value,
+                                                        );
+                                                        setKecamatan('');
+                                                        setDesa('');
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem
+                                                            value={
+                                                                ALL_REGION_VALUE
+                                                            }
+                                                        >
+                                                            Semua kota/kabupaten
+                                                        </SelectItem>
+                                                        {kotaKabupatenOptions.map(
+                                                            (option) => (
+                                                                <SelectItem
+                                                                    key={option}
+                                                                    value={
+                                                                        option
+                                                                    }
+                                                                >
+                                                                    {option}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
                                         </div>
 
                                         <div className="space-y-2">
                                             <Label>Kecamatan</Label>
-                                            <Select
-                                                disabled={
-                                                    !provinsi || !kotaKabupaten
-                                                }
-                                                value={
-                                                    kecamatan ||
-                                                    ALL_REGION_VALUE
-                                                }
-                                                onValueChange={(value) => {
-                                                    setKecamatan(
-                                                        value ===
-                                                            ALL_REGION_VALUE
-                                                            ? ''
-                                                            : value,
-                                                    );
-                                                    setDesa('');
-                                                }}
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem
-                                                        value={ALL_REGION_VALUE}
-                                                    >
-                                                        Semua kecamatan
-                                                    </SelectItem>
-                                                    {kecamatanOptions.map(
-                                                        (option) => (
-                                                            <SelectItem
-                                                                key={option}
-                                                                value={option}
-                                                            >
-                                                                {option}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
+                                            {regionalAccess.locked_filters
+                                                .kecamatan ? (
+                                                <LockedRegionValue
+                                                    value={
+                                                        regionalAccess
+                                                            .locked_filters
+                                                            .kecamatan
+                                                    }
+                                                />
+                                            ) : (
+                                                <Select
+                                                    disabled={
+                                                        !provinsi ||
+                                                        !kotaKabupaten
+                                                    }
+                                                    value={
+                                                        kecamatan ||
+                                                        ALL_REGION_VALUE
+                                                    }
+                                                    onValueChange={(value) => {
+                                                        setKecamatan(
+                                                            value ===
+                                                                ALL_REGION_VALUE
+                                                                ? ''
+                                                                : value,
+                                                        );
+                                                        setDesa('');
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem
+                                                            value={
+                                                                ALL_REGION_VALUE
+                                                            }
+                                                        >
+                                                            Semua kecamatan
+                                                        </SelectItem>
+                                                        {kecamatanOptions.map(
+                                                            (option) => (
+                                                                <SelectItem
+                                                                    key={option}
+                                                                    value={
+                                                                        option
+                                                                    }
+                                                                >
+                                                                    {option}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
                                         </div>
 
                                         <div className="space-y-2">
                                             <Label>Desa</Label>
-                                            <Select
-                                                disabled={
-                                                    !provinsi ||
-                                                    !kotaKabupaten ||
-                                                    !kecamatan
-                                                }
-                                                value={desa || ALL_REGION_VALUE}
-                                                onValueChange={(value) =>
-                                                    setDesa(
-                                                        value ===
-                                                            ALL_REGION_VALUE
-                                                            ? ''
-                                                            : value,
-                                                    )
-                                                }
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem
-                                                        value={ALL_REGION_VALUE}
-                                                    >
-                                                        Semua desa
-                                                    </SelectItem>
-                                                    {desaOptions.map(
-                                                        (option) => (
-                                                            <SelectItem
-                                                                key={option}
-                                                                value={option}
-                                                            >
-                                                                {option}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
+                                            {regionalAccess.locked_filters
+                                                .desa ? (
+                                                <LockedRegionValue
+                                                    value={
+                                                        regionalAccess
+                                                            .locked_filters.desa
+                                                    }
+                                                />
+                                            ) : (
+                                                <Select
+                                                    disabled={
+                                                        !provinsi ||
+                                                        !kotaKabupaten ||
+                                                        !kecamatan
+                                                    }
+                                                    value={
+                                                        desa || ALL_REGION_VALUE
+                                                    }
+                                                    onValueChange={(value) =>
+                                                        setDesa(
+                                                            value ===
+                                                                ALL_REGION_VALUE
+                                                                ? ''
+                                                                : value,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem
+                                                            value={
+                                                                ALL_REGION_VALUE
+                                                            }
+                                                        >
+                                                            Semua desa
+                                                        </SelectItem>
+                                                        {desaOptions.map(
+                                                            (option) => (
+                                                                <SelectItem
+                                                                    key={option}
+                                                                    value={
+                                                                        option
+                                                                    }
+                                                                >
+                                                                    {option}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
