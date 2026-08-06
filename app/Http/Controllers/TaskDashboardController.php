@@ -9,8 +9,11 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskAdditionalField;
 use App\Models\TaskReport;
+use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -77,57 +80,260 @@ class TaskDashboardController extends Controller
     {
         $user = $request->user();
         $isSuperadmin = $user?->role?->level === RoleLevel::Superadmin;
+        $historyStart = now()->subDays(13)->startOfDay();
+        $historyEnd = now()->endOfDay();
 
         $reports = TaskReport::query()
             ->with(['task.taskCategory', 'task.roles', 'user'])
             ->when(! $isSuperadmin, fn ($query) => $query->where('user_id', $user?->id))
             ->where('status', TaskReportStatus::Completed->value)
+            ->whereNotNull('finished_at')
+            ->whereBetween('finished_at', [$historyStart, $historyEnd])
             ->latest('finished_at')
-            ->paginate(15)
-            ->through(fn (TaskReport $report): array => [
-                'id' => $report->id,
-                'uuid' => $report->uuid,
-                'started_at' => $report->started_at?->toIso8601String(),
-                'finished_at' => $report->finished_at?->toIso8601String(),
-                'duration_minutes' => $report->duration_minutes,
-                'status_label' => $report->status->label(),
-                'documents' => $this->transformDocuments($report),
-                'task' => [
-                    'id' => $report->task->id,
-                    'uuid' => $report->task->uuid,
-                    'name' => $report->task->name,
-                    'description' => $report->task->description,
-                    'time_require' => $report->task->time_require,
-                    'lower_time_threshold_minutes' => $report->task->lower_time_threshold_minutes,
-                    'upper_time_threshold_minutes' => $report->task->upper_time_threshold_minutes,
-                    'task_category' => [
-                        'id' => $report->task->taskCategory->id,
-                        'name' => $report->task->taskCategory->name,
-                        'slug' => $report->task->taskCategory->slug,
-                    ],
-                    'roles' => $report->task->roles
-                        ->map(fn (Role $role): array => [
-                            'id' => $role->id,
-                            'name' => $role->name,
-                            'slug' => $role->slug,
-                            'level' => $role->level->value,
-                            'level_label' => $role->level->label(),
-                        ])
-                        ->values()
-                        ->all(),
-                ],
-                'user' => $isSuperadmin ? [
-                    'id' => $report->user->id,
-                    'name' => $report->user->name,
-                    'username' => $report->user->username,
-                    'email' => $report->user->email,
-                ] : null,
-            ]);
+            ->get();
+
+        $tasksByRole = $this->activeTasksByRole();
+        $dailyReports = $reports
+            ->groupBy(fn (TaskReport $report): string => $report->finished_at->toDateString())
+            ->map(fn (Collection $dayReports, string $date): array => $this->transformDailySummary(
+                date: $date,
+                dayReports: $dayReports,
+                user: $user,
+                isSuperadmin: $isSuperadmin,
+                tasksByRole: $tasksByRole,
+            ))
+            ->sortByDesc('date')
+            ->values();
+
+        $perPage = 15;
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $paginatedDailyReports = new LengthAwarePaginator(
+            items: $dailyReports->forPage($page, $perPage)->values(),
+            total: $dailyReports->count(),
+            perPage: $perPage,
+            currentPage: $page,
+            options: [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ],
+        );
 
         return Inertia::render('TaskDashboard/Completed', [
-            'reports' => $reports,
+            'reports' => $paginatedDailyReports,
             'isSuperadmin' => $isSuperadmin,
         ]);
+    }
+
+    /**
+     * @return Collection<int, Collection<int, Task>>
+     */
+    private function activeTasksByRole(): Collection
+    {
+        $tasks = Task::query()
+            ->with(['taskCategory', 'roles'])
+            ->active()
+            ->get([
+                'id',
+                'uuid',
+                'task_category_id',
+                'name',
+                'description',
+                'time_require',
+                'period',
+            ]);
+
+        $tasksByRole = collect();
+
+        foreach ($tasks as $task) {
+            foreach ($task->roles as $role) {
+                $roleId = (int) $role->id;
+                $tasksByRole->put(
+                    $roleId,
+                    $tasksByRole->get($roleId, collect())->push($task),
+                );
+            }
+        }
+
+        return $tasksByRole;
+    }
+
+    /**
+     * @param  Collection<int, TaskReport>  $dayReports
+     * @param  Collection<int, Collection<int, Task>>  $tasksByRole
+     * @return array<string, mixed>
+     */
+    private function transformDailySummary(
+        string $date,
+        Collection $dayReports,
+        ?User $user,
+        bool $isSuperadmin,
+        Collection $tasksByRole,
+    ): array {
+        $expectedTasks = $this->expectedTasksForDay(
+            dayReports: $dayReports,
+            user: $user,
+            isSuperadmin: $isSuperadmin,
+            tasksByRole: $tasksByRole,
+        );
+        $completedReports = $dayReports
+            ->unique(fn (TaskReport $report): string => $this->reportKey($report))
+            ->values();
+        $completedKeys = $completedReports
+            ->mapWithKeys(fn (TaskReport $report): array => [
+                $this->reportKey($report) => true,
+            ]);
+        $onTimeReports = $completedReports->filter(
+            fn (TaskReport $report): bool => $this->isReportOnTime($report),
+        );
+        $lateReports = $completedReports->reject(
+            fn (TaskReport $report): bool => $this->isReportOnTime($report),
+        );
+
+        return [
+            'date' => $date,
+            'total_tasks' => $expectedTasks->count(),
+            'on_time_tasks' => $onTimeReports->count(),
+            'late_tasks' => $lateReports->count(),
+            'not_worked_tasks' => $expectedTasks
+                ->reject(fn (array $assignment, string $key): bool => $completedKeys->has($key))
+                ->map(fn (array $assignment): array => [
+                    'task' => $this->transformTaskReference($assignment['task']),
+                    'user' => $this->transformUserReference($assignment['user']),
+                ])
+                ->values()
+                ->all(),
+            'completed_reports' => $completedReports
+                ->map(fn (TaskReport $report): array => $this->transformCompletedReport($report, $isSuperadmin))
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, TaskReport>  $dayReports
+     * @param  Collection<int, Collection<int, Task>>  $tasksByRole
+     * @return Collection<string, array{user_id: int, task: Task, user: User|null}>
+     */
+    private function expectedTasksForDay(
+        Collection $dayReports,
+        ?User $user,
+        bool $isSuperadmin,
+        Collection $tasksByRole,
+    ): Collection {
+        $usersById = $dayReports
+            ->mapWithKeys(fn (TaskReport $report): array => [
+                (int) $report->user_id => $report->user,
+            ])
+            ->filter();
+        $userIds = $isSuperadmin
+            ? $usersById->keys()
+            : collect([$user?->id])->filter();
+        $expectedTasks = collect();
+
+        foreach ($userIds as $userId) {
+            $participant = $usersById->get((int) $userId);
+            $roleId = $isSuperadmin
+                ? $participant?->role_id
+                : $user?->role_id;
+
+            if ($roleId === null) {
+                continue;
+            }
+
+            foreach ($tasksByRole->get((int) $roleId, collect()) as $task) {
+                $expectedTasks->put($this->assignmentKey((int) $userId, $task), [
+                    'user_id' => (int) $userId,
+                    'task' => $task,
+                    'user' => $isSuperadmin ? $participant : null,
+                ]);
+            }
+        }
+
+        return $expectedTasks;
+    }
+
+    private function assignmentKey(int $userId, Task $task): string
+    {
+        return $userId.'|'.$task->id;
+    }
+
+    private function reportKey(TaskReport $report): string
+    {
+        return $this->assignmentKey((int) $report->user_id, $report->task);
+    }
+
+    private function isReportOnTime(TaskReport $report): bool
+    {
+        return $report->duration_minutes !== null
+            && $report->duration_minutes <= $report->task->time_require;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function transformCompletedReport(TaskReport $report, bool $isSuperadmin): array
+    {
+        $isOnTime = $this->isReportOnTime($report);
+
+        return [
+            'id' => $report->id,
+            'uuid' => $report->uuid,
+            'started_at' => $report->started_at?->toIso8601String(),
+            'finished_at' => $report->finished_at?->toIso8601String(),
+            'duration_minutes' => $report->duration_minutes,
+            'status_label' => $report->status->label(),
+            'timing_status' => $isOnTime ? 'on_time' : 'late',
+            'timing_label' => $isOnTime ? 'Tepat Waktu' : 'Terlambat',
+            'documents' => $this->transformDocuments($report),
+            'task' => $this->transformTaskReference($report->task),
+            'user' => $isSuperadmin ? $this->transformUserReference($report->user) : null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function transformTaskReference(Task $task): array
+    {
+        return [
+            'id' => $task->id,
+            'uuid' => $task->uuid,
+            'name' => $task->name,
+            'description' => $task->description,
+            'time_require' => $task->time_require,
+            'task_category' => [
+                'id' => $task->taskCategory->id,
+                'name' => $task->taskCategory->name,
+                'slug' => $task->taskCategory->slug,
+            ],
+            'roles' => $task->roles
+                ->map(fn (Role $role): array => [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'slug' => $role->slug,
+                    'level' => $role->level->value,
+                    'level_label' => $role->level->label(),
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function transformUserReference(?User $user): ?array
+    {
+        if (! $user) {
+            return null;
+        }
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'username' => $user->username,
+            'email' => $user->email,
+        ];
     }
 
     /**
