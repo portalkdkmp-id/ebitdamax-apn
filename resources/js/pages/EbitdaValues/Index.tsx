@@ -9,7 +9,7 @@ import {
     WalletCards,
 } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -66,6 +66,11 @@ type EbitdaFormData = {
     material_cost: string;
     machine_cost: string;
     source_sheet: string;
+};
+
+type OrganizationValueGroup = {
+    organization: EbitdaValueItem['organization'];
+    values: EbitdaValueItem[];
 };
 
 const scenarioOptions = [
@@ -149,6 +154,38 @@ function scenarioLabel(scenario: string) {
         scenarioOptions.find((option) => option.value === scenario)?.label ??
         scenario
     );
+}
+
+function scenarioBadgeClass(scenario: string) {
+    if (scenario === 'direct_input') {
+        return 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300';
+    }
+
+    if (scenario === 'target_harian') {
+        return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300';
+    }
+
+    if (scenario === 'target_tahunan') {
+        return 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300';
+    }
+
+    if (scenario === 'plan_harian') {
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300';
+    }
+
+    return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300';
+}
+
+function formatPeriodDate(periodDate: string | null) {
+    if (!periodDate) {
+        return '-';
+    }
+
+    return new Intl.DateTimeFormat('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    }).format(new Date(`${periodDate}T00:00:00`));
 }
 
 function SourceValueHint({ value }: { value: string }) {
@@ -237,6 +274,40 @@ export default function EbitdaValuesIndex({
 
         return { toc, ebitda, margin };
     }, [data.doc_fixed, data.doc_variable, data.ioc, data.revenue]);
+
+    const groupedValues = useMemo(() => {
+        const groups = new Map<number, OrganizationValueGroup>();
+
+        values.data.forEach((item) => {
+            const existingGroup = groups.get(item.organization_id);
+
+            if (existingGroup) {
+                existingGroup.values.push(item);
+
+                return;
+            }
+
+            groups.set(item.organization_id, {
+                organization: item.organization,
+                values: [item],
+            });
+        });
+
+        const scenarioOrder = new Map(
+            scenarioOptions.map((option, index) => [option.value, index]),
+        );
+
+        return Array.from(groups.values()).map((group) => ({
+            ...group,
+            values: [...group.values].sort(
+                (firstValue, secondValue) =>
+                    (scenarioOrder.get(firstValue.scenario) ??
+                        Number.MAX_SAFE_INTEGER) -
+                    (scenarioOrder.get(secondValue.scenario) ??
+                        Number.MAX_SAFE_INTEGER),
+            ),
+        }));
+    }, [values.data]);
 
     const submitFilters = (event: FormEvent) => {
         event.preventDefault();
@@ -410,186 +481,270 @@ export default function EbitdaValuesIndex({
                     </Card>
 
                     <Card className="rounded-lg border bg-card shadow-sm">
-                        <CardHeader className="border-b">
-                            <CardTitle>Data EBITDA Values</CardTitle>
+                        <CardHeader className="flex flex-col gap-2 border-b sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <CardTitle>
+                                    Data EBITDA per Organisasi
+                                </CardTitle>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Nilai input, target, plan, dan aktual
+                                    dikelompokkan dalam organisasi yang sama.
+                                </p>
+                            </div>
+                            <Badge
+                                variant="outline"
+                                className="w-fit border-primary/25 bg-primary/5 text-primary"
+                            >
+                                {groupedValues.length} organisasi di halaman ini
+                            </Badge>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="bg-muted/40">
-                                        <TableHead className="min-w-[280px] p-4">
-                                            Organisasi
-                                        </TableHead>
-                                        <TableHead className="p-4">
-                                            Scenario
-                                        </TableHead>
-                                        <TableHead className="p-4 text-right">
-                                            Revenue
-                                        </TableHead>
-                                        <TableHead className="p-4 text-right">
-                                            TOC
-                                        </TableHead>
-                                        <TableHead className="p-4 text-right">
-                                            EBITDA
-                                        </TableHead>
-                                        <TableHead className="p-4 text-right">
-                                            Margin
-                                        </TableHead>
-                                        <TableHead className="w-[260px] p-4 text-right">
-                                            Aksi
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-
-                                <TableBody>
-                                    {values.data.map((item) => (
-                                        <TableRow key={item.id}>
-                                            <TableCell className="p-4">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <Badge className="bg-primary text-primary-foreground">
-                                                        {item.organization
-                                                            ?.code ?? '-'}
-                                                    </Badge>
-                                                    {item.classification && (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="border-primary/25 bg-primary/5 text-primary"
-                                                        >
-                                                            {
-                                                                item.classification
-                                                            }
-                                                        </Badge>
-                                                    )}
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="border-border bg-background text-muted-foreground"
-                                                    >
-                                                        Nilai input
-                                                    </Badge>
-                                                    {item.value_source ===
-                                                        'calculated_from_children' && (
-                                                        <Badge className="bg-primary text-primary-foreground">
-                                                            Roll-up dashboard
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                <p className="mt-2 font-medium text-foreground">
-                                                    {item.organization?.name ??
-                                                        '-'}
-                                                </p>
-                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                    {item.organization?.level ??
-                                                        '-'}
-                                                </p>
-                                            </TableCell>
-                                            <TableCell className="p-4 text-muted-foreground">
-                                                {item.year} /{' '}
-                                                {scenarioLabel(item.scenario)}
-                                            </TableCell>
-                                            <TableCell className="p-4 text-right">
-                                                {formatCurrency(
-                                                    item.resolved_value.revenue,
-                                                )}
-                                                {item.value_source ===
-                                                    'calculated_from_children' && (
-                                                    <SourceValueHint
-                                                        value={formatCurrency(
-                                                            item.revenue,
-                                                        )}
-                                                    />
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="p-4 text-right">
-                                                {formatCurrency(
-                                                    item.resolved_value.toc,
-                                                )}
-                                                {item.value_source ===
-                                                    'calculated_from_children' && (
-                                                    <SourceValueHint
-                                                        value={formatCurrency(
-                                                            item.toc,
-                                                        )}
-                                                    />
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="p-4 text-right font-semibold text-primary">
-                                                {formatCurrency(
-                                                    item.resolved_value.ebitda,
-                                                )}
-                                                {item.value_source ===
-                                                    'calculated_from_children' && (
-                                                    <SourceValueHint
-                                                        value={formatCurrency(
-                                                            item.ebitda,
-                                                        )}
-                                                    />
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="p-4 text-right">
-                                                {formatPercent(
-                                                    item.resolved_value
-                                                        .ebitda_margin,
-                                                )}
-                                                {item.value_source ===
-                                                    'calculated_from_children' && (
-                                                    <SourceValueHint
-                                                        value={formatPercent(
-                                                            item.ebitda_margin,
-                                                        )}
-                                                    />
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="p-4">
-                                                <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            setDetailItem(item)
-                                                        }
-                                                    >
-                                                        <Eye className="size-4" />
-                                                        Detail
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            openEditForm(item)
-                                                        }
-                                                    >
-                                                        <Pencil className="size-4" />
-                                                        Edit
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        variant="destructive"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            destroy(item)
-                                                        }
-                                                    >
-                                                        <Trash2 className="size-4" />
-                                                        Hapus
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/40">
+                                            <TableHead className="min-w-[180px] p-4">
+                                                Skenario
+                                            </TableHead>
+                                            <TableHead className="min-w-[140px] p-4">
+                                                Periode
+                                            </TableHead>
+                                            <TableHead className="p-4 text-right">
+                                                Revenue
+                                            </TableHead>
+                                            <TableHead className="p-4 text-right">
+                                                TOC
+                                            </TableHead>
+                                            <TableHead className="p-4 text-right">
+                                                EBITDA
+                                            </TableHead>
+                                            <TableHead className="p-4 text-right">
+                                                Margin
+                                            </TableHead>
+                                            <TableHead className="w-[260px] p-4 text-right">
+                                                Aksi
+                                            </TableHead>
                                         </TableRow>
-                                    ))}
+                                    </TableHeader>
 
-                                    {values.data.length === 0 && (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={7}
-                                                className="p-8 text-center text-muted-foreground"
+                                    <TableBody>
+                                        {groupedValues.map((group) => (
+                                            <Fragment
+                                                key={`organization-${group.organization?.id ?? group.values[0].organization_id}`}
                                             >
-                                                Data EBITDA belum tersedia.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
+                                                <TableRow className="bg-primary/5 hover:bg-primary/10">
+                                                    <TableCell
+                                                        colSpan={7}
+                                                        className="border-y border-primary/15 px-4 py-3"
+                                                    >
+                                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <Badge className="bg-primary text-primary-foreground">
+                                                                    {group
+                                                                        .organization
+                                                                        ?.code ??
+                                                                        '-'}
+                                                                </Badge>
+                                                                <p className="font-semibold text-foreground">
+                                                                    {group
+                                                                        .organization
+                                                                        ?.name ??
+                                                                        '-'}
+                                                                </p>
+                                                                {group
+                                                                    .organization
+                                                                    ?.level && (
+                                                                    <span className="text-sm text-muted-foreground">
+                                                                        {
+                                                                            group
+                                                                                .organization
+                                                                                .level
+                                                                        }
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                {group.values[0]
+                                                                    .classification && (
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="border-primary/25 bg-background text-primary"
+                                                                    >
+                                                                        {
+                                                                            group
+                                                                                .values[0]
+                                                                                .classification
+                                                                        }
+                                                                    </Badge>
+                                                                )}
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="border-primary/25 bg-background text-muted-foreground"
+                                                                >
+                                                                    {
+                                                                        group
+                                                                            .values
+                                                                            .length
+                                                                    }{' '}
+                                                                    data
+                                                                </Badge>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+
+                                                {group.values.map((item) => (
+                                                    <TableRow key={item.id}>
+                                                        <TableCell className="p-4 pl-6">
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={scenarioBadgeClass(
+                                                                    item.scenario,
+                                                                )}
+                                                            >
+                                                                {scenarioLabel(
+                                                                    item.scenario,
+                                                                )}
+                                                            </Badge>
+                                                            {item.value_source ===
+                                                                'calculated_from_children' && (
+                                                                <p className="mt-1 text-xs text-primary">
+                                                                    Roll-up
+                                                                    dashboard
+                                                                </p>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="p-4 text-muted-foreground">
+                                                            <p>
+                                                                {formatPeriodDate(
+                                                                    item.period_date,
+                                                                )}
+                                                            </p>
+                                                            <p className="mt-1 text-xs">
+                                                                Tahun{' '}
+                                                                {item.year}
+                                                            </p>
+                                                        </TableCell>
+                                                        <TableCell className="p-4 text-right">
+                                                            {formatCurrency(
+                                                                item
+                                                                    .resolved_value
+                                                                    .revenue,
+                                                            )}
+                                                            {item.value_source ===
+                                                                'calculated_from_children' && (
+                                                                <SourceValueHint
+                                                                    value={formatCurrency(
+                                                                        item.revenue,
+                                                                    )}
+                                                                />
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="p-4 text-right">
+                                                            {formatCurrency(
+                                                                item
+                                                                    .resolved_value
+                                                                    .toc,
+                                                            )}
+                                                            {item.value_source ===
+                                                                'calculated_from_children' && (
+                                                                <SourceValueHint
+                                                                    value={formatCurrency(
+                                                                        item.toc,
+                                                                    )}
+                                                                />
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="p-4 text-right font-semibold text-primary">
+                                                            {formatCurrency(
+                                                                item
+                                                                    .resolved_value
+                                                                    .ebitda,
+                                                            )}
+                                                            {item.value_source ===
+                                                                'calculated_from_children' && (
+                                                                <SourceValueHint
+                                                                    value={formatCurrency(
+                                                                        item.ebitda,
+                                                                    )}
+                                                                />
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="p-4 text-right">
+                                                            {formatPercent(
+                                                                item
+                                                                    .resolved_value
+                                                                    .ebitda_margin,
+                                                            )}
+                                                            {item.value_source ===
+                                                                'calculated_from_children' && (
+                                                                <SourceValueHint
+                                                                    value={formatPercent(
+                                                                        item.ebitda_margin,
+                                                                    )}
+                                                                />
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="p-4">
+                                                            <div className="flex justify-end gap-2">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        setDetailItem(
+                                                                            item,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Eye className="size-4" />
+                                                                    Detail
+                                                                </Button>
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        openEditForm(
+                                                                            item,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Pencil className="size-4" />
+                                                                    Edit
+                                                                </Button>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="destructive"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        destroy(
+                                                                            item,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Trash2 className="size-4" />
+                                                                    Hapus
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </Fragment>
+                                        ))}
+
+                                        {values.data.length === 0 && (
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={7}
+                                                    className="p-8 text-center text-muted-foreground"
+                                                >
+                                                    Data EBITDA belum tersedia.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
 
                             <div className="flex flex-col gap-3 border-t p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                                 <p>

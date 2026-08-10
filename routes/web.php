@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\BusinessProcessController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardRedirectController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\LumbungChatController;
 use App\Http\Controllers\MeetingActionItemController;
 use App\Http\Controllers\MeetingMinuteController;
 use App\Http\Controllers\MonitoringDashboardController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationCalculationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\PlanEbitdaMatrixController;
@@ -42,6 +44,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::put('/dashboard/kdkmp/today', [KdkmpDashboardController::class, 'upsert'])
         ->name('kdkmp-dashboard.upsert');
+
+    Route::get('/notifications', [NotificationController::class, 'index'])
+        ->name('notifications.index');
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])
+        ->name('notifications.read-all');
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markAsRead'])
+        ->name('notifications.read');
 
     Route::get('/admin/kdkmp-dashboard', KdkmpDashboardMonitoringController::class)
         ->name('admin.kdkmp-dashboard.index');
@@ -154,6 +163,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('role.level:superadmin')->group(function () {
+        Route::get('/announcements', [AnnouncementController::class, 'index'])
+            ->name('announcements.index');
+        Route::post('/announcements', [AnnouncementController::class, 'store'])
+            ->name('announcements.store');
+
         Route::resource('organizations', OrganizationController::class)
             ->except(['create', 'edit', 'show']);
 

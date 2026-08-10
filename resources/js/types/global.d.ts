@@ -1,4 +1,5 @@
 import type { Auth } from '@/types/auth';
+import type { NotificationCenter } from '@/types/notification';
 import type { FlashToast } from '@/types/ui';
 
 declare module 'react' {
@@ -16,6 +17,7 @@ declare module '@inertiajs/core' {
             flash?: {
                 toast?: FlashToast | null;
             };
+            notificationCenter: NotificationCenter;
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

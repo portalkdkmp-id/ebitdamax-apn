@@ -11,6 +11,7 @@ import {
     Gauge,
     GraduationCap,
     LayoutDashboard,
+    Megaphone,
     MessageSquareText,
     Network,
     Radar,
@@ -32,6 +33,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as announcementsIndex } from '@/routes/announcements';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import { index as adminKdkmpDashboardIndex } from '@/routes/admin/kdkmp-dashboard';
 import { index as ebitdaTreeIndex } from '@/routes/ebitda-tree';
@@ -136,6 +138,14 @@ const sharedOperationalNavItems: NavItem[] = [
         title: 'Import Excel',
         href: importExcelIndex(),
         icon: FileSpreadsheet,
+    },
+];
+
+const announcementNavItems: NavItem[] = [
+    {
+        title: 'Pengumuman',
+        href: announcementsIndex(),
+        icon: Megaphone,
     },
 ];
 
@@ -262,10 +272,16 @@ export function AppSidebar() {
 
             <SidebarContent>
                 {isKdkmpSuperadmin ? (
-                    <NavMain
-                        items={superadminKdkmpNavItems}
-                        label="EBITDAMAX KDKMP"
-                    />
+                    <>
+                        <NavMain
+                            items={superadminKdkmpNavItems}
+                            label="EBITDAMAX KDKMP"
+                        />
+                        <NavMain
+                            items={announcementNavItems}
+                            label="Komunikasi"
+                        />
+                    </>
                 ) : isRegionalManager ? (
                     <NavMain items={regionalManagerNavItems} />
                 ) : (
@@ -303,6 +319,12 @@ export function AppSidebar() {
                             <NavMain
                                 items={sharedOperationalNavItems}
                                 label="Operasional Bersama"
+                            />
+                        )}
+                        {isSuperadmin && (
+                            <NavMain
+                                items={announcementNavItems}
+                                label="Komunikasi"
                             />
                         )}
                         <NavMain

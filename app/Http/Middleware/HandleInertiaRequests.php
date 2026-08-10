@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\EbitdamaxKdkmp;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -69,6 +70,28 @@ class HandleInertiaRequests extends Middleware
             ],
             'flash' => [
                 'toast' => $this->toast($request),
+            ],
+            'notificationCenter' => $user ? [
+                'unread_count' => $user->unreadNotifications()->count(),
+                'items' => $user->notifications()
+                    ->latest()
+                    ->limit(5)
+                    ->get()
+                    ->map(fn (DatabaseNotification $notification): array => [
+                        'id' => $notification->id,
+                        'title' => (string) ($notification->data['title'] ?? 'Pengumuman'),
+                        'message' => (string) ($notification->data['message'] ?? ''),
+                        'sender_name' => isset($notification->data['sender_name'])
+                            ? (string) $notification->data['sender_name']
+                            : null,
+                        'created_at' => $notification->created_at?->toIso8601String(),
+                        'read_at' => $notification->read_at?->toIso8601String(),
+                    ])
+                    ->values()
+                    ->all(),
+            ] : [
+                'unread_count' => 0,
+                'items' => [],
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
