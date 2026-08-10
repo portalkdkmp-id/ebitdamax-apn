@@ -103,20 +103,9 @@ class OrganizationController extends Controller
                 );
             }
 
-            if (
-                $organization->ebitdaValues()->exists()
-                || $organization->profile()->exists()
-                || $organization->calculation()->exists()
-            ) {
-                return back()->with(
-                    'error',
-                    'Organisasi tidak dapat dihapus permanen karena masih memiliki data terkait.',
-                );
-            }
-
             $organization->delete();
 
-            return back()->with('success', 'Organisasi berhasil dihapus permanen.');
+            return back()->with('success', 'Organisasi beserta data terkait berhasil dihapus permanen.');
         }
 
         $organization->update([

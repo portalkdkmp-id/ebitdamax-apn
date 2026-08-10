@@ -691,6 +691,10 @@ function OrganizationsIndex({
         null,
     );
     const [detailItem, setDetailItem] = useState<OrganizationNode | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<OrganizationNode | null>(
+        null,
+    );
+    const [isDeleting, setIsDeleting] = useState(false);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [filterForm, setFilterForm] = useState({
         search: filters.search ?? '',
@@ -759,21 +763,16 @@ function OrganizationsIndex({
         post(storeOrganization.url(), options);
     };
 
-    const destroy = (item: OrganizationNode) => {
-        const confirmationMessage = item.is_active
-            ? 'Nonaktifkan organisasi ' + item.code + ' - ' + item.name + '?'
-            : 'Hapus permanen organisasi ' +
-              item.code +
-              ' - ' +
-              item.name +
-              '? Tindakan ini tidak dapat dibatalkan.';
-
-        if (!confirm(confirmationMessage)) {
+    const confirmDestroy = () => {
+        if (!deleteTarget) {
             return;
         }
 
-        router.delete(destroyOrganization.url(item.slug), {
+        router.delete(destroyOrganization.url(deleteTarget.slug), {
             preserveScroll: true,
+            onStart: () => setIsDeleting(true),
+            onSuccess: () => setDeleteTarget(null),
+            onFinish: () => setIsDeleting(false),
         });
     };
 
@@ -911,7 +910,7 @@ function OrganizationsIndex({
                                         nodes={organizationTableTree}
                                         onDetail={setDetailItem}
                                         onEdit={openEditForm}
-                                        onDelete={destroy}
+                                        onDelete={setDeleteTarget}
                                     />
 
                                     {organizationRows.length === 0 && (
@@ -1092,6 +1091,84 @@ function OrganizationsIndex({
                             </Button>
                         </DialogFooter>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={deleteTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open && !isDeleting) {
+                        setDeleteTarget(null);
+                    }
+                }}
+            >
+                <DialogContent
+                    showCloseButton={!isDeleting}
+                    className="sm:max-w-md"
+                >
+                    {deleteTarget && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>
+                                    {deleteTarget.is_active
+                                        ? 'Nonaktifkan Organisasi?'
+                                        : 'Hapus Organisasi Permanen?'}
+                                </DialogTitle>
+                                <DialogDescription>
+                                    {deleteTarget.is_active ? (
+                                        <>
+                                            Organisasi{' '}
+                                            <span className="font-medium text-foreground">
+                                                {deleteTarget.code} -{' '}
+                                                {deleteTarget.name}
+                                            </span>{' '}
+                                            akan dinonaktifkan dan tidak lagi
+                                            digunakan pada struktur organisasi.
+                                        </>
+                                    ) : (
+                                        <>
+                                            Organisasi{' '}
+                                            <span className="font-medium text-foreground">
+                                                {deleteTarget.code} -{' '}
+                                                {deleteTarget.name}
+                                            </span>{' '}
+                                            beserta nilai EBITDA, profil, dan
+                                            kalkulasi terkait akan dihapus
+                                            permanen. Tindakan ini tidak dapat
+                                            dibatalkan.
+                                        </>
+                                    )}
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={isDeleting}
+                                    onClick={() => setDeleteTarget(null)}
+                                >
+                                    Tidak
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={
+                                        deleteTarget.is_active
+                                            ? 'default'
+                                            : 'destructive'
+                                    }
+                                    disabled={isDeleting}
+                                    onClick={confirmDestroy}
+                                >
+                                    {isDeleting
+                                        ? 'Memproses...'
+                                        : deleteTarget.is_active
+                                          ? 'Ya, Nonaktifkan'
+                                          : 'Ya, Hapus Permanen'}
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
                 </DialogContent>
             </Dialog>
 
