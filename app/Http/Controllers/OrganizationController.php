@@ -95,6 +95,30 @@ class OrganizationController extends Controller
 
     public function destroy(Organization $organization): RedirectResponse
     {
+        if (! $organization->is_active) {
+            if ($organization->children()->exists()) {
+                return back()->with(
+                    'error',
+                    'Organisasi tidak dapat dihapus permanen karena masih memiliki child organisasi.',
+                );
+            }
+
+            if (
+                $organization->ebitdaValues()->exists()
+                || $organization->profile()->exists()
+                || $organization->calculation()->exists()
+            ) {
+                return back()->with(
+                    'error',
+                    'Organisasi tidak dapat dihapus permanen karena masih memiliki data terkait.',
+                );
+            }
+
+            $organization->delete();
+
+            return back()->with('success', 'Organisasi berhasil dihapus permanen.');
+        }
+
         $organization->update([
             'is_active' => false,
         ]);

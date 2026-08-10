@@ -657,13 +657,12 @@ function OrganizationTableRow({
                         </Button>
                         <Button
                             type="button"
-                            variant="destructive"
+                            variant={node.is_active ? 'outline' : 'destructive'}
                             size="sm"
                             onClick={() => onDelete(node)}
-                            disabled={!node.is_active}
                         >
                             <Trash2 className="size-4" />
-                            Hapus
+                            {node.is_active ? 'Nonaktifkan' : 'Hapus Permanen'}
                         </Button>
                     </div>
                 </TableCell>
@@ -761,7 +760,15 @@ function OrganizationsIndex({
     };
 
     const destroy = (item: OrganizationNode) => {
-        if (!confirm(`Nonaktifkan organisasi ${item.code} - ${item.name}?`)) {
+        const confirmationMessage = item.is_active
+            ? 'Nonaktifkan organisasi ' + item.code + ' - ' + item.name + '?'
+            : 'Hapus permanen organisasi ' +
+              item.code +
+              ' - ' +
+              item.name +
+              '? Tindakan ini tidak dapat dibatalkan.';
+
+        if (!confirm(confirmationMessage)) {
             return;
         }
 
