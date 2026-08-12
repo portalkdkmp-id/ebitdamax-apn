@@ -30,6 +30,7 @@ class TaskReport extends Model
         'started_at',
         'finished_at',
         'duration_minutes',
+        'member_allocations',
         'status',
     ];
 
@@ -39,6 +40,7 @@ class TaskReport extends Model
         'finished_at' => 'datetime',
         'finished_documents' => 'array',
         'duration_minutes' => 'integer',
+        'member_allocations' => 'array',
         'status' => TaskReportStatus::class,
     ];
 

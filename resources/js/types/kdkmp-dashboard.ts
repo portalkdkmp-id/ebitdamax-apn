@@ -30,6 +30,20 @@ export type KdkmpPlanRevenueCategoryFields = {
     plan_revenue_obat_obatan: string | null;
 };
 
+export type KdkmpOperationalAttendanceKey =
+    | 'pramuniaga'
+    | 'kasir'
+    | 'karyawan_umkm'
+    | 'security'
+    | 'driver_truck'
+    | 'driver_pickup'
+    | 'driver_motor_roda_tiga';
+
+export type KdkmpOperationalAttendance = Record<
+    KdkmpOperationalAttendanceKey,
+    number
+>;
+
 export type KdkmpComputedValues = Pick<
     KdkmpDashboardFields,
     'target_revenue' | 'actual_cost' | 'total_duration' | 'performance_scoring'
@@ -44,6 +58,8 @@ export type KdkmpDailyEntry = KdkmpDashboardFields &
         report_date: string;
         is_complete: boolean;
         plan_revenue_requires_review: boolean;
+        operational_attendance: KdkmpOperationalAttendance;
+        operational_attendance_saved_at: string | null;
         updated_at: string | null;
     };
 

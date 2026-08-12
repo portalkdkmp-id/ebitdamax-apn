@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Enums\RoleLevel;
 use App\Enums\TaskPeriod;
 use App\Enums\TaskReportStatus;
+use App\Models\EbitdamaxKdkmp;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskAdditionalField;
 use App\Models\TaskReport;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -67,6 +69,7 @@ class TaskDashboardController extends Controller
 
         return Inertia::render('TaskDashboard/Index', [
             'tasks' => $tasks,
+            'operationalAttendance' => $this->operationalAttendanceForUser($user),
             'summary' => [
                 'total' => $tasks->count(),
                 'pending' => $tasks->where('status', 'pending')->count(),
@@ -74,6 +77,32 @@ class TaskDashboardController extends Controller
                 'completed' => $tasks->where('status', 'completed')->count(),
             ],
         ]);
+    }
+
+    /**
+     * @return array{business_date: string, is_saved: bool, values: array<string, int>}|null
+     */
+    private function operationalAttendanceForUser(mixed $user): ?array
+    {
+        if (! $user instanceof User || ! $user->isKdkmpManager()) {
+            return null;
+        }
+
+        $businessDate = CarbonImmutable::now((string) config('app.kdkmp_business_timezone'));
+        $attendanceEntry = $user->sdm_kdkmp_entry_id === null
+            ? null
+            : EbitdamaxKdkmp::query()
+                ->where('sdm_kdkmp_entry_id', $user->sdm_kdkmp_entry_id)
+                ->whereDate('report_date', $businessDate->toDateString())
+                ->first();
+
+        return [
+            'business_date' => $businessDate->toDateString(),
+            'is_saved' => $attendanceEntry?->hasConfirmedOperationalAttendance() ?? false,
+            'values' => EbitdamaxKdkmp::normalizeOperationalAttendance(
+                $attendanceEntry?->operational_attendance,
+            ),
+        ];
     }
 
     public function completed(Request $request): Response

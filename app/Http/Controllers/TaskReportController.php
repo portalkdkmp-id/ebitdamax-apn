@@ -8,10 +8,13 @@ use App\Enums\TaskPeriod;
 use App\Enums\TaskReportStatus;
 use App\Http\Requests\FinishTaskRequest;
 use App\Http\Requests\StartTaskRequest;
+use App\Models\EbitdamaxKdkmp;
 use App\Models\Task;
 use App\Models\TaskAdditionalField;
 use App\Models\TaskReport;
 use App\Models\TaskReportValue;
+use App\Models\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Arr;
@@ -36,6 +39,7 @@ class TaskReportController extends Controller
 
         try {
             DB::transaction(function () use ($request, $task, $periodKey, &$storedFiles): void {
+                $memberAllocations = $this->memberAllocationsForStart($request);
                 $completedReportExists = TaskReport::query()
                     ->where('task_id', $task->id)
                     ->where('user_id', $request->user()->id)
@@ -61,6 +65,7 @@ class TaskReportController extends Controller
                         'task_id' => $task->id,
                         'user_id' => $request->user()->id,
                         'period_key' => $periodKey,
+                        'member_allocations' => $memberAllocations,
                         'started_at' => now(),
                         'status' => TaskReportStatus::InProgress,
                     ]);
@@ -80,7 +85,7 @@ class TaskReportController extends Controller
                 $newDocuments = $this->storeTaskReportDocuments->execute($report, $documents, 'start');
                 $storedFiles = [...$storedFiles, ...$this->fileReferences($newDocuments)];
 
-                $report->update([
+                $reportPayload = [
                     'started_photo' => $photoPath,
                     'started_documents' => [
                         ...($report->started_documents ?? []),
@@ -88,7 +93,13 @@ class TaskReportController extends Controller
                     ],
                     'started_at' => $report->started_at ?? now(),
                     'status' => TaskReportStatus::InProgress,
-                ]);
+                ];
+
+                if ($memberAllocations !== null) {
+                    $reportPayload['member_allocations'] = $memberAllocations;
+                }
+
+                $report->update($reportPayload);
 
                 $this->syncValues(
                     report: $report,
@@ -165,6 +176,54 @@ class TaskReportController extends Controller
         }
 
         return back()->with('success', 'Task berhasil diselesaikan.');
+    }
+
+    /**
+     * @return array<string, int>|null
+     */
+    private function memberAllocationsForStart(StartTaskRequest $request): ?array
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User || ! $user->isKdkmpManager()) {
+            return null;
+        }
+
+        if ($user->sdm_kdkmp_entry_id === null) {
+            throw ValidationException::withMessages([
+                'member_allocations' => 'Akun Manager belum terhubung ke data KDKMP.',
+            ]);
+        }
+
+        $attendanceEntry = EbitdamaxKdkmp::query()
+            ->where('sdm_kdkmp_entry_id', $user->sdm_kdkmp_entry_id)
+            ->whereDate('report_date', $this->businessDate()->toDateString())
+            ->lockForUpdate()
+            ->first();
+
+        if (! $attendanceEntry?->hasConfirmedOperationalAttendance()) {
+            throw ValidationException::withMessages([
+                'member_allocations' => 'Simpan kehadiran anggota hari ini terlebih dahulu sebelum memulai task.',
+            ]);
+        }
+
+        $allocations = $request->memberAllocations();
+        $attendance = EbitdamaxKdkmp::normalizeOperationalAttendance(
+            $attendanceEntry->operational_attendance,
+        );
+        $errors = [];
+
+        foreach (EbitdamaxKdkmp::OPERATIONAL_ATTENDANCE_ROLES as $key => $label) {
+            if ($allocations[$key] > $attendance[$key]) {
+                $errors["member_allocations.{$key}"] = "Alokasi {$label} tidak boleh lebih dari {$attendance[$key]} anggota yang masuk.";
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $allocations;
     }
 
     /**
@@ -255,6 +314,11 @@ class TaskReportController extends Controller
 
         return $roleId !== null
             && $task->roles()->whereKey($roleId)->exists();
+    }
+
+    private function businessDate(): CarbonImmutable
+    {
+        return CarbonImmutable::now((string) config('app.kdkmp_business_timezone'));
     }
 
     private function periodKey(TaskPeriod $period, CarbonInterface $date): string

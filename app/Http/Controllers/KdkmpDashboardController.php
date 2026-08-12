@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\SaveEbitdamaxKdkmpRequest;
+use App\Http\Requests\SaveOperationalAttendanceRequest;
 use App\Models\EbitdamaxKdkmp;
 use App\Models\SdmKdkmpEntry;
 use App\Models\User;
@@ -122,8 +123,33 @@ class KdkmpDashboardController extends Controller
         return back()->with('success', $message);
     }
 
+    public function saveOperationalAttendance(
+        SaveOperationalAttendanceRequest $request
+    ): RedirectResponse {
+        $user = $request->user();
+        abort_unless($user instanceof User && $user->sdm_kdkmp_entry_id !== null, 403);
+
+        $entry = EbitdamaxKdkmp::query()->firstOrNew([
+            'sdm_kdkmp_entry_id' => $user->sdm_kdkmp_entry_id,
+            'report_date' => $this->businessDate()->toDateString(),
+        ]);
+
+        if (! $entry->exists) {
+            $entry->created_by = $user->id;
+        }
+
+        $entry->fill([
+            'operational_attendance' => $request->operationalAttendance(),
+            'operational_attendance_saved_at' => now(),
+            'updated_by' => $user->id,
+        ]);
+        $entry->save();
+
+        return back()->with('success', 'Kehadiran anggota hari ini berhasil disimpan.');
+    }
+
     /**
-     * @return array<string, int|float|string|bool|null>
+     * @return array<string, array<string, int>|int|float|string|bool|null>
      */
     private function transformEntry(EbitdamaxKdkmp $entry, array $overrides = []): array
     {
@@ -132,6 +158,12 @@ class KdkmpDashboardController extends Controller
             'report_date' => $entry->report_date?->toDateString(),
             'is_complete' => $entry->isComplete(),
             'plan_revenue_requires_review' => $entry->plan_revenue_requires_review,
+            'operational_attendance' => EbitdamaxKdkmp::normalizeOperationalAttendance(
+                $entry->operational_attendance,
+            ),
+            'operational_attendance_saved_at' => $entry
+                ->operational_attendance_saved_at
+                ?->toIso8601String(),
             'updated_at' => $entry->updated_at?->toIso8601String(),
         ];
 

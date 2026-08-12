@@ -61,6 +61,16 @@ class EbitdamaxKdkmp extends Model
         'plan_revenue_obat_obatan' => 'Obat-obatan',
     ];
 
+    public const OPERATIONAL_ATTENDANCE_ROLES = [
+        'pramuniaga' => 'Pramuniaga',
+        'kasir' => 'Kasir',
+        'karyawan_umkm' => 'Karyawan UMKM',
+        'security' => 'Security',
+        'driver_truck' => 'Driver Truck',
+        'driver_pickup' => 'Driver Pickup',
+        'driver_motor_roda_tiga' => 'Driver Motor Roda Tiga',
+    ];
+
     protected $table = 'ebitdamax_kdkmp';
 
     protected $fillable = [
@@ -86,6 +96,8 @@ class EbitdamaxKdkmp extends Model
         'actual_ebitda_margin',
         'total_duration',
         'performance_scoring',
+        'operational_attendance',
+        'operational_attendance_saved_at',
         'created_by',
         'updated_by',
     ];
@@ -148,6 +160,29 @@ class EbitdamaxKdkmp extends Model
         return $formattedMargin.'%';
     }
 
+    /**
+     * @param  array<string, mixed>|null  $attendance
+     * @return array<string, int>
+     */
+    public static function normalizeOperationalAttendance(?array $attendance): array
+    {
+        $normalizedAttendance = [];
+
+        foreach (array_keys(self::OPERATIONAL_ATTENDANCE_ROLES) as $role) {
+            $value = $attendance[$role] ?? 0;
+            $normalizedAttendance[$role] = is_numeric($value)
+                ? max(0, (int) $value)
+                : 0;
+        }
+
+        return $normalizedAttendance;
+    }
+
+    public function hasConfirmedOperationalAttendance(): bool
+    {
+        return $this->operational_attendance_saved_at !== null;
+    }
+
     public static function calculatePerformanceScoring(
         ?string $planRevenue,
         ?string $actualRevenue,
@@ -193,6 +228,8 @@ class EbitdamaxKdkmp extends Model
     {
         return [
             'report_date' => 'date',
+            'operational_attendance' => 'array',
+            'operational_attendance_saved_at' => 'datetime',
             'plan_revenue_requires_review' => 'boolean',
             'plan_revenue_makanan' => 'decimal:2',
             'plan_revenue_minuman' => 'decimal:2',

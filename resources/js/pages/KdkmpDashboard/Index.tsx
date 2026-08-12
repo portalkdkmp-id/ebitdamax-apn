@@ -37,11 +37,19 @@ import {
     kdkmpDashboardFields,
     kdkmpPlanRevenueCategories,
 } from '@/lib/kdkmp-dashboard-fields';
-import { upsert } from '@/routes/kdkmp-dashboard';
+import {
+    emptyKdkmpOperationalAttendance,
+    kdkmpOperationalAttendanceRoles,
+} from '@/lib/kdkmp-operational-attendance';
+import {
+    upsert,
+} from '@/routes/kdkmp-dashboard';
+import { save as saveOperationalAttendanceRoute } from '@/routes/kdkmp-dashboard/operational-attendance';
 import type {
     KdkmpDailyEntry,
     KdkmpDashboardFields,
     KdkmpManagerDashboardProps,
+    KdkmpOperationalAttendance,
     KdkmpPlanRevenueCategoryFields,
 } from '@/types/kdkmp-dashboard';
 
@@ -50,6 +58,10 @@ type DailyForm = {
     plan_cost: string;
 } & {
     [Field in keyof KdkmpPlanRevenueCategoryFields]: string;
+};
+
+type OperationalAttendanceForm = {
+    operational_attendance: KdkmpOperationalAttendance;
 };
 
 const ACTUAL_EBITDA_MARGIN_FIXED_COST = 9_172_133;
@@ -147,6 +159,15 @@ function formDataFrom(entry: KdkmpDailyEntry | null): DailyForm {
         plan_revenue_subsidi: inputValue(entry?.plan_revenue_subsidi),
         plan_revenue_expenses: inputValue(entry?.plan_revenue_expenses),
         plan_revenue_obat_obatan: inputValue(entry?.plan_revenue_obat_obatan),
+    };
+}
+
+function operationalAttendanceFormDataFrom(
+    entry: KdkmpDailyEntry | null,
+): OperationalAttendanceForm {
+    return {
+        operational_attendance:
+            entry?.operational_attendance ?? emptyKdkmpOperationalAttendance(),
     };
 }
 
@@ -309,12 +330,27 @@ export default function KdkmpDashboardIndex({
     const { data, setData, put, processing, errors } = useForm<DailyForm>(
         formDataFrom(todayEntry),
     );
+    const {
+        data: attendanceData,
+        setData: setAttendanceData,
+        put: putAttendance,
+        processing: isSavingAttendance,
+        errors: attendanceErrors,
+    } = useForm<OperationalAttendanceForm>(
+        operationalAttendanceFormDataFrom(todayEntry),
+    );
     const [showLowPlanRevenueConfirmation, setShowLowPlanRevenueConfirmation] =
         useState(false);
 
     const save = () => {
         setShowLowPlanRevenueConfirmation(false);
         put(upsert.url(), { preserveScroll: true });
+    };
+
+    const saveOperationalAttendance = () => {
+        putAttendance(saveOperationalAttendanceRoute.url(), {
+            preserveScroll: true,
+        });
     };
 
     const submit = (event: FormEvent) => {
@@ -650,6 +686,117 @@ export default function KdkmpDashboardIndex({
                                                 {performanceFields.map(
                                                     renderDashboardField,
                                                 )}
+                                            </div>
+
+                                            <div className="space-y-4 border-t pt-5">
+                                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                                    <div>
+                                                        <h3 className="font-medium text-foreground">
+                                                            Anggota yang masuk
+                                                            (Jumlah Anggota)
+                                                        </h3>
+                                                        <p className="mt-1 text-sm text-muted-foreground">
+                                                            Simpan kehadiran
+                                                            operasional sebelum
+                                                            memulai task.
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded-md border bg-background px-3 py-2 text-sm">
+                                                        <span className="text-muted-foreground">
+                                                            Jam Operasional:{' '}
+                                                        </span>
+                                                        <span className="font-semibold text-foreground">
+                                                            08:00 - 17:00
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                                                    {kdkmpOperationalAttendanceRoles.map(
+                                                        (role) => (
+                                                            <div
+                                                                key={role.key}
+                                                                className="space-y-2"
+                                                            >
+                                                                <Label
+                                                                    htmlFor={`operational-attendance-${role.key}`}
+                                                                >
+                                                                    {
+                                                                        role.label
+                                                                    }
+                                                                </Label>
+                                                                <Input
+                                                                    id={`operational-attendance-${role.key}`}
+                                                                    type="number"
+                                                                    inputMode="numeric"
+                                                                    min="0"
+                                                                    step="1"
+                                                                    value={
+                                                                        attendanceData
+                                                                            .operational_attendance[
+                                                                            role
+                                                                                .key
+                                                                        ]
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) => {
+                                                                        const value =
+                                                                            Math.max(
+                                                                                0,
+                                                                                Math.floor(
+                                                                                    Number(
+                                                                                        event
+                                                                                            .target
+                                                                                            .value,
+                                                                                    ) ||
+                                                                                        0,
+                                                                                ),
+                                                                            );
+
+                                                                        setAttendanceData(
+                                                                            'operational_attendance',
+                                                                            {
+                                                                                ...attendanceData.operational_attendance,
+                                                                                [role.key]:
+                                                                                    value,
+                                                                            },
+                                                                        );
+                                                                    }}
+                                                                />
+                                                                <InputError
+                                                                    message={
+                                                                        attendanceErrors[
+                                                                            `operational_attendance.${role.key}`
+                                                                        ]
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        ),
+                                                    )}
+                                                </div>
+
+                                                <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                                                    <p className="text-sm text-muted-foreground">
+                                                        {todayEntry?.operational_attendance_saved_at
+                                                            ? 'Kehadiran hari ini sudah disimpan dan dapat diperbarui.'
+                                                            : 'Kehadiran hari ini belum disimpan.'}
+                                                    </p>
+                                                    <Button
+                                                        type="button"
+                                                        onClick={
+                                                            saveOperationalAttendance
+                                                        }
+                                                        disabled={
+                                                            isSavingAttendance
+                                                        }
+                                                    >
+                                                        <Save className="size-4" />
+                                                        {isSavingAttendance
+                                                            ? 'Menyimpan Kehadiran...'
+                                                            : 'Simpan Kehadiran'}
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </section>
 

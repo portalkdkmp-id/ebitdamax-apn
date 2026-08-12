@@ -45,6 +45,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/dashboard/kdkmp/today', [KdkmpDashboardController::class, 'upsert'])
         ->name('kdkmp-dashboard.upsert');
 
+    Route::put(
+        '/dashboard/kdkmp/today/operational-attendance',
+        [KdkmpDashboardController::class, 'saveOperationalAttendance']
+    )->name('kdkmp-dashboard.operational-attendance.save');
+
     Route::get('/notifications', [NotificationController::class, 'index'])
         ->name('notifications.index');
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])

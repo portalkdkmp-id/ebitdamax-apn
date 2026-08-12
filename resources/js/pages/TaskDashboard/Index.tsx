@@ -37,6 +37,10 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import {
+    emptyKdkmpOperationalAttendance,
+    kdkmpOperationalAttendanceRoles,
+} from '@/lib/kdkmp-operational-attendance';
+import {
     finish as finishTaskRoute,
     start as startTaskRoute,
 } from '@/routes/tasks';
@@ -45,6 +49,7 @@ import type {
     TaskItem,
     TaskReportDocument,
 } from '@/types/task';
+import type { KdkmpOperationalAttendance } from '@/types/kdkmp-dashboard';
 
 type DashboardTask = TaskItem & {
     status: 'pending' | 'in_progress' | 'completed';
@@ -54,6 +59,7 @@ type DashboardTask = TaskItem & {
 
 type Props = {
     tasks: DashboardTask[];
+    operationalAttendance: OperationalAttendanceContext | null;
     summary: {
         total: number;
         pending: number;
@@ -62,12 +68,19 @@ type Props = {
     };
 };
 
+type OperationalAttendanceContext = {
+    business_date: string;
+    is_saved: boolean;
+    values: KdkmpOperationalAttendance;
+};
+
 type AdditionalFieldValue = string | string[] | boolean;
 
 type TaskActionFormData = {
     started_photo: File | null;
     finished_photo: File | null;
     documents: File[];
+    member_allocations?: KdkmpOperationalAttendance;
     values: Record<string, AdditionalFieldValue>;
 };
 
@@ -317,7 +330,11 @@ async function compressImage(file: File): Promise<File> {
     });
 }
 
-export default function TaskDashboardIndex({ tasks, summary }: Props) {
+export default function TaskDashboardIndex({
+    tasks,
+    operationalAttendance,
+    summary,
+}: Props) {
     const [startTask, setStartTask] = useState<DashboardTask | null>(null);
     const [finishTask, setFinishTask] = useState<DashboardTask | null>(null);
     const taskGroups = useMemo(() => {
@@ -607,6 +624,7 @@ export default function TaskDashboardIndex({ tasks, summary }: Props) {
                 photoLabel="Foto Mulai"
                 photoField="started_photo"
                 fields={startFields}
+                operationalAttendance={operationalAttendance}
                 existingDocuments={[]}
                 submitLabel="Mulai"
             />
@@ -650,6 +668,7 @@ function TaskActionDialog({
     photoLabel,
     photoField,
     fields,
+    operationalAttendance,
     existingDocuments,
     submitLabel,
 }: {
@@ -660,6 +679,7 @@ function TaskActionDialog({
     photoLabel: string;
     photoField: 'started_photo' | 'finished_photo';
     fields: TaskAdditionalFieldItem[];
+    operationalAttendance?: OperationalAttendanceContext | null;
     existingDocuments: TaskReportDocument[];
     submitLabel: string;
 }) {
@@ -689,8 +709,15 @@ function TaskActionDialog({
         started_photo: null,
         finished_photo: null,
         documents: [],
+        member_allocations: operationalAttendance
+            ? emptyKdkmpOperationalAttendance()
+            : undefined,
         values: {},
     });
+    const shouldShowMemberAllocations = operationalAttendance !== undefined &&
+        operationalAttendance !== null;
+    const mustSaveOperationalAttendance =
+        shouldShowMemberAllocations && !operationalAttendance.is_saved;
     const documentError =
         documentSelectionError ??
         errors.documents ??
@@ -1162,6 +1189,125 @@ function TaskActionDialog({
                         )}
                     </div>
 
+                    {shouldShowMemberAllocations && operationalAttendance && (
+                        <div className="space-y-4 rounded-lg border p-4">
+                            <div>
+                                <h3 className="text-sm font-semibold">
+                                    Alokasi Anggota untuk Task
+                                </h3>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Maksimal alokasi setiap role mengikuti
+                                    jumlah anggota yang masuk pada tanggal{' '}
+                                    {new Intl.DateTimeFormat('id-ID', {
+                                        day: '2-digit',
+                                        month: 'long',
+                                        year: 'numeric',
+                                    }).format(
+                                        new Date(
+                                            `${operationalAttendance.business_date}T00:00:00`,
+                                        ),
+                                    )}
+                                    .
+                                </p>
+                            </div>
+
+                            {mustSaveOperationalAttendance ? (
+                                <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                                    Kehadiran anggota hari ini belum disimpan.
+                                    Buka Dashboard KDKMP dan simpan
+                                    kehadiran terlebih dahulu.
+                                </p>
+                            ) : (
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    {kdkmpOperationalAttendanceRoles.map(
+                                        (role) => {
+                                            const maximumAllocation =
+                                                operationalAttendance.values[
+                                                    role.key
+                                                ];
+
+                                            return (
+                                                <div
+                                                    key={role.key}
+                                                    className="space-y-2"
+                                                >
+                                                    <Label
+                                                        htmlFor={`member-allocation-${photoField}-${role.key}`}
+                                                    >
+                                                        {role.label}
+                                                    </Label>
+                                                    <Input
+                                                        id={`member-allocation-${photoField}-${role.key}`}
+                                                        type="number"
+                                                        inputMode="numeric"
+                                                        min="0"
+                                                        max={maximumAllocation}
+                                                        step="1"
+                                                        value={
+                                                            data
+                                                                .member_allocations?.[
+                                                                role.key
+                                                            ] ?? 0
+                                                        }
+                                                        onChange={(event) => {
+                                                            const value =
+                                                                Math.min(
+                                                                    maximumAllocation,
+                                                                    Math.max(
+                                                                        0,
+                                                                        Math.floor(
+                                                                            Number(
+                                                                                event
+                                                                                    .target
+                                                                                    .value,
+                                                                            ) ||
+                                                                                0,
+                                                                        ),
+                                                                    ),
+                                                                );
+
+                                                            setData(
+                                                                'member_allocations',
+                                                                {
+                                                                    ...(data.member_allocations ??
+                                                                        emptyKdkmpOperationalAttendance()),
+                                                                    [role.key]:
+                                                                        value,
+                                                                },
+                                                            );
+                                                        }}
+                                                    />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Maksimal{' '}
+                                                        {maximumAllocation}{' '}
+                                                        anggota
+                                                    </p>
+                                                    {errors[
+                                                        `member_allocations.${role.key}`
+                                                    ] && (
+                                                        <p className="text-sm text-destructive">
+                                                            {
+                                                                errors[
+                                                                    `member_allocations.${role.key}`
+                                                                ]
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            );
+                                        },
+                                    )}
+                                </div>
+                            )}
+
+                            {errors.member_allocations && (
+                                <p className="text-sm text-destructive">
+                                    {errors.member_allocations}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     {fields.map((field) => (
                         <div
                             key={field.id ?? field.field_name}
@@ -1206,7 +1352,7 @@ function TaskActionDialog({
                     </Button>
                     <Button
                         type="button"
-                        disabled={processing}
+                        disabled={processing || mustSaveOperationalAttendance}
                         onClick={handleSubmit}
                     >
                         {submitLabel}
