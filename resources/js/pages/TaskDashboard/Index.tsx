@@ -49,7 +49,10 @@ import type {
     TaskItem,
     TaskReportDocument,
 } from '@/types/task';
-import type { KdkmpOperationalAttendance } from '@/types/kdkmp-dashboard';
+import type {
+    KdkmpOperationalAttendance,
+    KdkmpOperationalAttendanceKey,
+} from '@/types/kdkmp-dashboard';
 
 type DashboardTask = TaskItem & {
     status: 'pending' | 'in_progress' | 'completed';
@@ -72,6 +75,8 @@ type OperationalAttendanceContext = {
     business_date: string;
     is_saved: boolean;
     values: KdkmpOperationalAttendance;
+    allocated: KdkmpOperationalAttendance;
+    available: KdkmpOperationalAttendance;
 };
 
 type AdditionalFieldValue = string | string[] | boolean;
@@ -718,6 +723,24 @@ function TaskActionDialog({
         operationalAttendance !== null;
     const mustSaveOperationalAttendance =
         shouldShowMemberAllocations && !operationalAttendance.is_saved;
+    const memberAllocationValidationErrors: Partial<
+        Record<KdkmpOperationalAttendanceKey, string>
+    > = {};
+
+    if (shouldShowMemberAllocations && operationalAttendance) {
+        for (const role of kdkmpOperationalAttendanceRoles) {
+            const allocation = data.member_allocations?.[role.key] ?? 0;
+            const available = operationalAttendance.available[role.key];
+
+            if (allocation > available) {
+                memberAllocationValidationErrors[role.key] =
+                    `Jumlah alokasi melebihi sisa anggota yang tersedia (Sisa: ${available})`;
+            }
+        }
+    }
+
+    const hasMemberAllocationValidationErrors =
+        Object.keys(memberAllocationValidationErrors).length > 0;
     const documentError =
         documentSelectionError ??
         errors.documents ??
@@ -1196,8 +1219,9 @@ function TaskActionDialog({
                                     Alokasi Anggota untuk Task
                                 </h3>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    Maksimal alokasi setiap role mengikuti
-                                    jumlah anggota yang masuk pada tanggal{' '}
+                                    Sisa kuota setiap role dihitung dari
+                                    kehadiran dikurangi task berjalan yang
+                                    dimulai pada tanggal{' '}
                                     {new Intl.DateTimeFormat('id-ID', {
                                         day: '2-digit',
                                         month: 'long',
@@ -1221,9 +1245,28 @@ function TaskActionDialog({
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     {kdkmpOperationalAttendanceRoles.map(
                                         (role) => {
-                                            const maximumAllocation =
+                                            const currentAllocation =
+                                                data.member_allocations?.[
+                                                    role.key
+                                                ] ?? 0;
+                                            const totalAttendance =
                                                 operationalAttendance.values[
                                                     role.key
+                                                ];
+                                            const allocated =
+                                                operationalAttendance.allocated[
+                                                    role.key
+                                                ];
+                                            const available =
+                                                operationalAttendance.available[
+                                                    role.key
+                                                ];
+                                            const allocationError =
+                                                memberAllocationValidationErrors[
+                                                    role.key
+                                                ] ??
+                                                errors[
+                                                    `member_allocations.${role.key}`
                                                 ];
 
                                             return (
@@ -1241,28 +1284,22 @@ function TaskActionDialog({
                                                         type="number"
                                                         inputMode="numeric"
                                                         min="0"
-                                                        max={maximumAllocation}
                                                         step="1"
-                                                        value={
-                                                            data
-                                                                .member_allocations?.[
-                                                                role.key
-                                                            ] ?? 0
-                                                        }
+                                                        value={currentAllocation}
+                                                        aria-invalid={Boolean(
+                                                            allocationError,
+                                                        )}
                                                         onChange={(event) => {
                                                             const value =
-                                                                Math.min(
-                                                                    maximumAllocation,
-                                                                    Math.max(
-                                                                        0,
-                                                                        Math.floor(
-                                                                            Number(
-                                                                                event
-                                                                                    .target
-                                                                                    .value,
-                                                                            ) ||
-                                                                                0,
-                                                                        ),
+                                                                Math.max(
+                                                                    0,
+                                                                    Math.floor(
+                                                                        Number(
+                                                                            event
+                                                                                .target
+                                                                                .value,
+                                                                        ) ||
+                                                                            0,
                                                                     ),
                                                                 );
 
@@ -1278,19 +1315,22 @@ function TaskActionDialog({
                                                         }}
                                                     />
                                                     <p className="text-xs text-muted-foreground">
-                                                        Maksimal{' '}
-                                                        {maximumAllocation}{' '}
-                                                        anggota
+                                                        Hadir: {totalAttendance}{' '}
+                                                        · Sedang dialokasikan:{' '}
+                                                        {allocated} · Sisa
+                                                        tersedia: {available}
                                                     </p>
-                                                    {errors[
-                                                        `member_allocations.${role.key}`
-                                                    ] && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Sisa setelah alokasi ini:{' '}
+                                                        {Math.max(
+                                                            0,
+                                                            available -
+                                                                currentAllocation,
+                                                        )}
+                                                    </p>
+                                                    {allocationError && (
                                                         <p className="text-sm text-destructive">
-                                                            {
-                                                                errors[
-                                                                    `member_allocations.${role.key}`
-                                                                ]
-                                                            }
+                                                            {allocationError}
                                                         </p>
                                                     )}
                                                 </div>
@@ -1352,7 +1392,11 @@ function TaskActionDialog({
                     </Button>
                     <Button
                         type="button"
-                        disabled={processing || mustSaveOperationalAttendance}
+                        disabled={
+                            processing ||
+                            mustSaveOperationalAttendance ||
+                            hasMemberAllocationValidationErrors
+                        }
                         onClick={handleSubmit}
                     >
                         {submitLabel}

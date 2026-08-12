@@ -14,6 +14,7 @@ use App\Models\TaskAdditionalField;
 use App\Models\TaskReport;
 use App\Models\TaskReportValue;
 use App\Models\User;
+use App\Services\KdkmpOperationalAllocationService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
@@ -28,6 +29,7 @@ class TaskReportController extends Controller
 {
     public function __construct(
         private readonly StoreTaskReportDocumentsAction $storeTaskReportDocuments,
+        private readonly KdkmpOperationalAllocationService $operationalAllocation,
     ) {}
 
     public function start(StartTaskRequest $request, Task $task): RedirectResponse
@@ -35,11 +37,11 @@ class TaskReportController extends Controller
         abort_unless($this->canAccessTask($request, $task), 403);
 
         $periodKey = $this->periodKey($task->period, now());
+        $businessDate = $this->businessDate();
         $storedFiles = [];
 
         try {
-            DB::transaction(function () use ($request, $task, $periodKey, &$storedFiles): void {
-                $memberAllocations = $this->memberAllocationsForStart($request);
+            DB::transaction(function () use ($businessDate, $request, $task, $periodKey, &$storedFiles): void {
                 $completedReportExists = TaskReport::query()
                     ->where('task_id', $task->id)
                     ->where('user_id', $request->user()->id)
@@ -53,12 +55,23 @@ class TaskReportController extends Controller
                     ]);
                 }
 
+                $attendanceEntry = $this->lockedOperationalAttendanceForStart(
+                    request: $request,
+                    businessDate: $businessDate,
+                );
                 $report = TaskReport::query()
                     ->where('task_id', $task->id)
                     ->where('user_id', $request->user()->id)
                     ->where('period_key', $periodKey)
                     ->where('status', TaskReportStatus::InProgress->value)
+                    ->lockForUpdate()
                     ->first();
+                $memberAllocations = $this->memberAllocationsForStart(
+                    request: $request,
+                    attendanceEntry: $attendanceEntry,
+                    businessDate: $businessDate,
+                    exceptTaskReportId: $report?->id,
+                );
 
                 if (! $report) {
                     $report = TaskReport::query()->create([
@@ -178,11 +191,10 @@ class TaskReportController extends Controller
         return back()->with('success', 'Task berhasil diselesaikan.');
     }
 
-    /**
-     * @return array<string, int>|null
-     */
-    private function memberAllocationsForStart(StartTaskRequest $request): ?array
-    {
+    private function lockedOperationalAttendanceForStart(
+        StartTaskRequest $request,
+        CarbonImmutable $businessDate,
+    ): ?EbitdamaxKdkmp {
         $user = $request->user();
 
         if (! $user instanceof User || ! $user->isKdkmpManager()) {
@@ -197,7 +209,7 @@ class TaskReportController extends Controller
 
         $attendanceEntry = EbitdamaxKdkmp::query()
             ->where('sdm_kdkmp_entry_id', $user->sdm_kdkmp_entry_id)
-            ->whereDate('report_date', $this->businessDate()->toDateString())
+            ->whereDate('report_date', $businessDate->toDateString())
             ->lockForUpdate()
             ->first();
 
@@ -207,15 +219,37 @@ class TaskReportController extends Controller
             ]);
         }
 
+        return $attendanceEntry;
+    }
+
+    /**
+     * @return array<string, int>|null
+     */
+    private function memberAllocationsForStart(
+        StartTaskRequest $request,
+        ?EbitdamaxKdkmp $attendanceEntry,
+        CarbonImmutable $businessDate,
+        ?int $exceptTaskReportId,
+    ): ?array {
+        $user = $request->user();
+
+        if (! $user instanceof User || ! $user->isKdkmpManager()) {
+            return null;
+        }
+
         $allocations = $request->memberAllocations();
-        $attendance = EbitdamaxKdkmp::normalizeOperationalAttendance(
-            $attendanceEntry->operational_attendance,
+        $allocationSummary = $this->operationalAllocation->summaryForUser(
+            user: $user,
+            businessDate: $businessDate,
+            attendance: $attendanceEntry?->operational_attendance,
+            exceptTaskReportId: $exceptTaskReportId,
+            lockForUpdate: true,
         );
         $errors = [];
 
         foreach (EbitdamaxKdkmp::OPERATIONAL_ATTENDANCE_ROLES as $key => $label) {
-            if ($allocations[$key] > $attendance[$key]) {
-                $errors["member_allocations.{$key}"] = "Alokasi {$label} tidak boleh lebih dari {$attendance[$key]} anggota yang masuk.";
+            if ($allocations[$key] > $allocationSummary['available'][$key]) {
+                $errors["member_allocations.{$key}"] = "Jumlah alokasi {$label} melebihi sisa anggota yang tersedia (Sisa: {$allocationSummary['available'][$key]}).";
             }
         }
 

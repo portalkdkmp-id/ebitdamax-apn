@@ -8,10 +8,13 @@ use App\Models\EbitdamaxKdkmp;
 use App\Models\SdmKdkmpEntry;
 use App\Models\User;
 use App\Services\KdkmpDashboardMetricsService;
+use App\Services\KdkmpOperationalAllocationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,6 +22,7 @@ class KdkmpDashboardController extends Controller
 {
     public function __construct(
         private readonly KdkmpDashboardMetricsService $dashboardMetrics,
+        private readonly KdkmpOperationalAllocationService $operationalAllocation,
     ) {}
 
     public function index(Request $request): Response
@@ -129,21 +133,49 @@ class KdkmpDashboardController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User && $user->sdm_kdkmp_entry_id !== null, 403);
 
-        $entry = EbitdamaxKdkmp::query()->firstOrNew([
-            'sdm_kdkmp_entry_id' => $user->sdm_kdkmp_entry_id,
-            'report_date' => $this->businessDate()->toDateString(),
-        ]);
+        $businessDate = $this->businessDate();
 
-        if (! $entry->exists) {
-            $entry->created_by = $user->id;
-        }
+        DB::transaction(function () use ($businessDate, $request, $user): void {
+            $entry = EbitdamaxKdkmp::query()
+                ->where('sdm_kdkmp_entry_id', $user->sdm_kdkmp_entry_id)
+                ->whereDate('report_date', $businessDate->toDateString())
+                ->lockForUpdate()
+                ->first();
 
-        $entry->fill([
-            'operational_attendance' => $request->operationalAttendance(),
-            'operational_attendance_saved_at' => now(),
-            'updated_by' => $user->id,
-        ]);
-        $entry->save();
+            if (! $entry) {
+                $entry = new EbitdamaxKdkmp([
+                    'sdm_kdkmp_entry_id' => $user->sdm_kdkmp_entry_id,
+                    'report_date' => $businessDate->toDateString(),
+                    'created_by' => $user->id,
+                ]);
+            }
+
+            $attendance = $request->operationalAttendance();
+            $allocationSummary = $this->operationalAllocation->summaryForUser(
+                user: $user,
+                businessDate: $businessDate,
+                attendance: $attendance,
+                lockForUpdate: true,
+            );
+            $errors = [];
+
+            foreach (EbitdamaxKdkmp::OPERATIONAL_ATTENDANCE_ROLES as $key => $label) {
+                if ($attendance[$key] < $allocationSummary['allocated'][$key]) {
+                    $errors["operational_attendance.{$key}"] = "Jumlah anggota {$label} tidak boleh lebih kecil dari {$allocationSummary['allocated'][$key]} anggota yang sedang dialokasikan.";
+                }
+            }
+
+            if ($errors !== []) {
+                throw ValidationException::withMessages($errors);
+            }
+
+            $entry->fill([
+                'operational_attendance' => $attendance,
+                'operational_attendance_saved_at' => now(),
+                'updated_by' => $user->id,
+            ]);
+            $entry->save();
+        });
 
         return back()->with('success', 'Kehadiran anggota hari ini berhasil disimpan.');
     }

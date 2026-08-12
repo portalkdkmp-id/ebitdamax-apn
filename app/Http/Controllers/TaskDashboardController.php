@@ -11,6 +11,7 @@ use App\Models\Task;
 use App\Models\TaskAdditionalField;
 use App\Models\TaskReport;
 use App\Models\User;
+use App\Services\KdkmpOperationalAllocationService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
@@ -21,6 +22,10 @@ use Inertia\Response;
 
 class TaskDashboardController extends Controller
 {
+    public function __construct(
+        private readonly KdkmpOperationalAllocationService $operationalAllocation,
+    ) {}
+
     public function index(Request $request): Response
     {
         $user = $request->user();
@@ -80,7 +85,7 @@ class TaskDashboardController extends Controller
     }
 
     /**
-     * @return array{business_date: string, is_saved: bool, values: array<string, int>}|null
+     * @return array{business_date: string, is_saved: bool, values: array<string, int>, allocated: array<string, int>, available: array<string, int>}|null
      */
     private function operationalAttendanceForUser(mixed $user): ?array
     {
@@ -96,12 +101,21 @@ class TaskDashboardController extends Controller
                 ->whereDate('report_date', $businessDate->toDateString())
                 ->first();
 
+        $values = EbitdamaxKdkmp::normalizeOperationalAttendance(
+            $attendanceEntry?->operational_attendance,
+        );
+        $allocationSummary = $this->operationalAllocation->summaryForUser(
+            user: $user,
+            businessDate: $businessDate,
+            attendance: $values,
+        );
+
         return [
             'business_date' => $businessDate->toDateString(),
             'is_saved' => $attendanceEntry?->hasConfirmedOperationalAttendance() ?? false,
-            'values' => EbitdamaxKdkmp::normalizeOperationalAttendance(
-                $attendanceEntry?->operational_attendance,
-            ),
+            'values' => $values,
+            'allocated' => $allocationSummary['allocated'],
+            'available' => $allocationSummary['available'],
         ];
     }
 
