@@ -16,7 +16,7 @@ class Role extends Model
 {
     public const SLUG_EBITDA_KDKMP = 'ebitda_kdkmp';
 
-    public const SLUG_KDKMP_MANAGER = 'kepala-toko-manager';
+    public const SLUG_KDKMP_MANAGER = 'manager';
 
     public const SLUG_REGIONAL_MANAGER = 'manager-wilayah';
 

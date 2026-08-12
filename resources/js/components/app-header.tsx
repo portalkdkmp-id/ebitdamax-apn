@@ -174,7 +174,9 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
     const getInitials = useInitials();
     const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
     const isSuperadmin = auth.user?.role?.level === 'superadmin';
-    const isKdkmpManager = auth.user?.role?.slug === 'kepala-toko-manager';
+    const isKdkmpManager =
+        auth.user?.role?.domain === 'kdkmp' &&
+        auth.user.role.slug === 'manager';
     const isRegionalManager = auth.user?.role?.slug === 'manager-wilayah';
     const canViewKdkmpMonitoring =
         auth.user?.can_view_kdkmp_monitoring === true;

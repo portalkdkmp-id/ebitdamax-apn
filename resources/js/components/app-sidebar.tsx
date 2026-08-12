@@ -246,7 +246,7 @@ export function AppSidebar() {
         isSuperadmin && auth.user?.role?.domain === 'kdkmp';
     const isKdkmpManager =
         auth.user?.role?.domain === 'kdkmp' &&
-        auth.user.role.slug === 'kepala-toko-manager';
+        auth.user.role.slug === 'manager';
     const isRegionalManager =
         auth.user?.role?.domain === 'kdkmp' &&
         auth.user.role.slug === 'manager-wilayah';
