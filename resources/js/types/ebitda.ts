@@ -32,6 +32,12 @@ export type EbitdaValueItem = EbitdaValue & {
     } | null;
 };
 
+export type EbitdaOrganizationValueGroup = {
+    organization: NonNullable<EbitdaValueItem['organization']>;
+    values: EbitdaValueItem[];
+    is_unfilled: boolean;
+};
+
 export type EbitdaValueFilters = {
     search: string;
     year: number;

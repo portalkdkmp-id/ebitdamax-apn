@@ -41,12 +41,13 @@ import {
 import type {
     EbitdaValueFilters,
     EbitdaValueItem,
+    EbitdaOrganizationValueGroup,
     OrganizationOption,
     PaginatedResponse,
 } from '@/types/ebitda';
 
 type Props = {
-    values: PaginatedResponse<EbitdaValueItem>;
+    groups: PaginatedResponse<EbitdaOrganizationValueGroup>;
     organizations: OrganizationOption[];
     filters: EbitdaValueFilters;
 };
@@ -66,11 +67,6 @@ type EbitdaFormData = {
     material_cost: string;
     machine_cost: string;
     source_sheet: string;
-};
-
-type OrganizationValueGroup = {
-    organization: EbitdaValueItem['organization'];
-    values: EbitdaValueItem[];
 };
 
 const scenarioOptions = [
@@ -246,7 +242,7 @@ function DetailMetric({
 }
 
 export default function EbitdaValuesIndex({
-    values,
+    groups,
     organizations,
     filters,
 }: Props) {
@@ -275,29 +271,12 @@ export default function EbitdaValuesIndex({
         return { toc, ebitda, margin };
     }, [data.doc_fixed, data.doc_variable, data.ioc, data.revenue]);
 
-    const groupedValues = useMemo(() => {
-        const groups = new Map<number, OrganizationValueGroup>();
-
-        values.data.forEach((item) => {
-            const existingGroup = groups.get(item.organization_id);
-
-            if (existingGroup) {
-                existingGroup.values.push(item);
-
-                return;
-            }
-
-            groups.set(item.organization_id, {
-                organization: item.organization,
-                values: [item],
-            });
-        });
-
+    const organizationGroups = useMemo(() => {
         const scenarioOrder = new Map(
             scenarioOptions.map((option, index) => [option.value, index]),
         );
 
-        return Array.from(groups.values()).map((group) => ({
+        return groups.data.map((group) => ({
             ...group,
             values: [...group.values].sort(
                 (firstValue, secondValue) =>
@@ -307,7 +286,7 @@ export default function EbitdaValuesIndex({
                         Number.MAX_SAFE_INTEGER),
             ),
         }));
-    }, [values.data]);
+    }, [groups.data]);
 
     const submitFilters = (event: FormEvent) => {
         event.preventDefault();
@@ -325,11 +304,14 @@ export default function EbitdaValuesIndex({
         );
     };
 
-    const openCreateForm = () => {
+    const openCreateForm = (organizationId?: number) => {
         setSelectedItem(null);
         reset();
         clearErrors();
-        setData(createDefaultForm(filters));
+        setData({
+            ...createDefaultForm(filters),
+            organization_id: organizationId ? String(organizationId) : '',
+        });
         setIsFormOpen(true);
     };
 
@@ -410,10 +392,10 @@ export default function EbitdaValuesIndex({
                             <CardContent className="flex items-center justify-between gap-4 p-5">
                                 <div>
                                     <p className="text-sm text-muted-foreground">
-                                        Total Data
+                                        Total Organisasi
                                     </p>
                                     <p className="mt-1 text-2xl font-semibold text-primary">
-                                        {values.total}
+                                        {groups.total}
                                     </p>
                                 </div>
                                 <WalletCards className="size-5 text-primary" />
@@ -495,7 +477,8 @@ export default function EbitdaValuesIndex({
                                 variant="outline"
                                 className="w-fit border-primary/25 bg-primary/5 text-primary"
                             >
-                                {groupedValues.length} organisasi di halaman ini
+                                {organizationGroups.length} organisasi di
+                                halaman ini
                             </Badge>
                         </CardHeader>
                         <CardContent className="p-0">
@@ -528,9 +511,9 @@ export default function EbitdaValuesIndex({
                                     </TableHeader>
 
                                     <TableBody>
-                                        {groupedValues.map((group) => (
+                                        {organizationGroups.map((group) => (
                                             <Fragment
-                                                key={`organization-${group.organization?.id ?? group.values[0].organization_id}`}
+                                                key={`organization-${group.organization.id}`}
                                             >
                                                 <TableRow className="bg-primary/5 hover:bg-primary/10">
                                                     <TableCell
@@ -540,20 +523,22 @@ export default function EbitdaValuesIndex({
                                                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                                             <div className="flex flex-wrap items-center gap-2">
                                                                 <Badge className="bg-primary text-primary-foreground">
-                                                                    {group
-                                                                        .organization
-                                                                        ?.code ??
-                                                                        '-'}
+                                                                    {
+                                                                        group
+                                                                            .organization
+                                                                            .code
+                                                                    }
                                                                 </Badge>
                                                                 <p className="font-semibold text-foreground">
-                                                                    {group
-                                                                        .organization
-                                                                        ?.name ??
-                                                                        '-'}
+                                                                    {
+                                                                        group
+                                                                            .organization
+                                                                            .name
+                                                                    }
                                                                 </p>
                                                                 {group
                                                                     .organization
-                                                                    ?.level && (
+                                                                    .level && (
                                                                     <span className="text-sm text-muted-foreground">
                                                                         {
                                                                             group
@@ -565,7 +550,7 @@ export default function EbitdaValuesIndex({
                                                             </div>
                                                             <div className="flex flex-wrap items-center gap-2">
                                                                 {group.values[0]
-                                                                    .classification && (
+                                                                    ?.classification && (
                                                                     <Badge
                                                                         variant="outline"
                                                                         className="border-primary/25 bg-background text-primary"
@@ -573,7 +558,7 @@ export default function EbitdaValuesIndex({
                                                                         {
                                                                             group
                                                                                 .values[0]
-                                                                                .classification
+                                                                                ?.classification
                                                                         }
                                                                     </Badge>
                                                                 )}
@@ -581,164 +566,200 @@ export default function EbitdaValuesIndex({
                                                                     variant="outline"
                                                                     className="border-primary/25 bg-background text-muted-foreground"
                                                                 >
-                                                                    {
-                                                                        group
-                                                                            .values
-                                                                            .length
-                                                                    }{' '}
-                                                                    data
+                                                                    {group.is_unfilled
+                                                                        ? 'Belum diisi'
+                                                                        : `${group.values.length} data`}
                                                                 </Badge>
                                                             </div>
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
 
-                                                {group.values.map((item) => (
-                                                    <TableRow key={item.id}>
+                                                {group.is_unfilled ? (
+                                                    <TableRow>
                                                         <TableCell className="p-4 pl-6">
                                                             <Badge
                                                                 variant="outline"
-                                                                className={scenarioBadgeClass(
-                                                                    item.scenario,
-                                                                )}
+                                                                className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
                                                             >
-                                                                {scenarioLabel(
-                                                                    item.scenario,
-                                                                )}
+                                                                Belum diisi
                                                             </Badge>
-                                                            {item.value_source ===
-                                                                'calculated_from_children' && (
-                                                                <p className="mt-1 text-xs text-primary">
-                                                                    Roll-up
-                                                                    dashboard
-                                                                </p>
-                                                            )}
                                                         </TableCell>
-                                                        <TableCell className="p-4 text-muted-foreground">
-                                                            <p>
-                                                                {formatPeriodDate(
-                                                                    item.period_date,
-                                                                )}
-                                                            </p>
-                                                            <p className="mt-1 text-xs">
-                                                                Tahun{' '}
-                                                                {item.year}
-                                                            </p>
-                                                        </TableCell>
-                                                        <TableCell className="p-4 text-right">
-                                                            {formatCurrency(
-                                                                item
-                                                                    .resolved_value
-                                                                    .revenue,
-                                                            )}
-                                                            {item.value_source ===
-                                                                'calculated_from_children' && (
-                                                                <SourceValueHint
-                                                                    value={formatCurrency(
-                                                                        item.revenue,
-                                                                    )}
-                                                                />
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="p-4 text-right">
-                                                            {formatCurrency(
-                                                                item
-                                                                    .resolved_value
-                                                                    .toc,
-                                                            )}
-                                                            {item.value_source ===
-                                                                'calculated_from_children' && (
-                                                                <SourceValueHint
-                                                                    value={formatCurrency(
-                                                                        item.toc,
-                                                                    )}
-                                                                />
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="p-4 text-right font-semibold text-primary">
-                                                            {formatCurrency(
-                                                                item
-                                                                    .resolved_value
-                                                                    .ebitda,
-                                                            )}
-                                                            {item.value_source ===
-                                                                'calculated_from_children' && (
-                                                                <SourceValueHint
-                                                                    value={formatCurrency(
-                                                                        item.ebitda,
-                                                                    )}
-                                                                />
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="p-4 text-right">
-                                                            {formatPercent(
-                                                                item
-                                                                    .resolved_value
-                                                                    .ebitda_margin,
-                                                            )}
-                                                            {item.value_source ===
-                                                                'calculated_from_children' && (
-                                                                <SourceValueHint
-                                                                    value={formatPercent(
-                                                                        item.ebitda_margin,
-                                                                    )}
-                                                                />
-                                                            )}
+                                                        <TableCell
+                                                            colSpan={5}
+                                                            className="p-4 text-muted-foreground"
+                                                        >
+                                                            Belum ada nilai
+                                                            EBITDA untuk tahun{' '}
+                                                            {filters.year}.
                                                         </TableCell>
                                                         <TableCell className="p-4">
-                                                            <div className="flex justify-end gap-2">
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() =>
-                                                                        setDetailItem(
-                                                                            item,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Eye className="size-4" />
-                                                                    Detail
-                                                                </Button>
+                                                            <div className="flex justify-end">
                                                                 <Button
                                                                     type="button"
                                                                     size="sm"
                                                                     onClick={() =>
-                                                                        openEditForm(
-                                                                            item,
+                                                                        openCreateForm(
+                                                                            group
+                                                                                .organization
+                                                                                .id,
                                                                         )
                                                                     }
                                                                 >
-                                                                    <Pencil className="size-4" />
-                                                                    Edit
-                                                                </Button>
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="destructive"
-                                                                    size="sm"
-                                                                    onClick={() =>
-                                                                        destroy(
-                                                                            item,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Trash2 className="size-4" />
-                                                                    Hapus
+                                                                    <Plus className="size-4" />
+                                                                    Isi Nilai
                                                                 </Button>
                                                             </div>
                                                         </TableCell>
                                                     </TableRow>
-                                                ))}
+                                                ) : (
+                                                    group.values.map((item) => (
+                                                        <TableRow key={item.id}>
+                                                            <TableCell className="p-4 pl-6">
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={scenarioBadgeClass(
+                                                                        item.scenario,
+                                                                    )}
+                                                                >
+                                                                    {scenarioLabel(
+                                                                        item.scenario,
+                                                                    )}
+                                                                </Badge>
+                                                                {item.value_source ===
+                                                                    'calculated_from_children' && (
+                                                                    <p className="mt-1 text-xs text-primary">
+                                                                        Roll-up
+                                                                        dashboard
+                                                                    </p>
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="p-4 text-muted-foreground">
+                                                                <p>
+                                                                    {formatPeriodDate(
+                                                                        item.period_date,
+                                                                    )}
+                                                                </p>
+                                                                <p className="mt-1 text-xs">
+                                                                    Tahun{' '}
+                                                                    {item.year}
+                                                                </p>
+                                                            </TableCell>
+                                                            <TableCell className="p-4 text-right">
+                                                                {formatCurrency(
+                                                                    item
+                                                                        .resolved_value
+                                                                        .revenue,
+                                                                )}
+                                                                {item.value_source ===
+                                                                    'calculated_from_children' && (
+                                                                    <SourceValueHint
+                                                                        value={formatCurrency(
+                                                                            item.revenue,
+                                                                        )}
+                                                                    />
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="p-4 text-right">
+                                                                {formatCurrency(
+                                                                    item
+                                                                        .resolved_value
+                                                                        .toc,
+                                                                )}
+                                                                {item.value_source ===
+                                                                    'calculated_from_children' && (
+                                                                    <SourceValueHint
+                                                                        value={formatCurrency(
+                                                                            item.toc,
+                                                                        )}
+                                                                    />
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="p-4 text-right font-semibold text-primary">
+                                                                {formatCurrency(
+                                                                    item
+                                                                        .resolved_value
+                                                                        .ebitda,
+                                                                )}
+                                                                {item.value_source ===
+                                                                    'calculated_from_children' && (
+                                                                    <SourceValueHint
+                                                                        value={formatCurrency(
+                                                                            item.ebitda,
+                                                                        )}
+                                                                    />
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="p-4 text-right">
+                                                                {formatPercent(
+                                                                    item
+                                                                        .resolved_value
+                                                                        .ebitda_margin,
+                                                                )}
+                                                                {item.value_source ===
+                                                                    'calculated_from_children' && (
+                                                                    <SourceValueHint
+                                                                        value={formatPercent(
+                                                                            item.ebitda_margin,
+                                                                        )}
+                                                                    />
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="p-4">
+                                                                <div className="flex justify-end gap-2">
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            setDetailItem(
+                                                                                item,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Eye className="size-4" />
+                                                                        Detail
+                                                                    </Button>
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            openEditForm(
+                                                                                item,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Pencil className="size-4" />
+                                                                        Edit
+                                                                    </Button>
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="destructive"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            destroy(
+                                                                                item,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Trash2 className="size-4" />
+                                                                        Hapus
+                                                                    </Button>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                )}
                                             </Fragment>
                                         ))}
 
-                                        {values.data.length === 0 && (
+                                        {organizationGroups.length === 0 && (
                                             <TableRow>
                                                 <TableCell
                                                     colSpan={7}
                                                     className="p-8 text-center text-muted-foreground"
                                                 >
-                                                    Data EBITDA belum tersedia.
+                                                    Organisasi tidak ditemukan.
                                                 </TableCell>
                                             </TableRow>
                                         )}
@@ -748,11 +769,12 @@ export default function EbitdaValuesIndex({
 
                             <div className="flex flex-col gap-3 border-t p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                                 <p>
-                                    Menampilkan {values.from ?? 0}-
-                                    {values.to ?? 0} dari {values.total} data
+                                    Menampilkan {groups.from ?? 0}-
+                                    {groups.to ?? 0} dari {groups.total}{' '}
+                                    organisasi
                                 </p>
                                 <div className="flex flex-wrap gap-2">
-                                    {values.links.map((link) => (
+                                    {groups.links.map((link) => (
                                         <Button
                                             key={`${link.label}-${link.url}`}
                                             type="button"

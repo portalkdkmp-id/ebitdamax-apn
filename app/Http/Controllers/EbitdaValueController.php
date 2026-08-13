@@ -24,25 +24,26 @@ class EbitdaValueController extends Controller
         $search = trim((string) $request->input('search', ''));
         $year = $request->input('year', now()->year);
 
-        $values = EbitdaValue::query()
-            ->with('organization')
-            ->whereIn('scenario', $this->visibleScenarioKeys())
-            ->when($search !== '', function ($query) use ($search) {
-                $query->whereHas('organization', function ($subQuery) use ($search) {
+        $groups = Organization::query()
+            ->active()
+            ->with([
+                'ebitdaValues' => fn ($query) => $query
+                    ->whereIn('scenario', $this->visibleScenarioKeys())
+                    ->when($year, fn ($query) => $query->where('year', $year))
+                    ->with('organization')
+                    ->orderBy('scenario'),
+            ])
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($subQuery) use ($search): void {
                     $subQuery
                         ->where('code', 'ilike', "%{$search}%")
                         ->orWhere('name', 'ilike', "%{$search}%")
                         ->orWhere('level', 'ilike', "%{$search}%");
                 });
             })
-            ->when($year, fn ($query) => $query->where('year', $year))
-            ->join('organizations', 'organizations.id', '=', 'ebitda_values.organization_id')
-            ->select('ebitda_values.*')
-            ->orderBy('organizations.sort_order')
-            ->orderBy('organizations.code')
-            ->orderBy('ebitda_values.scenario')
+            ->ordered()
             ->paginate(25)
-            ->through(fn (EbitdaValue $value): array => $this->transformEbitdaValue($value))
+            ->through(fn (Organization $organization): array => $this->transformOrganizationGroup($organization))
             ->appends($request->only(['search', 'year']));
 
         $organizations = Organization::query()
@@ -51,7 +52,7 @@ class EbitdaValueController extends Controller
             ->get(['id', 'code', 'name', 'level']);
 
         return Inertia::render('EbitdaValues/Index', [
-            'values' => $values,
+            'groups' => $groups,
             'organizations' => $organizations,
             'filters' => [
                 'search' => $search,
@@ -158,6 +159,30 @@ class EbitdaValueController extends Controller
                 'is_revenue_center' => $organization->is_revenue_center,
                 'is_cost_center' => $organization->is_cost_center,
             ] : null,
+        ];
+    }
+
+    /**
+     * @return array{organization: array<string, mixed>, values: array<int, array<string, mixed>>, is_unfilled: bool}
+     */
+    private function transformOrganizationGroup(Organization $organization): array
+    {
+        $values = $organization->ebitdaValues
+            ->map(fn (EbitdaValue $value): array => $this->transformEbitdaValue($value))
+            ->values()
+            ->all();
+
+        return [
+            'organization' => [
+                'id' => $organization->id,
+                'code' => $organization->code,
+                'name' => $organization->name,
+                'level' => $organization->level,
+                'is_revenue_center' => $organization->is_revenue_center,
+                'is_cost_center' => $organization->is_cost_center,
+            ],
+            'values' => $values,
+            'is_unfilled' => $values === [],
         ];
     }
 }
