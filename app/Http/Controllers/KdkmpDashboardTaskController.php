@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TaskAdditionalFieldInputType;
 use App\Enums\TaskReportStatus;
 use App\Models\EbitdamaxKdkmp;
 use App\Models\Role;
@@ -188,7 +189,7 @@ class KdkmpDashboardTaskController extends Controller
     }
 
     /**
-     * @return array<int, array{phase: string, phase_label: string, label: string, value: string|null}>
+     * @return array<int, array{phase: string, phase_label: string, label: string, value: string|null, file: array{phase: string, phase_label: string, name: string, mime_type: string|null, size: int, preview_url: string, download_url: string}|null}>
      */
     private function transformValues(TaskReport $taskReport): array
     {
@@ -199,13 +200,61 @@ class KdkmpDashboardTaskController extends Controller
                 $value->additionalField->sort_order,
                 $value->id,
             ])
-            ->map(fn (TaskReportValue $value): array => [
-                'phase' => $value->additionalField->show_when->value,
-                'phase_label' => $value->additionalField->show_when->label(),
-                'label' => $value->additionalField->label,
-                'value' => $value->value,
-            ])
+            ->map(function (TaskReportValue $value) use ($taskReport): array {
+                $field = $value->additionalField;
+
+                return [
+                    'phase' => $field->show_when->value,
+                    'phase_label' => $field->show_when->label(),
+                    'label' => $field->label,
+                    'value' => $value->value,
+                    'file' => $this->transformAdditionalFieldFile($taskReport, $value),
+                ];
+            })
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array{phase: string, phase_label: string, name: string, mime_type: string|null, size: int, preview_url: string, download_url: string}|null
+     */
+    private function transformAdditionalFieldFile(
+        TaskReport $taskReport,
+        TaskReportValue $value,
+    ): ?array {
+        $field = $value->additionalField;
+
+        if ($field === null || $field->input_type !== TaskAdditionalFieldInputType::File) {
+            return null;
+        }
+
+        $document = json_decode((string) $value->value, true);
+
+        if (! is_array($document) || ! isset($document['original_name'], $document['size'])) {
+            return null;
+        }
+
+        $routeParameters = [
+            'taskReport' => $taskReport,
+            'taskReportValue' => $value,
+        ];
+
+        return [
+            'phase' => $field->show_when->value,
+            'phase_label' => $field->show_when->label(),
+            'name' => (string) $document['original_name'],
+            'mime_type' => isset($document['mime_type']) ? (string) $document['mime_type'] : null,
+            'size' => (int) $document['size'],
+            'preview_url' => route(
+                'task-reports.additional-fields.preview',
+                $routeParameters,
+                absolute: false
+            ),
+            'download_url' => route(
+                'task-reports.additional-fields.download',
+                $routeParameters,
+                absolute: false
+            ),
+        ];
     }
 }

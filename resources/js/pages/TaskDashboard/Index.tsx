@@ -79,7 +79,7 @@ type OperationalAttendanceContext = {
     available: KdkmpOperationalAttendance;
 };
 
-type AdditionalFieldValue = string | string[] | boolean;
+type AdditionalFieldValue = string | string[] | boolean | File;
 
 type TaskActionFormData = {
     started_photo: File | null;
@@ -92,6 +92,8 @@ type TaskActionFormData = {
 const MAX_DOCUMENT_COUNT = 10;
 const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024;
 const MOBILE_DESCRIPTION_PREVIEW_LENGTH = 50;
+const ADDITIONAL_FIELD_FILE_ACCEPT =
+    '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png';
 
 function formatFileSize(size: number): string {
     if (size < 1024) {
@@ -188,6 +190,36 @@ function FieldPreview({
     value: AdditionalFieldValue | undefined;
     onChange: (value: AdditionalFieldValue) => void;
 }) {
+    if (field.input_type === 'file') {
+        const selectedFile = value instanceof File ? value : null;
+
+        return (
+            <div className="space-y-2">
+                <Input
+                    type="file"
+                    accept={ADDITIONAL_FIELD_FILE_ACCEPT}
+                    onChange={(event) => {
+                        const file = event.target.files?.[0];
+
+                        if (file) {
+                            onChange(file);
+                        }
+                    }}
+                />
+                <p className="text-xs text-muted-foreground">
+                    Maksimal 10 MB. Format: PDF, Office, TXT, CSV, JPG, atau
+                    PNG.
+                </p>
+                {selectedFile && (
+                    <p className="text-sm text-muted-foreground">
+                        Dipilih: {selectedFile.name} ·{' '}
+                        {formatFileSize(selectedFile.size)}
+                    </p>
+                )}
+            </div>
+        );
+    }
+
     if (field.input_type === 'textarea') {
         return (
             <textarea
@@ -719,8 +751,8 @@ function TaskActionDialog({
             : undefined,
         values: {},
     });
-    const shouldShowMemberAllocations = operationalAttendance !== undefined &&
-        operationalAttendance !== null;
+    const shouldShowMemberAllocations =
+        operationalAttendance !== undefined && operationalAttendance !== null;
     const mustSaveOperationalAttendance =
         shouldShowMemberAllocations && !operationalAttendance.is_saved;
     const memberAllocationValidationErrors: Partial<
@@ -1238,8 +1270,8 @@ function TaskActionDialog({
                             {mustSaveOperationalAttendance ? (
                                 <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
                                     Kehadiran anggota hari ini belum disimpan.
-                                    Buka Dashboard KDKMP dan simpan
-                                    kehadiran terlebih dahulu.
+                                    Buka Dashboard KDKMP dan simpan kehadiran
+                                    terlebih dahulu.
                                 </p>
                             ) : (
                                 <div className="grid gap-4 sm:grid-cols-2">
@@ -1285,7 +1317,9 @@ function TaskActionDialog({
                                                         inputMode="numeric"
                                                         min="0"
                                                         step="1"
-                                                        value={currentAllocation}
+                                                        value={
+                                                            currentAllocation
+                                                        }
                                                         aria-invalid={Boolean(
                                                             allocationError,
                                                         )}
@@ -1298,8 +1332,7 @@ function TaskActionDialog({
                                                                             event
                                                                                 .target
                                                                                 .value,
-                                                                        ) ||
-                                                                            0,
+                                                                        ) || 0,
                                                                     ),
                                                                 );
 
@@ -1321,7 +1354,8 @@ function TaskActionDialog({
                                                         tersedia: {available}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">
-                                                        Sisa setelah alokasi ini:{' '}
+                                                        Sisa setelah alokasi
+                                                        ini:{' '}
                                                         {Math.max(
                                                             0,
                                                             available -

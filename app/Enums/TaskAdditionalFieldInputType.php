@@ -16,6 +16,7 @@ enum TaskAdditionalFieldInputType: string
     case Select = 'select';
     case Radio = 'radio';
     case Checkbox = 'checkbox';
+    case File = 'file';
 
     public function label(): string
     {
@@ -32,6 +33,7 @@ enum TaskAdditionalFieldInputType: string
             self::Select => 'Select',
             self::Radio => 'Radio',
             self::Checkbox => 'Checkbox',
+            self::File => 'File Upload',
         };
     }
 

@@ -24,7 +24,8 @@ export type TaskAdditionalFieldInputType =
     | 'boolean'
     | 'select'
     | 'radio'
-    | 'checkbox';
+    | 'checkbox'
+    | 'file';
 
 export type TaskAdditionalFieldShowWhen = 'start' | 'finish';
 export type TaskPeriod = 'once' | 'daily' | 'weekly' | 'monthly';
@@ -52,6 +53,7 @@ export type TaskReportValue = {
     phase_label: string;
     label: string;
     value: string | null;
+    file: TaskReportDocument | null;
 };
 
 export type TaskAdditionalFieldItem = {

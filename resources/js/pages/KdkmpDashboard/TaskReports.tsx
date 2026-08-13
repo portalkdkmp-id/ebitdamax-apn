@@ -462,11 +462,73 @@ export default function KdkmpDashboardTaskReports({
                                                     <p className="mt-1 text-sm font-medium">
                                                         {reportValue.label}
                                                     </p>
-                                                    <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
-                                                        {formatReportValue(
-                                                            reportValue.value,
-                                                        )}
-                                                    </p>
+                                                    {reportValue.file ? (
+                                                        <div className="mt-3 flex flex-col gap-3 rounded-md border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between">
+                                                            <div className="flex min-w-0 items-center gap-2">
+                                                                <FileText className="size-4 shrink-0 text-muted-foreground" />
+                                                                <div className="min-w-0">
+                                                                    <p className="truncate text-sm text-muted-foreground">
+                                                                        {
+                                                                            reportValue
+                                                                                .file
+                                                                                .name
+                                                                        }
+                                                                    </p>
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        {formatFileSize(
+                                                                            reportValue
+                                                                                .file
+                                                                                .size,
+                                                                        )}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex shrink-0 gap-2">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="secondary"
+                                                                    size="sm"
+                                                                    asChild
+                                                                >
+                                                                    <a
+                                                                        href={
+                                                                            reportValue
+                                                                                .file
+                                                                                .preview_url
+                                                                        }
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                    >
+                                                                        <Eye className="size-3.5" />
+                                                                        Preview
+                                                                    </a>
+                                                                </Button>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="secondary"
+                                                                    size="sm"
+                                                                    asChild
+                                                                >
+                                                                    <a
+                                                                        href={
+                                                                            reportValue
+                                                                                .file
+                                                                                .download_url
+                                                                        }
+                                                                    >
+                                                                        <Download className="size-3.5" />
+                                                                        Unduh
+                                                                    </a>
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
+                                                            {formatReportValue(
+                                                                reportValue.value,
+                                                            )}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             ),
                                         )}

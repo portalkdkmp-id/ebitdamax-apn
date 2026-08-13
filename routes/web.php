@@ -118,6 +118,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->whereIn('phase', ['start', 'finish'])
         ->name('task-reports.photos.download');
 
+    Route::get(
+        '/task-reports/{taskReport}/additional-fields/{taskReportValue}/preview',
+        [TaskReportDocumentController::class, 'previewAdditionalField']
+    )->name('task-reports.additional-fields.preview');
+
+    Route::get(
+        '/task-reports/{taskReport}/additional-fields/{taskReportValue}/download',
+        [TaskReportDocumentController::class, 'downloadAdditionalField']
+    )->name('task-reports.additional-fields.download');
+
     Route::resource('meeting-minutes', MeetingMinuteController::class)
         ->except(['create', 'edit', 'show']);
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\StoreTaskReportDocumentsAction;
+use App\Enums\TaskAdditionalFieldInputType;
 use App\Enums\TaskAdditionalFieldShowWhen;
 use App\Enums\TaskPeriod;
 use App\Enums\TaskReportStatus;
@@ -18,6 +19,7 @@ use App\Services\KdkmpOperationalAllocationService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -118,7 +120,8 @@ class TaskReportController extends Controller
                     report: $report,
                     task: $task,
                     values: $request->validated('values', []),
-                    showWhen: TaskAdditionalFieldShowWhen::Start
+                    showWhen: TaskAdditionalFieldShowWhen::Start,
+                    storedFiles: $storedFiles,
                 );
             });
         } catch (Throwable $exception) {
@@ -179,7 +182,8 @@ class TaskReportController extends Controller
                     report: $report,
                     task: $task,
                     values: $request->validated('values', []),
-                    showWhen: TaskAdditionalFieldShowWhen::Finish
+                    showWhen: TaskAdditionalFieldShowWhen::Finish,
+                    storedFiles: $storedFiles,
                 );
             });
         } catch (Throwable $exception) {
@@ -262,12 +266,14 @@ class TaskReportController extends Controller
 
     /**
      * @param  array<string, mixed>  $values
+     * @param  array<int, array{disk: string, path: string}>  $storedFiles
      */
     private function syncValues(
         TaskReport $report,
         Task $task,
         array $values,
-        TaskAdditionalFieldShowWhen $showWhen
+        TaskAdditionalFieldShowWhen $showWhen,
+        array &$storedFiles,
     ): void {
         $fields = TaskAdditionalField::query()
             ->where('task_id', $task->id)
@@ -276,6 +282,30 @@ class TaskReportController extends Controller
 
         foreach ($fields as $field) {
             $value = $values[$field->field_name] ?? null;
+
+            if ($field->input_type === TaskAdditionalFieldInputType::File) {
+                if (! $value instanceof UploadedFile) {
+                    if ($field->is_required) {
+                        throw ValidationException::withMessages([
+                            "values.{$field->field_name}" => "{$field->label} wajib diisi.",
+                        ]);
+                    }
+
+                    continue;
+                }
+
+                $storedDocument = $this->storeTaskReportDocuments->storeAdditionalField(
+                    taskReport: $report,
+                    field: $field,
+                    file: $value,
+                    phase: $showWhen->value,
+                );
+                $storedFiles[] = [
+                    'disk' => $storedDocument['disk'],
+                    'path' => $storedDocument['path'],
+                ];
+                $value = json_encode($storedDocument, JSON_THROW_ON_ERROR);
+            }
 
             if ($field->is_required && $this->isEmptyValue($value)) {
                 throw ValidationException::withMessages([

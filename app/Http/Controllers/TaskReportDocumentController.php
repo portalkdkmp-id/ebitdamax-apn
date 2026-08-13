@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TaskAdditionalFieldInputType;
 use App\Models\TaskReport;
+use App\Models\TaskReportValue;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -81,6 +83,46 @@ class TaskReportDocumentController extends Controller
         );
     }
 
+    public function previewAdditionalField(
+        TaskReport $taskReport,
+        TaskReportValue $taskReportValue,
+    ): StreamedResponse {
+        Gate::authorize('view', $taskReport);
+
+        $document = $this->additionalFieldDocument($taskReport, $taskReportValue);
+        $storage = Storage::disk($document['disk']);
+
+        abort_unless($storage->exists($document['path']), 404);
+
+        return $storage->response(
+            $document['path'],
+            basename($document['original_name']),
+            [
+                'Content-Type' => $document['mime_type'] ?? 'application/octet-stream',
+                'X-Content-Type-Options' => 'nosniff',
+            ],
+            'inline'
+        );
+    }
+
+    public function downloadAdditionalField(
+        TaskReport $taskReport,
+        TaskReportValue $taskReportValue,
+    ): StreamedResponse {
+        Gate::authorize('view', $taskReport);
+
+        $document = $this->additionalFieldDocument($taskReport, $taskReportValue);
+        $storage = Storage::disk($document['disk']);
+
+        abort_unless($storage->exists($document['path']), 404);
+
+        return $storage->download(
+            $document['path'],
+            basename($document['original_name']),
+            ['Content-Type' => $document['mime_type'] ?? 'application/octet-stream']
+        );
+    }
+
     /**
      * @return array{disk: string, path: string, original_name: string, mime_type: string|null, size: int}
      */
@@ -129,6 +171,38 @@ class TaskReportDocumentController extends Controller
             'disk' => (string) config('filesystems.default', 'local'),
             'path' => $path,
             'original_name' => "foto-{$phaseLabel}-{$taskReport->uuid}".($extension !== '' ? ".{$extension}" : ''),
+        ];
+    }
+
+    /**
+     * @return array{disk: string, path: string, original_name: string, mime_type: string|null, size: int}
+     */
+    private function additionalFieldDocument(
+        TaskReport $taskReport,
+        TaskReportValue $taskReportValue,
+    ): array {
+        $taskReportValue->loadMissing('additionalField');
+
+        abort_unless(
+            $taskReportValue->task_report_id === $taskReport->id
+                && $taskReportValue->additionalField?->input_type === TaskAdditionalFieldInputType::File,
+            404
+        );
+
+        $document = json_decode((string) $taskReportValue->value, true);
+
+        abort_unless(
+            is_array($document)
+            && isset($document['disk'], $document['path'], $document['original_name'], $document['size']),
+            404
+        );
+
+        return [
+            'disk' => (string) $document['disk'],
+            'path' => (string) $document['path'],
+            'original_name' => (string) $document['original_name'],
+            'mime_type' => isset($document['mime_type']) ? (string) $document['mime_type'] : null,
+            'size' => (int) $document['size'],
         ];
     }
 }
