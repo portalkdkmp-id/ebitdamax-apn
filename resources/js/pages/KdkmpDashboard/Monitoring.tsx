@@ -252,6 +252,7 @@ export default function KdkmpDashboardMonitoring({
             provinsi?: string | null;
             kota_kabupaten?: string | null;
             kecamatan?: string | null;
+            desa?: string | null;
         } = {},
     ) => {
         const nextProvinsi =
@@ -266,12 +267,14 @@ export default function KdkmpDashboardMonitoring({
             region.kecamatan ??
             regionalAccess.locked_filters.kecamatan ??
             kecamatan;
+        const nextDesa =
+            region.desa ?? regionalAccess.locked_filters.desa ?? desa;
 
         setConsolidationLevel(level);
         setProvinsi(nextProvinsi);
         setKotaKabupaten(nextKotaKabupaten);
         setKecamatan(nextKecamatan);
-        setDesa(regionalAccess.locked_filters.desa ?? '');
+        setDesa(nextDesa);
 
         router.get(
             monitoringIndex.url(),
@@ -283,7 +286,7 @@ export default function KdkmpDashboardMonitoring({
                 provinsi: nextProvinsi,
                 kota_kabupaten: nextKotaKabupaten,
                 kecamatan: nextKecamatan,
-                desa: regionalAccess.locked_filters.desa ?? '',
+                desa: nextDesa,
             },
             { preserveState: true, preserveScroll: true },
         );
@@ -297,6 +300,7 @@ export default function KdkmpDashboardMonitoring({
                 provinsi: regionalAccess.locked_filters.provinsi,
                 kota_kabupaten: regionalAccess.locked_filters.kota_kabupaten,
                 kecamatan: regionalAccess.locked_filters.kecamatan,
+                desa: regionalAccess.locked_filters.desa ?? '',
             });
 
             return;
@@ -307,6 +311,7 @@ export default function KdkmpDashboardMonitoring({
                 provinsi: row.provinsi,
                 kota_kabupaten: regionalAccess.locked_filters.kota_kabupaten,
                 kecamatan: regionalAccess.locked_filters.kecamatan,
+                desa: regionalAccess.locked_filters.desa ?? '',
             });
 
             return;
@@ -317,6 +322,18 @@ export default function KdkmpDashboardMonitoring({
                 provinsi: row.provinsi,
                 kota_kabupaten: row.kota_kabupaten,
                 kecamatan: regionalAccess.locked_filters.kecamatan,
+                desa: regionalAccess.locked_filters.desa ?? '',
+            });
+
+            return;
+        }
+
+        if (consolidation.level === 'district') {
+            visitConsolidation('village', {
+                provinsi: row.provinsi,
+                kota_kabupaten: row.kota_kabupaten,
+                kecamatan: row.kecamatan,
+                desa: regionalAccess.locked_filters.desa ?? '',
             });
         }
     };
@@ -415,6 +432,9 @@ export default function KdkmpDashboardMonitoring({
                                             <SelectItem value="district">
                                                 Kecamatan
                                             </SelectItem>
+                                            <SelectItem value="village">
+                                                Desa
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -494,7 +514,7 @@ export default function KdkmpDashboardMonitoring({
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     {consolidation.level !==
-                                                        'district' && (
+                                                        'village' && (
                                                         <Button
                                                             type="button"
                                                             variant="outline"

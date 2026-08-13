@@ -12,7 +12,7 @@ class KdkmpConsolidationService
 {
     /**
      * @param  Builder<SdmKdkmpEntry>  $kdkmpEntries
-     * @return array<int, array{key: string, label: string, provinsi: string|null, kota_kabupaten: string|null, kecamatan: string|null, total_kdkmp: int, complete_kdkmp: int, plan_revenue: float|null, actual_revenue: float|null, gap: float|null}>
+     * @return array<int, array{key: string, label: string, provinsi: string|null, kota_kabupaten: string|null, kecamatan: string|null, desa: string|null, total_kdkmp: int, complete_kdkmp: int, plan_revenue: float|null, actual_revenue: float|null, gap: float|null}>
      */
     public function forEntries(
         Builder $kdkmpEntries,
@@ -30,6 +30,7 @@ class KdkmpConsolidationService
                 'provinsi',
                 'kota_kabupaten',
                 'kecamatan',
+                'desa',
             ])
             ->groupBy(fn (SdmKdkmpEntry $entry): string => $this->groupKey($entry, $level))
             ->map(function (Collection $entries) use ($level): array {
@@ -46,6 +47,7 @@ class KdkmpConsolidationService
                     'provinsi' => $firstEntry->provinsi,
                     'kota_kabupaten' => $firstEntry->kota_kabupaten,
                     'kecamatan' => $firstEntry->kecamatan,
+                    'desa' => $firstEntry->desa,
                     'total_kdkmp' => $entries->count(),
                     'complete_kdkmp' => $dailyRecords->count(),
                     'plan_revenue' => $planRevenue,
@@ -73,6 +75,12 @@ class KdkmpConsolidationService
                 $entry->kota_kabupaten,
                 $entry->kecamatan,
             ]),
+            'village' => implode('|', [
+                $entry->provinsi,
+                $entry->kota_kabupaten,
+                $entry->kecamatan,
+                $entry->desa,
+            ]),
             default => 'national',
         };
     }
@@ -83,6 +91,7 @@ class KdkmpConsolidationService
             'province' => (string) ($entry->provinsi ?? '-'),
             'regency' => (string) ($entry->kota_kabupaten ?? '-'),
             'district' => (string) ($entry->kecamatan ?? '-'),
+            'village' => (string) ($entry->desa ?? '-'),
             default => 'Indonesia',
         };
     }

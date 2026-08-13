@@ -85,7 +85,7 @@ export type KdkmpRegionOption = {
 };
 
 export type KdkmpConsolidationLevel =
-    'national' | 'province' | 'regency' | 'district';
+    'national' | 'province' | 'regency' | 'district' | 'village';
 
 export type KdkmpRegionalAccess = {
     is_national: boolean;
@@ -99,6 +99,7 @@ export type KdkmpConsolidationRow = {
     provinsi: string | null;
     kota_kabupaten: string | null;
     kecamatan: string | null;
+    desa: string | null;
     total_kdkmp: number;
     complete_kdkmp: number;
     plan_revenue: number | null;
