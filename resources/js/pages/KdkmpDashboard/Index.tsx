@@ -11,6 +11,7 @@ import {
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
+import KdkmpFinancialMatrixChart from '@/components/monitoring/KdkmpFinancialMatrixChart';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,9 +42,7 @@ import {
     emptyKdkmpOperationalAttendance,
     kdkmpOperationalAttendanceRoles,
 } from '@/lib/kdkmp-operational-attendance';
-import {
-    upsert,
-} from '@/routes/kdkmp-dashboard';
+import { upsert } from '@/routes/kdkmp-dashboard';
 import { save as saveOperationalAttendanceRoute } from '@/routes/kdkmp-dashboard/operational-attendance';
 import type {
     KdkmpDailyEntry,
@@ -325,6 +324,7 @@ export default function KdkmpDashboardIndex({
     kdkmp,
     todayEntry,
     computedValues,
+    financialMatrix,
     history,
 }: KdkmpManagerDashboardProps) {
     const { data, setData, put, processing, errors } = useForm<DailyForm>(
@@ -526,6 +526,10 @@ export default function KdkmpDashboardIndex({
                                 </Card>
                             </div>
 
+                            <KdkmpFinancialMatrixChart
+                                matrix={financialMatrix}
+                            />
+
                             <Card>
                                 <CardHeader className="border-b">
                                     <CardTitle>Input Data Hari Ini</CardTitle>
@@ -703,7 +707,8 @@ export default function KdkmpDashboardIndex({
                                                     </div>
                                                     <div className="rounded-md border bg-background px-3 py-2 text-sm">
                                                         <span className="text-muted-foreground">
-                                                            Jam Operasional:{' '}
+                                                            Jam
+                                                            Operasional:{' '}
                                                         </span>
                                                         <span className="font-semibold text-foreground">
                                                             08:00 - 17:00
@@ -721,9 +726,7 @@ export default function KdkmpDashboardIndex({
                                                                 <Label
                                                                     htmlFor={`operational-attendance-${role.key}`}
                                                                 >
-                                                                    {
-                                                                        role.label
-                                                                    }
+                                                                    {role.label}
                                                                 </Label>
                                                                 <Input
                                                                     id={`operational-attendance-${role.key}`}

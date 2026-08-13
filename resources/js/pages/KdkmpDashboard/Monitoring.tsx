@@ -37,7 +37,6 @@ import {
     index as monitoringIndex,
     tasks as monitoringTasks,
 } from '@/routes/admin/kdkmp-dashboard';
-import KdkmpRevenueGapChart from '@/components/monitoring/KdkmpRevenueGapChart';
 import type {
     KdkmpMonitoringEntry,
     KdkmpMonitoringProps,
@@ -46,8 +45,25 @@ import type {
 
 type MonitoringStatus = KdkmpMonitoringProps['filters']['status'];
 type RegionOptionField = keyof KdkmpRegionOption;
+type ConsolidationLevel = KdkmpMonitoringProps['consolidation']['level'];
 
 const ALL_REGION_VALUE = '__all_regions__';
+
+const consolidationLevelLabels: Record<ConsolidationLevel, string> = {
+    national: 'Nasional',
+    province: 'Provinsi',
+    regency: 'Kabupaten/Kota',
+    district: 'Kecamatan',
+    village: 'Desa',
+};
+
+const consolidationLevelOrder: ConsolidationLevel[] = [
+    'national',
+    'province',
+    'regency',
+    'district',
+    'village',
+];
 
 function formatDate(value: string): string {
     return new Intl.DateTimeFormat('id-ID', {
@@ -157,9 +173,115 @@ function LockedRegionValue({ value }: { value: string }) {
     );
 }
 
+function nextConsolidationLevel(
+    level: ConsolidationLevel,
+): ConsolidationLevel | null {
+    const levelIndex = consolidationLevelOrder.indexOf(level);
+
+    return consolidationLevelOrder[levelIndex + 1] ?? null;
+}
+
+function ConsolidationRegionCard({
+    level,
+    onClick,
+    row,
+}: {
+    level: ConsolidationLevel;
+    onClick: (() => void) | null;
+    row: KdkmpMonitoringProps['consolidation']['rows'][number];
+}) {
+    const nextLevel = nextConsolidationLevel(level);
+    const gapTone =
+        row.gap === null
+            ? 'text-muted-foreground'
+            : row.gap < 0
+              ? 'text-destructive'
+              : 'text-emerald-600';
+    const content = (
+        <div
+            className={`h-full rounded-xl border bg-card p-5 shadow-sm transition-all ${
+                onClick
+                    ? 'cursor-pointer hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md'
+                    : ''
+            }`}
+        >
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                        {consolidationLevelLabels[level]}
+                    </p>
+                    <h3 className="mt-1 text-lg font-semibold text-foreground">
+                        {row.label}
+                    </h3>
+                </div>
+                {onClick && (
+                    <div className="rounded-full bg-primary/10 p-2 text-primary">
+                        <ChevronRight className="size-4" />
+                    </div>
+                )}
+            </div>
+
+            <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
+                <div>
+                    <dt className="text-muted-foreground">KDKMP</dt>
+                    <dd className="mt-1 text-lg font-semibold text-foreground tabular-nums">
+                        {row.total_kdkmp.toLocaleString('id-ID')}
+                    </dd>
+                </div>
+                <div>
+                    <dt className="text-muted-foreground">Data Lengkap</dt>
+                    <dd className="mt-1 text-lg font-semibold text-foreground tabular-nums">
+                        {row.complete_kdkmp.toLocaleString('id-ID')}
+                    </dd>
+                </div>
+                <div>
+                    <dt className="text-muted-foreground">Plan Revenue</dt>
+                    <dd className="mt-1 font-semibold text-foreground tabular-nums">
+                        {formatRupiah(row.plan_revenue)}
+                    </dd>
+                </div>
+                <div>
+                    <dt className="text-muted-foreground">Actual Revenue</dt>
+                    <dd className="mt-1 font-semibold text-foreground tabular-nums">
+                        {formatRupiah(row.actual_revenue)}
+                    </dd>
+                </div>
+                <div className="col-span-2 border-t pt-3">
+                    <dt className="text-muted-foreground">Gap</dt>
+                    <dd
+                        className={`mt-1 font-semibold tabular-nums ${gapTone}`}
+                    >
+                        {formatRupiah(row.gap)}
+                    </dd>
+                </div>
+            </dl>
+
+            <p className="mt-5 text-sm text-muted-foreground">
+                {nextLevel
+                    ? `Klik untuk melihat ${consolidationLevelLabels[nextLevel]}.`
+                    : 'Level wilayah terkecil.'}
+            </p>
+        </div>
+    );
+
+    if (!onClick) {
+        return content;
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className="h-full w-full text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+            aria-label={`Lihat ${nextLevel ? consolidationLevelLabels[nextLevel] : 'rincian'} dari ${row.label}`}
+        >
+            {content}
+        </button>
+    );
+}
+
 export default function KdkmpDashboardMonitoring({
     businessDate,
-    revenueGap,
     regionOptions,
     entries,
     summary,
@@ -247,7 +369,7 @@ export default function KdkmpDashboardMonitoring({
     };
 
     const visitConsolidation = (
-        level: KdkmpMonitoringProps['consolidation']['level'],
+        level: ConsolidationLevel,
         region: {
             provinsi?: string | null;
             kota_kabupaten?: string | null;
@@ -256,19 +378,19 @@ export default function KdkmpDashboardMonitoring({
         } = {},
     ) => {
         const nextProvinsi =
-            region.provinsi ??
             regionalAccess.locked_filters.provinsi ??
+            region.provinsi ??
             provinsi;
         const nextKotaKabupaten =
-            region.kota_kabupaten ??
             regionalAccess.locked_filters.kota_kabupaten ??
+            region.kota_kabupaten ??
             kotaKabupaten;
         const nextKecamatan =
-            region.kecamatan ??
             regionalAccess.locked_filters.kecamatan ??
+            region.kecamatan ??
             kecamatan;
         const nextDesa =
-            region.desa ?? regionalAccess.locked_filters.desa ?? desa;
+            regionalAccess.locked_filters.desa ?? region.desa ?? desa;
 
         setConsolidationLevel(level);
         setProvinsi(nextProvinsi);
@@ -290,6 +412,23 @@ export default function KdkmpDashboardMonitoring({
             },
             { preserveState: true, preserveScroll: true },
         );
+    };
+
+    const visitHierarchyLevel = (level: ConsolidationLevel) => {
+        const currentProvinsi =
+            level === 'national' || level === 'province' ? '' : provinsi;
+        const currentKotaKabupaten =
+            level === 'national' || level === 'province' || level === 'regency'
+                ? ''
+                : kotaKabupaten;
+        const currentKecamatan = level === 'village' ? kecamatan : '';
+
+        visitConsolidation(level, {
+            provinsi: currentProvinsi,
+            kota_kabupaten: currentKotaKabupaten,
+            kecamatan: currentKecamatan,
+            desa: '',
+        });
     };
 
     const drillDown = (
@@ -337,6 +476,12 @@ export default function KdkmpDashboardMonitoring({
             });
         }
     };
+    const visibleConsolidationLevels = regionalAccess.is_national
+        ? consolidationLevelOrder
+        : consolidationLevelOrder.filter((level) => level !== 'national');
+    const currentConsolidationLevelIndex = visibleConsolidationLevels.indexOf(
+        consolidation.level,
+    );
 
     return (
         <>
@@ -393,152 +538,88 @@ export default function KdkmpDashboardMonitoring({
 
                     <Card>
                         <CardContent className="space-y-5 p-5">
-                            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                                <div>
-                                    <h2 className="font-semibold text-foreground">
-                                        Consolidated View
-                                    </h2>
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        Data terakumulasi berdasarkan hierarki
-                                        wilayah. Gunakan drill-down untuk
-                                        melihat rincian level berikutnya.
-                                    </p>
-                                </div>
-                                <div className="w-full space-y-2 lg:w-64">
-                                    <Label>Level Konsolidasi</Label>
-                                    <Select
-                                        value={consolidationLevel}
-                                        onValueChange={(value) =>
-                                            visitConsolidation(
-                                                value as KdkmpMonitoringProps['consolidation']['level'],
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {regionalAccess.is_national && (
-                                                <SelectItem value="national">
-                                                    Nasional
-                                                </SelectItem>
-                                            )}
-                                            <SelectItem value="province">
-                                                Provinsi
-                                            </SelectItem>
-                                            <SelectItem value="regency">
-                                                Kabupaten/Kota
-                                            </SelectItem>
-                                            <SelectItem value="district">
-                                                Kecamatan
-                                            </SelectItem>
-                                            <SelectItem value="village">
-                                                Desa
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                            <div>
+                                <h2 className="font-semibold text-foreground">
+                                    Pohon EBITDA KDKMP
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Telusuri ringkasan EBITDA berdasarkan
+                                    hierarki wilayah melalui kartu di bawah.
+                                </p>
                             </div>
 
-                            <div className="overflow-x-auto rounded-md border">
-                                <Table className="min-w-[960px]">
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Wilayah</TableHead>
-                                            <TableHead className="text-right">
-                                                KDKMP
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Data Lengkap
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Plan Revenue
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Actual Revenue
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Gap
-                                            </TableHead>
-                                            <TableHead className="w-36 text-right">
-                                                Aksi
-                                            </TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {consolidation.rows.length === 0 && (
-                                            <TableRow>
-                                                <TableCell
-                                                    colSpan={7}
-                                                    className="py-8 text-center text-muted-foreground"
+                            <nav
+                                aria-label="Hierarki wilayah"
+                                className="flex flex-wrap items-center gap-2 text-sm"
+                            >
+                                {visibleConsolidationLevels
+                                    .slice(
+                                        0,
+                                        currentConsolidationLevelIndex + 1,
+                                    )
+                                    .map((level, index) => (
+                                        <div
+                                            key={level}
+                                            className="flex items-center gap-2"
+                                        >
+                                            {index > 0 && (
+                                                <ChevronRight className="size-4 text-muted-foreground" />
+                                            )}
+                                            {level === consolidation.level ? (
+                                                <span
+                                                    aria-current="page"
+                                                    className="font-semibold text-foreground"
                                                 >
-                                                    Belum ada KDKMP pada cakupan
-                                                    wilayah ini.
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                        {consolidation.rows.map((row) => (
-                                            <TableRow key={row.key}>
-                                                <TableCell className="font-medium">
-                                                    {row.label}
-                                                </TableCell>
-                                                <TableCell className="text-right tabular-nums">
-                                                    {row.total_kdkmp.toLocaleString(
-                                                        'id-ID',
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right tabular-nums">
-                                                    {row.complete_kdkmp.toLocaleString(
-                                                        'id-ID',
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right tabular-nums">
-                                                    {formatRupiah(
-                                                        row.plan_revenue,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right tabular-nums">
-                                                    {formatRupiah(
-                                                        row.actual_revenue,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell
-                                                    className={`text-right font-medium tabular-nums ${
-                                                        row.gap !== null &&
-                                                        row.gap < 0
-                                                            ? 'text-destructive'
-                                                            : 'text-emerald-600'
-                                                    }`}
+                                                    {
+                                                        consolidationLevelLabels[
+                                                            level
+                                                        ]
+                                                    }
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        visitHierarchyLevel(
+                                                            level,
+                                                        )
+                                                    }
+                                                    className="text-primary hover:underline"
                                                 >
-                                                    {formatRupiah(row.gap)}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {consolidation.level !==
-                                                        'village' && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                drillDown(row)
-                                                            }
-                                                        >
-                                                            Drill-down
-                                                            <ChevronRight className="size-4" />
-                                                        </Button>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
+                                                    {
+                                                        consolidationLevelLabels[
+                                                            level
+                                                        ]
+                                                    }
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                            </nav>
+
+                            {consolidation.rows.length === 0 ? (
+                                <div className="flex min-h-48 items-center justify-center rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                    Belum ada KDKMP pada cakupan wilayah ini.
+                                </div>
+                            ) : (
+                                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                                    {consolidation.rows.map((row) => (
+                                        <ConsolidationRegionCard
+                                            key={row.key}
+                                            level={consolidation.level}
+                                            row={row}
+                                            onClick={
+                                                consolidation.level ===
+                                                'village'
+                                                    ? null
+                                                    : () => drillDown(row)
+                                            }
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
-
-                    <div className="overflow-x-auto">
-                        <KdkmpRevenueGapChart data={revenueGap.trend} />
-                    </div>
 
                     <Card>
                         <CardContent className="space-y-5 p-5">

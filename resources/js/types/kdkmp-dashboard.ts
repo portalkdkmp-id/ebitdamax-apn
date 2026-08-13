@@ -63,11 +63,29 @@ export type KdkmpDailyEntry = KdkmpDashboardFields &
         updated_at: string | null;
     };
 
-export type KdkmpRevenueGapPoint = {
-    date: string;
+export type KdkmpFinancialMatrixPoint = {
+    process: number;
+    task_id: number;
+    task_name: string;
+    estimated_minutes: number;
+    actual_duration_minutes: number;
+    plan_cost: number | null;
+    actual_cost: number | null;
+    cumulative_plan_cost: number | null;
+    cumulative_actual_cost: number | null;
+};
+
+export type KdkmpFinancialMatrix = {
+    daily_cost_budget: number;
+    total_estimated_minutes: number;
+    total_actual_duration_minutes: number;
+    total_plan_cost: number | null;
+    total_actual_cost: number | null;
     plan_revenue: number | null;
     actual_revenue: number | null;
-    gap: number | null;
+    plan_ebitda: number | null;
+    actual_ebitda: number | null;
+    points: KdkmpFinancialMatrixPoint[];
 };
 
 export type KdkmpRegionFilters = {
@@ -112,6 +130,7 @@ export type KdkmpManagerDashboardProps = {
     kdkmp: KdkmpIdentity | null;
     todayEntry: KdkmpDailyEntry | null;
     computedValues: KdkmpComputedValues;
+    financialMatrix: KdkmpFinancialMatrix;
     history: PaginatedResponse<KdkmpDailyEntry>;
 };
 
@@ -140,13 +159,6 @@ export type KdkmpMonitoringProps = {
     consolidation: {
         level: KdkmpConsolidationLevel;
         rows: KdkmpConsolidationRow[];
-    };
-    revenueGap: {
-        period: {
-            start_date: string;
-            end_date: string;
-        };
-        trend: KdkmpRevenueGapPoint[];
     };
     entries: PaginatedResponse<KdkmpMonitoringEntry>;
     summary: {

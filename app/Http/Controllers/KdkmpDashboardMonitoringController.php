@@ -8,7 +8,6 @@ use App\Models\SdmKdkmpEntry;
 use App\Models\User;
 use App\Services\KdkmpConsolidationService;
 use App\Services\KdkmpDashboardMetricsService;
-use App\Services\KdkmpRevenueAnalyticsService;
 use App\Services\RegionalAccessService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,7 +18,6 @@ class KdkmpDashboardMonitoringController extends Controller
 {
     public function __construct(
         private readonly KdkmpDashboardMetricsService $dashboardMetrics,
-        private readonly KdkmpRevenueAnalyticsService $revenueAnalytics,
         private readonly KdkmpConsolidationService $consolidation,
         private readonly RegionalAccessService $regionalAccess,
     ) {}
@@ -124,10 +122,6 @@ class KdkmpDashboardMonitoringController extends Controller
                 ...$metrics,
             ]);
         });
-        $revenueGap = $this->revenueAnalytics->forKdkmpEntries(
-            $selectedBusinessDate,
-            clone $baseQuery,
-        );
         $consolidation = $this->consolidation->forEntries(
             clone $baseQuery,
             $reportDate,
@@ -155,13 +149,6 @@ class KdkmpDashboardMonitoringController extends Controller
             'consolidation' => [
                 'level' => $consolidationLevel,
                 'rows' => $consolidation,
-            ],
-            'revenueGap' => [
-                'period' => [
-                    'start_date' => $revenueGap['start_date'],
-                    'end_date' => $revenueGap['end_date'],
-                ],
-                'trend' => $revenueGap['points'],
             ],
         ]);
     }

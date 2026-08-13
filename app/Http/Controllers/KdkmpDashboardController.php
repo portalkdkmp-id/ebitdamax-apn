@@ -8,6 +8,7 @@ use App\Models\EbitdamaxKdkmp;
 use App\Models\SdmKdkmpEntry;
 use App\Models\User;
 use App\Services\KdkmpDashboardMetricsService;
+use App\Services\KdkmpFinancialMatrixService;
 use App\Services\KdkmpOperationalAllocationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +23,7 @@ class KdkmpDashboardController extends Controller
 {
     public function __construct(
         private readonly KdkmpDashboardMetricsService $dashboardMetrics,
+        private readonly KdkmpFinancialMatrixService $financialMatrix,
         private readonly KdkmpOperationalAllocationService $operationalAllocation,
     ) {}
 
@@ -72,6 +74,12 @@ class KdkmpDashboardController extends Controller
                 ? $this->transformEntry($todayEntry, $computedValues)
                 : null,
             'computedValues' => $computedValues,
+            'financialMatrix' => $this->financialMatrix->forUser(
+                user: $user,
+                businessDate: $businessDate,
+                planRevenue: $todayEntry?->plan_revenue,
+                actualRevenue: $todayEntry?->actual_revenue,
+            ),
             'history' => $history,
         ]);
     }
