@@ -50,7 +50,10 @@ import { cn, toUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import { index as adminKdkmpDashboardIndex } from '@/routes/admin/kdkmp-dashboard';
-import { index as kdkmpDashboardIndex } from '@/routes/kdkmp-dashboard';
+import {
+    index as kdkmpDashboardIndex,
+    input as kdkmpDashboardInput,
+} from '@/routes/kdkmp-dashboard';
 import { index as rolesIndex } from '@/routes/roles';
 import { index as taskCategoriesIndex } from '@/routes/task-categories';
 import { completed as taskDashboardCompleted } from '@/routes/task-dashboard';
@@ -136,6 +139,11 @@ const kdkmpManagerNavItems: NavItem[] = [
         title: 'Dashboard KDKMP',
         href: kdkmpDashboardIndex(),
         icon: Gauge,
+    },
+    {
+        title: 'Input Data Hari Ini',
+        href: kdkmpDashboardInput(),
+        icon: ClipboardList,
     },
     {
         title: 'Consolidated View KDKMP',

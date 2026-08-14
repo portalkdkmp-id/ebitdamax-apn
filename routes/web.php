@@ -42,6 +42,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard/kdkmp', [KdkmpDashboardController::class, 'index'])
         ->name('kdkmp-dashboard.index');
 
+    Route::get('/dashboard/kdkmp/input', [KdkmpDashboardController::class, 'input'])
+        ->name('kdkmp-dashboard.input');
+
     Route::put('/dashboard/kdkmp/today', [KdkmpDashboardController::class, 'upsert'])
         ->name('kdkmp-dashboard.upsert');
 

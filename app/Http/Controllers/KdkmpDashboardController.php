@@ -84,6 +84,44 @@ class KdkmpDashboardController extends Controller
         ]);
     }
 
+    public function input(Request $request): Response
+    {
+        Gate::authorize('viewDashboard', EbitdamaxKdkmp::class);
+
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        $businessDate = $this->businessDate();
+        $sdmKdkmpEntry = $user->sdmKdkmpEntry;
+        $todayEntry = $sdmKdkmpEntry
+            ? $sdmKdkmpEntry->dailyEbitdaRecords()
+                ->whereDate('report_date', $businessDate->toDateString())
+                ->first()
+            : null;
+        $metrics = $this->dashboardMetrics->forUser($user->id, $businessDate);
+        $computedValues = [
+            'target_revenue' => EbitdamaxKdkmp::TARGET_REVENUE,
+            ...$metrics,
+            'performance_scoring' => EbitdamaxKdkmp::calculatePerformanceScoring(
+                $todayEntry?->plan_revenue,
+                $todayEntry?->actual_revenue,
+                $metrics['task_completion_rate'],
+                $metrics['time_compliance_rate'],
+            ),
+        ];
+
+        return Inertia::render('KdkmpDashboard/Input', [
+            'businessDate' => $businessDate->toDateString(),
+            'kdkmp' => $sdmKdkmpEntry
+                ? $this->transformKdkmp($sdmKdkmpEntry)
+                : null,
+            'todayEntry' => $todayEntry
+                ? $this->transformEntry($todayEntry, $computedValues)
+                : null,
+            'computedValues' => $computedValues,
+        ]);
+    }
+
     public function upsert(SaveEbitdamaxKdkmpRequest $request): RedirectResponse
     {
         $user = $request->user();
