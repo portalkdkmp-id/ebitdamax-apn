@@ -14,7 +14,7 @@ import {
     X,
 } from 'lucide-react';
 import type { ChangeEvent } from 'react';
-import { Fragment, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -105,6 +105,27 @@ function formatFileSize(size: number): string {
     }
 
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function cameraAccessErrorMessage(error: unknown): string {
+    const errorName = error instanceof DOMException ? error.name : null;
+
+    switch (errorName) {
+        case 'NotAllowedError':
+            return 'Izin kamera ditolak atau diblokir. Izinkan kamera pada pengaturan browser, lalu coba lagi.';
+        case 'NotFoundError':
+            return 'Kamera tidak ditemukan pada perangkat ini. Pastikan kamera tersedia dan tidak dinonaktifkan.';
+        case 'NotReadableError':
+            return 'Kamera sedang digunakan oleh aplikasi lain. Tutup aplikasi tersebut, lalu coba lagi.';
+        case 'SecurityError':
+            return 'Akses kamera diblokir oleh keamanan browser. Gunakan halaman HTTPS.';
+        case 'OverconstrainedError':
+            return 'Kamera perangkat tidak sesuai dengan konfigurasi yang diminta. Coba gunakan kamera lain.';
+        case 'AbortError':
+            return 'Kamera tidak dapat dimulai. Silakan coba buka kamera lagi.';
+        default:
+            return 'Kamera tidak dapat diakses. Silakan coba lagi.';
+    }
 }
 
 function fieldsFor(task: DashboardTask | null, showWhen: 'start' | 'finish') {
@@ -723,11 +744,16 @@ function TaskActionDialog({
     const galleryInputRef = useRef<HTMLInputElement | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
+    const cameraRequestRef = useRef(0);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [compressionLabel, setCompressionLabel] = useState<string | null>(
         null,
     );
     const [cameraActive, setCameraActive] = useState(false);
+    const [cameraStream, setCameraStream] = useState<MediaStream | null>(
+        null,
+    );
+    const [isOpeningCamera, setIsOpeningCamera] = useState(false);
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [documentInputKey, setDocumentInputKey] = useState(0);
     const [documentSelectionError, setDocumentSelectionError] = useState<
@@ -800,24 +826,82 @@ function TaskActionDialog({
         );
     };
 
-    const stopCamera = () => {
+    const releaseCamera = () => {
         streamRef.current?.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
+        setCameraStream(null);
         setCameraActive(false);
     };
+
+    const stopCamera = () => {
+        cameraRequestRef.current += 1;
+        releaseCamera();
+        setIsOpeningCamera(false);
+    };
+
+    useEffect(() => {
+        const video = videoRef.current;
+
+        if (!cameraStream || !video) {
+            return;
+        }
+
+        const playPreview = async () => {
+            try {
+                await video.play();
+            } catch (error) {
+                setCameraError(cameraAccessErrorMessage(error));
+            }
+        };
+        const handleLoadedMetadata = () => {
+            void playPreview();
+        };
+
+        video.srcObject = cameraStream;
+
+        if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+            void playPreview();
+        } else {
+            video.addEventListener('loadedmetadata', handleLoadedMetadata, {
+                once: true,
+            });
+        }
+
+        return () => {
+            video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.pause();
+
+            if (video.srcObject === cameraStream) {
+                video.srcObject = null;
+            }
+        };
+    }, [cameraStream]);
+
+    useEffect(() => {
+        return () => {
+            cameraRequestRef.current += 1;
+            streamRef.current?.getTracks().forEach((track) => track.stop());
+            streamRef.current = null;
+        };
+    }, []);
 
     const openCamera = async () => {
         setCameraError(null);
 
         if (!navigator.mediaDevices?.getUserMedia) {
-            setCameraError('Browser tidak mendukung akses kamera langsung.');
+            setCameraError(
+                'Kamera hanya dapat diakses melalui browser modern pada halaman HTTPS.',
+            );
 
             return;
         }
 
-        try {
-            stopCamera();
+        const requestId = cameraRequestRef.current + 1;
+        cameraRequestRef.current = requestId;
+        releaseCamera();
+        setIsOpeningCamera(true);
 
+        try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode: { ideal: 'environment' },
@@ -825,18 +909,23 @@ function TaskActionDialog({
                 audio: false,
             });
 
-            streamRef.current = stream;
-            setCameraActive(true);
-            await new Promise((resolve) => requestAnimationFrame(resolve));
+            if (cameraRequestRef.current !== requestId) {
+                stream.getTracks().forEach((track) => track.stop());
 
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                await videoRef.current.play();
+                return;
             }
-        } catch {
-            setCameraError(
-                'Kamera tidak dapat diakses. Pastikan permission kamera diizinkan.',
-            );
+
+            streamRef.current = stream;
+            setCameraStream(stream);
+            setCameraActive(true);
+        } catch (error) {
+            if (cameraRequestRef.current === requestId) {
+                setCameraError(cameraAccessErrorMessage(error));
+            }
+        } finally {
+            if (cameraRequestRef.current === requestId) {
+                setIsOpeningCamera(false);
+            }
         }
     };
 
@@ -1012,6 +1101,7 @@ function TaskActionDialog({
                                         <video
                                             ref={videoRef}
                                             className="h-full w-full object-cover"
+                                            autoPlay
                                             muted
                                             playsInline
                                         />
@@ -1046,9 +1136,14 @@ function TaskActionDialog({
                                             type="button"
                                             variant="outline"
                                             onClick={() => void openCamera()}
+                                            disabled={
+                                                cameraActive || isOpeningCamera
+                                            }
                                         >
                                             <Camera className="size-4" />
-                                            Buka Kamera
+                                            {isOpeningCamera
+                                                ? 'Membuka Kamera...'
+                                                : 'Buka Kamera'}
                                         </Button>
                                         {cameraActive && (
                                             <>
