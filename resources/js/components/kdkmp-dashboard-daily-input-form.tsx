@@ -1,7 +1,7 @@
 import { useForm } from '@inertiajs/react';
 import { AlertTriangle, Save } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,14 +45,19 @@ type OperationalAttendanceForm = {
 };
 
 type Props = {
+    businessDate: string;
     todayEntry: KdkmpDailyEntry | null;
     computedValues: KdkmpComputedValues;
+    kdkmpId: number;
 };
 
 const ACTUAL_EBITDA_MARGIN_FIXED_COST = 9_172_133;
 const TASK_COMPLETION_WEIGHT = 55;
 const TIME_COMPLIANCE_WEIGHT = 30;
 const REVENUE_WEIGHT = 15;
+const POS_ACTUAL_REVENUE = '0';
+const MANUAL_ACTUAL_REVENUE_STORAGE_PREFIX =
+    'ebitdamax-kdkmp.manual-actual-revenue';
 
 function inputValue(value: string | null | undefined): string {
     return value ?? '';
@@ -179,6 +184,31 @@ function calculatePlanRevenue(data: DailyForm): string {
         : '';
 }
 
+function isRevenueValue(value: string): boolean {
+    return value === '' || /^\d+(?:\.\d{1,2})?$/.test(value);
+}
+
+function calculateActualRevenue(manualRevenue: string): string {
+    const manualRevenueValue = manualRevenue === '' ? 0 : Number(manualRevenue);
+    const posRevenueValue = Number(POS_ACTUAL_REVENUE);
+
+    if (
+        !Number.isFinite(manualRevenueValue) ||
+        !Number.isFinite(posRevenueValue)
+    ) {
+        return POS_ACTUAL_REVENUE;
+    }
+
+    return (manualRevenueValue + posRevenueValue)
+        .toFixed(2)
+        .replace(/\.00$/, '')
+        .replace(/(\.\d)0$/, '$1');
+}
+
+function manualRevenueStorageKey(kdkmpId: number, businessDate: string): string {
+    return `${MANUAL_ACTUAL_REVENUE_STORAGE_PREFIX}:${kdkmpId}:${businessDate}`;
+}
+
 function calculateActualEbitdaMargin(actualRevenue: string): string {
     if (actualRevenue.trim() === '') {
         return '';
@@ -280,8 +310,10 @@ function formatManualValue(value: string | null, isRupiah: boolean): string {
 }
 
 export default function KdkmpDashboardDailyInputForm({
+    businessDate,
     todayEntry,
     computedValues,
+    kdkmpId,
 }: Props) {
     const { data, setData, put, processing, errors } = useForm<DailyForm>(
         formDataFrom(todayEntry),
@@ -297,6 +329,44 @@ export default function KdkmpDashboardDailyInputForm({
     );
     const [showLowPlanRevenueConfirmation, setShowLowPlanRevenueConfirmation] =
         useState(false);
+    const [manualActualRevenue, setManualActualRevenue] = useState(() =>
+        inputValue(todayEntry?.actual_revenue),
+    );
+    const storageKey = manualRevenueStorageKey(kdkmpId, businessDate);
+
+    useEffect(() => {
+        let storedManualRevenue: string | null = null;
+
+        try {
+            storedManualRevenue = window.localStorage.getItem(storageKey);
+        } catch {
+            storedManualRevenue = null;
+        }
+
+        const restoredManualRevenue =
+            storedManualRevenue !== null && isRevenueValue(storedManualRevenue)
+                ? storedManualRevenue
+                : inputValue(todayEntry?.actual_revenue);
+
+        setManualActualRevenue(restoredManualRevenue);
+        setData(
+            'actual_revenue',
+            calculateActualRevenue(restoredManualRevenue),
+        );
+    }, [storageKey, todayEntry?.actual_revenue, setData]);
+
+    const updateManualActualRevenue = (value: string) => {
+        const normalizedValue = value.startsWith('-') ? '' : value;
+
+        setManualActualRevenue(normalizedValue);
+        setData('actual_revenue', calculateActualRevenue(normalizedValue));
+
+        try {
+            window.localStorage.setItem(storageKey, normalizedValue);
+        } catch {
+            return;
+        }
+    };
 
     const save = () => {
         setShowLowPlanRevenueConfirmation(false);
@@ -329,8 +399,7 @@ export default function KdkmpDashboardDailyInputForm({
     };
 
     const revenueFields = kdkmpDashboardFields.filter(
-        (field) =>
-            field.key === 'target_revenue' || field.key === 'actual_revenue',
+        (field) => field.key === 'target_revenue',
     );
     const costFields = kdkmpDashboardFields.filter(
         (field) =>
@@ -347,10 +416,7 @@ export default function KdkmpDashboardDailyInputForm({
     const renderDashboardField = (
         field: (typeof kdkmpDashboardFields)[number],
     ) => {
-        const editableField =
-            field.key === 'actual_revenue' || field.key === 'plan_cost'
-                ? field.key
-                : null;
+        const editableField = field.key === 'plan_cost' ? field.key : null;
         const fieldValue = dashboardFieldValue(data, field.key, computedValues);
 
         return (
@@ -407,6 +473,54 @@ export default function KdkmpDashboardDailyInputForm({
 
                                 <div className="grid gap-5 md:grid-cols-2">
                                     {revenueFields.map(renderDashboardField)}
+                                    <div className="space-y-2">
+                                        <Label>Pendapatan POS</Label>
+                                        <p className="py-2 text-sm font-semibold text-foreground tabular-nums">
+                                            {formatManualValue(
+                                                POS_ACTUAL_REVENUE,
+                                                true,
+                                            )}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Nilai otomatis dari POS. Integrasi
+                                            POS belum tersedia sehingga saat ini
+                                            bernilai Rp0.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="actual-revenue-manual">
+                                            Pendapatan Manual
+                                        </Label>
+                                        <RupiahInput
+                                            id="actual-revenue-manual"
+                                            value={manualActualRevenue}
+                                            onValueChange={
+                                                updateManualActualRevenue
+                                            }
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Disimpan sementara pada browser ini
+                                            untuk KDKMP dan tanggal laporan
+                                            tersebut.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Actual Revenue</Label>
+                                        <p className="py-2 text-sm font-semibold text-foreground tabular-nums">
+                                            {formatManualValue(
+                                                calculateActualRevenue(
+                                                    manualActualRevenue,
+                                                ),
+                                                true,
+                                            )}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Akumulasi Pendapatan POS dan
+                                            Pendapatan Manual.
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-4 border-t pt-5">
