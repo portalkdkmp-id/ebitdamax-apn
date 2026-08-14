@@ -56,7 +56,7 @@ class RegionalAccessService
     /**
      * @return array{is_national: bool, scope_label: string, locked_filters: array{provinsi: string|null, kota_kabupaten: string|null, kecamatan: string|null, desa: string|null}}
      */
-    public function filterContext(User $user): array
+    public function filterContext(User $user, ?array $regionOptions = null): array
     {
         if ($user->role?->level === RoleLevel::Superadmin) {
             return [
@@ -71,7 +71,7 @@ class RegionalAccessService
             ];
         }
 
-        $options = $this->regionOptions($user);
+        $options = $regionOptions ?? $this->regionOptions($user);
         $lockedFilters = [];
 
         foreach (SdmKdkmpEntry::REGION_FIELDS as $field) {
@@ -86,7 +86,9 @@ class RegionalAccessService
                 : null;
         }
 
-        $assignmentCount = $user->regionalAssignments()->count();
+        $assignmentCount = $user->relationLoaded('regionalAssignments')
+            ? $user->regionalAssignments->count()
+            : $user->regionalAssignments()->count();
         $scopeLabel = $assignmentCount > 1
             ? "{$assignmentCount} cakupan wilayah"
             : ($user->sdm_kdkmp_entry_id !== null ? 'KDKMP sendiri' : 'Wilayah penugasan');

@@ -29,6 +29,8 @@ services:
       REDIS_CLIENT: phpredis
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      REDIS_CACHE_DB: "${REDIS_CACHE_DB:-1}"
+      KDKMP_MONITORING_CACHE_TTL_SECONDS: "${KDKMP_MONITORING_CACHE_TTL_SECONDS:-300}"
       CACHE_STORE: "${CACHE_STORE:-database}"
       SESSION_DRIVER: "${SESSION_DRIVER:-database}"
       QUEUE_CONNECTION: "${QUEUE_CONNECTION:-database}"
@@ -80,7 +82,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "127.0.0.1:${REDIS_FORWARD_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_FORWARD_PORT:-6378}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

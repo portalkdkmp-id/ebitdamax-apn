@@ -8,6 +8,7 @@ use App\Models\SdmKdkmpEntry;
 use App\Models\User;
 use App\Services\KdkmpConsolidationService;
 use App\Services\KdkmpDashboardMetricsService;
+use App\Services\KdkmpMonitoringCacheService;
 use App\Services\RegionalAccessService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,6 +20,7 @@ class KdkmpDashboardMonitoringController extends Controller
     public function __construct(
         private readonly KdkmpDashboardMetricsService $dashboardMetrics,
         private readonly KdkmpConsolidationService $consolidation,
+        private readonly KdkmpMonitoringCacheService $cache,
         private readonly RegionalAccessService $regionalAccess,
     ) {}
 
@@ -32,22 +34,80 @@ class KdkmpDashboardMonitoringController extends Controller
         $search = trim((string) ($request->validated('search') ?? ''));
         $status = (string) ($request->validated('status') ?? 'all');
         $regionFilters = $this->regionFilters($request);
-        $regionalAccess = $this->regionalAccess->filterContext($user);
+        $regionOptions = $this->cache->remember(
+            user: $user,
+            segment: 'region-options',
+            parameters: [],
+            resolver: fn (): array => $this->regionalAccess->regionOptions($user),
+        );
+        $regionalAccess = $this->regionalAccess->filterContext($user, $regionOptions);
         $consolidationLevel = (string) ($request->validated('consolidation_level') ?? 'national');
 
         if (! $regionalAccess['is_national'] && $consolidationLevel === 'national') {
             $consolidationLevel = 'province';
         }
+        $page = max(1, (int) $request->query('page', 1));
+        $monitoring = $this->cache->remember(
+            user: $user,
+            segment: 'dashboard',
+            parameters: [
+                'date' => $reportDate,
+                'search' => $search,
+                'status' => $status,
+                'consolidation_level' => $consolidationLevel,
+                'regions' => $regionFilters,
+                'page' => $page,
+            ],
+            resolver: fn (): array => $this->monitoringData(
+                user: $user,
+                reportDate: $reportDate,
+                search: $search,
+                status: $status,
+                regionFilters: $regionFilters,
+                consolidationLevel: $consolidationLevel,
+                page: $page,
+            ),
+        );
+
+        return Inertia::render('KdkmpDashboard/Monitoring', [
+            'entries' => $monitoring['entries'],
+            'summary' => $monitoring['summary'],
+            'filters' => [
+                'date' => $reportDate,
+                'search' => $search,
+                'status' => $status,
+                'consolidation_level' => $consolidationLevel,
+                ...$regionFilters,
+            ],
+            'regionOptions' => $regionOptions,
+            'regionalAccess' => $regionalAccess,
+            'businessDate' => $today->toDateString(),
+            'consolidation' => [
+                'level' => $consolidationLevel,
+                'rows' => $monitoring['consolidation'],
+            ],
+        ]);
+    }
+
+    /**
+     * @param  array{provinsi: string|null, kota_kabupaten: string|null, kecamatan: string|null, desa: string|null}  $regionFilters
+     * @return array{entries: array<string, mixed>, summary: array{total: int, complete: int, not_filled: int, requires_review: int}, consolidation: array<int, array<string, mixed>>}
+     */
+    private function monitoringData(
+        User $user,
+        string $reportDate,
+        string $search,
+        string $status,
+        array $regionFilters,
+        string $consolidationLevel,
+        int $page,
+    ): array {
         $selectedBusinessDate = CarbonImmutable::createFromFormat(
             'Y-m-d',
             $reportDate,
-            (string) config('app.kdkmp_business_timezone')
+            (string) config('app.kdkmp_business_timezone'),
         )->startOfDay();
-
-        $baseQuery = $this->regionalAccess->accessibleManagedKdkmpQuery(
-            $user,
-            $regionFilters,
-        );
+        $baseQuery = $this->regionalAccess->accessibleManagedKdkmpQuery($user, $regionFilters);
         $total = (clone $baseQuery)->count();
         $filled = (clone $baseQuery)
             ->whereHas('dailyEbitdaRecords', function (Builder $query) use ($reportDate): void {
@@ -60,7 +120,6 @@ class KdkmpDashboardMonitoringController extends Controller
                 $query->where('plan_revenue_requires_review', true);
             })
             ->count();
-
         $entries = (clone $baseQuery)
             ->with([
                 'managerUser:id,sdm_kdkmp_entry_id,name,email,username',
@@ -101,16 +160,20 @@ class KdkmpDashboardMonitoringController extends Controller
                 });
             })
             ->orderBy('nama_koperasi')
-            ->paginate(25)
-            ->withQueryString();
-
+            ->paginate(25, ['*'], 'page', $page)
+            ->appends([
+                'date' => $reportDate,
+                'search' => $search,
+                'status' => $status,
+                'consolidation_level' => $consolidationLevel,
+                ...$regionFilters,
+            ]);
         $metricsByUser = $this->dashboardMetrics->forUsers(
             $entries->getCollection()
                 ->map(fn (SdmKdkmpEntry $entry): ?int => $entry->managerUser?->id)
                 ->filter(),
-            $selectedBusinessDate
+            $selectedBusinessDate,
         );
-
         $entries->through(function (SdmKdkmpEntry $entry) use ($metricsByUser): array {
             $managerUserId = $entry->managerUser?->id;
             $metrics = $managerUserId !== null
@@ -122,35 +185,21 @@ class KdkmpDashboardMonitoringController extends Controller
                 ...$metrics,
             ]);
         });
-        $consolidation = $this->consolidation->forEntries(
-            clone $baseQuery,
-            $reportDate,
-            $consolidationLevel,
-        );
 
-        return Inertia::render('KdkmpDashboard/Monitoring', [
-            'entries' => $entries,
+        return [
+            'entries' => $entries->toArray(),
             'summary' => [
                 'total' => $total,
                 'complete' => $filled,
                 'not_filled' => $total - $filled,
                 'requires_review' => $requiresReview,
             ],
-            'filters' => [
-                'date' => $reportDate,
-                'search' => $search,
-                'status' => $status,
-                'consolidation_level' => $consolidationLevel,
-                ...$regionFilters,
-            ],
-            'regionOptions' => $this->regionalAccess->regionOptions($user),
-            'regionalAccess' => $regionalAccess,
-            'businessDate' => $today->toDateString(),
-            'consolidation' => [
-                'level' => $consolidationLevel,
-                'rows' => $consolidation,
-            ],
-        ]);
+            'consolidation' => $this->consolidation->forEntries(
+                clone $baseQuery,
+                $reportDate,
+                $consolidationLevel,
+            ),
+        ];
     }
 
     /**

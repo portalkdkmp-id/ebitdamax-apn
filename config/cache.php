@@ -17,6 +17,11 @@ return [
 
     'default' => env('CACHE_STORE', 'database'),
 
+    'kdkmp_monitoring_ttl_seconds' => (int) env(
+        'KDKMP_MONITORING_CACHE_TTL_SECONDS',
+        300,
+    ),
+
     /*
     |--------------------------------------------------------------------------
     | Cache Stores
