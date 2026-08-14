@@ -1,4 +1,6 @@
-FROM php:8.3-cli-bookworm
+ARG PHP_VERSION=8.3
+
+FROM php:${PHP_VERSION}-cli-bookworm
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
