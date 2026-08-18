@@ -138,11 +138,9 @@ class KdkmpDashboardController extends Controller
         }
 
         $metrics = $this->dashboardMetrics->forUser($user->id, $businessDate);
-        $planRevenueCategories = $request->planRevenueCategories();
-        $planRevenue = EbitdamaxKdkmp::calculatePlanRevenue($planRevenueCategories);
+        $planRevenue = $request->validated('plan_revenue');
         $actualRevenue = $request->validated('actual_revenue');
         $payload = [
-            ...$planRevenueCategories,
             'plan_revenue' => $planRevenue,
             'target_revenue' => EbitdamaxKdkmp::TARGET_REVENUE,
             'actual_cost' => $metrics['actual_cost'],
@@ -247,10 +245,6 @@ class KdkmpDashboardController extends Controller
 
         foreach (EbitdamaxKdkmp::ACTIVE_FIELDS as $field) {
             $data[$field] = $overrides[$field] ?? $entry->getAttribute($field);
-        }
-
-        foreach (array_keys(EbitdamaxKdkmp::PLAN_REVENUE_CATEGORIES) as $field) {
-            $data[$field] = $entry->getAttribute($field);
         }
 
         $data['actual_ebitda_margin'] = EbitdamaxKdkmp::calculateActualEbitdaMargin(

@@ -1,7 +1,4 @@
-import type {
-    KdkmpDashboardFields,
-    KdkmpPlanRevenueCategoryFields,
-} from '@/types/kdkmp-dashboard';
+import type { KdkmpDashboardFields } from '@/types/kdkmp-dashboard';
 
 export type KdkmpDashboardField = {
     key: keyof KdkmpDashboardFields;
@@ -11,20 +8,6 @@ export type KdkmpDashboardField = {
     placeholder?: string;
     description?: string;
 };
-
-export type KdkmpPlanRevenueCategory = {
-    key: keyof KdkmpPlanRevenueCategoryFields;
-    label: string;
-};
-
-export const kdkmpPlanRevenueCategories: KdkmpPlanRevenueCategory[] = [
-    { key: 'plan_revenue_makanan', label: 'Makanan' },
-    { key: 'plan_revenue_minuman', label: 'Minuman' },
-    { key: 'plan_revenue_rumahan', label: 'Rumahan' },
-    { key: 'plan_revenue_subsidi', label: 'Subsidi' },
-    { key: 'plan_revenue_expenses', label: 'Expenses' },
-    { key: 'plan_revenue_obat_obatan', label: 'Obat-obatan' },
-];
 
 export const kdkmpDashboardFields: KdkmpDashboardField[] = [
     {
@@ -38,8 +21,7 @@ export const kdkmpDashboardFields: KdkmpDashboardField[] = [
         key: 'plan_revenue',
         label: 'Plan Revenue',
         isRupiah: true,
-        isDisabled: true,
-        description: 'Akumulasi otomatis dari enam kategori Plan Revenue.',
+        description: 'Diisi manual. Nilai 0 diperbolehkan.',
     },
     { key: 'actual_revenue', label: 'Actual Revenue', isRupiah: true },
     { key: 'plan_cost', label: 'Plan Cost', isRupiah: true },

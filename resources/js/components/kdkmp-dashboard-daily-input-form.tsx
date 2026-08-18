@@ -15,10 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    kdkmpDashboardFields,
-    kdkmpPlanRevenueCategories,
-} from '@/lib/kdkmp-dashboard-fields';
+import { kdkmpDashboardFields } from '@/lib/kdkmp-dashboard-fields';
 import {
     emptyKdkmpOperationalAttendance,
     kdkmpOperationalAttendanceRoles,
@@ -30,14 +27,12 @@ import type {
     KdkmpDailyEntry,
     KdkmpDashboardFields,
     KdkmpOperationalAttendance,
-    KdkmpPlanRevenueCategoryFields,
 } from '@/types/kdkmp-dashboard';
 
 type DailyForm = {
+    plan_revenue: string;
     actual_revenue: string;
     plan_cost: string;
-} & {
-    [Field in keyof KdkmpPlanRevenueCategoryFields]: string;
 };
 
 type OperationalAttendanceForm = {
@@ -140,14 +135,9 @@ function RupiahInput({
 
 function formDataFrom(entry: KdkmpDailyEntry | null): DailyForm {
     return {
+        plan_revenue: inputValue(entry?.plan_revenue) || '0',
         actual_revenue: inputValue(entry?.actual_revenue),
         plan_cost: inputValue(entry?.plan_cost),
-        plan_revenue_makanan: inputValue(entry?.plan_revenue_makanan),
-        plan_revenue_minuman: inputValue(entry?.plan_revenue_minuman),
-        plan_revenue_rumahan: inputValue(entry?.plan_revenue_rumahan),
-        plan_revenue_subsidi: inputValue(entry?.plan_revenue_subsidi),
-        plan_revenue_expenses: inputValue(entry?.plan_revenue_expenses),
-        plan_revenue_obat_obatan: inputValue(entry?.plan_revenue_obat_obatan),
     };
 }
 
@@ -158,30 +148,6 @@ function operationalAttendanceFormDataFrom(
         operational_attendance:
             entry?.operational_attendance ?? emptyKdkmpOperationalAttendance(),
     };
-}
-
-function hasCompletePlanRevenueBreakdown(data: DailyForm): boolean {
-    return kdkmpPlanRevenueCategories.every(
-        ({ key }) => data[key].trim() !== '',
-    );
-}
-
-function calculatePlanRevenue(data: DailyForm): string {
-    if (!hasCompletePlanRevenueBreakdown(data)) {
-        return '';
-    }
-
-    const total = kdkmpPlanRevenueCategories.reduce(
-        (sum, { key }) => sum + Number(data[key]),
-        0,
-    );
-
-    return Number.isFinite(total)
-        ? total
-              .toFixed(2)
-              .replace(/\.00$/, '')
-              .replace(/(\.\d)0$/, '$1')
-        : '';
 }
 
 function isRevenueValue(value: string): boolean {
@@ -269,11 +235,11 @@ function dashboardFieldValue(
         return inputValue(computedValues.target_revenue);
     }
 
-    if (field === 'plan_revenue') {
-        return calculatePlanRevenue(data);
-    }
-
-    if (field === 'actual_revenue' || field === 'plan_cost') {
+    if (
+        field === 'plan_revenue' ||
+        field === 'actual_revenue' ||
+        field === 'plan_cost'
+    ) {
         return data[field];
     }
 
@@ -283,7 +249,7 @@ function dashboardFieldValue(
 
     if (field === 'performance_scoring') {
         return calculatePerformanceScoring(
-            calculatePlanRevenue(data),
+            data.plan_revenue,
             data.actual_revenue,
             computedValues.task_completion_rate,
             computedValues.time_compliance_rate,
@@ -382,11 +348,10 @@ export default function KdkmpDashboardDailyInputForm({
     const submit = (event: FormEvent) => {
         event.preventDefault();
 
-        const planRevenue = Number(calculatePlanRevenue(data));
+        const planRevenue = Number(data.plan_revenue);
         const targetRevenue = Number(computedValues.target_revenue);
 
         if (
-            hasCompletePlanRevenueBreakdown(data) &&
             Number.isFinite(planRevenue) &&
             planRevenue < targetRevenue
         ) {
@@ -399,7 +364,8 @@ export default function KdkmpDashboardDailyInputForm({
     };
 
     const revenueFields = kdkmpDashboardFields.filter(
-        (field) => field.key === 'target_revenue',
+        (field) =>
+            field.key === 'target_revenue' || field.key === 'plan_revenue',
     );
     const costFields = kdkmpDashboardFields.filter(
         (field) =>
@@ -416,7 +382,10 @@ export default function KdkmpDashboardDailyInputForm({
     const renderDashboardField = (
         field: (typeof kdkmpDashboardFields)[number],
     ) => {
-        const editableField = field.key === 'plan_cost' ? field.key : null;
+        const editableField =
+            field.key === 'plan_revenue' || field.key === 'plan_cost'
+                ? field.key
+                : null;
         const fieldValue = dashboardFieldValue(data, field.key, computedValues);
 
         return (
@@ -523,67 +492,6 @@ export default function KdkmpDashboardDailyInputForm({
                                     </div>
                                 </div>
 
-                                <div className="space-y-4 border-t pt-5">
-                                    <div>
-                                        <h3 className="font-medium text-foreground">
-                                            Breakdown Plan Revenue
-                                        </h3>
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            Isi seluruh kategori. Nilai 0
-                                            diperbolehkan dan ikut dihitung
-                                            dalam total Plan Revenue.
-                                        </p>
-                                    </div>
-
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        {kdkmpPlanRevenueCategories.map(
-                                            (category) => (
-                                                <div
-                                                    key={category.key}
-                                                    className="space-y-2"
-                                                >
-                                                    <Label
-                                                        htmlFor={category.key}
-                                                    >
-                                                        {category.label}
-                                                    </Label>
-                                                    <RupiahInput
-                                                        id={category.key}
-                                                        value={
-                                                            data[category.key]
-                                                        }
-                                                        onValueChange={(
-                                                            value,
-                                                        ) =>
-                                                            setData(
-                                                                category.key,
-                                                                value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <InputError
-                                                        message={
-                                                            errors[category.key]
-                                                        }
-                                                    />
-                                                </div>
-                                            ),
-                                        )}
-                                    </div>
-
-                                    <div className="flex flex-col gap-1 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-                                        <p className="text-sm font-medium text-foreground">
-                                            Total Plan Revenue
-                                        </p>
-                                        <p className="text-lg font-bold text-primary tabular-nums">
-                                            {formatManualValue(
-                                                calculatePlanRevenue(data) ||
-                                                    null,
-                                                true,
-                                            )}
-                                        </p>
-                                    </div>
-                                </div>
                             </section>
 
                             <section className="space-y-5 rounded-lg border bg-muted/20 p-4">
@@ -731,8 +639,8 @@ export default function KdkmpDashboardDailyInputForm({
 
                         <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
                             <p className="text-sm text-muted-foreground">
-                                Keenam kategori Plan Revenue wajib diisi. Nilai
-                                0 tetap dianggap sebagai data valid.
+                                Plan Revenue diisi manual. Nilai 0 tetap
+                                dianggap sebagai data valid.
                             </p>
                             <Button type="submit" disabled={processing}>
                                 <Save className="size-4" />
@@ -759,7 +667,7 @@ export default function KdkmpDashboardDailyInputForm({
                             Plan Revenue yang dimasukkan adalah{' '}
                             <span className="font-semibold text-foreground">
                                 {formatManualValue(
-                                    calculatePlanRevenue(data),
+                                    data.plan_revenue,
                                     true,
                                 )}
                             </span>

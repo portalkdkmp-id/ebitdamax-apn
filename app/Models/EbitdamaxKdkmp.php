@@ -52,15 +52,6 @@ class EbitdamaxKdkmp extends Model
         'plan_cost',
     ];
 
-    public const PLAN_REVENUE_CATEGORIES = [
-        'plan_revenue_makanan' => 'Makanan',
-        'plan_revenue_minuman' => 'Minuman',
-        'plan_revenue_rumahan' => 'Rumahan',
-        'plan_revenue_subsidi' => 'Subsidi',
-        'plan_revenue_expenses' => 'Expenses',
-        'plan_revenue_obat_obatan' => 'Obat-obatan',
-    ];
-
     public const OPERATIONAL_ATTENDANCE_ROLES = [
         'pramuniaga' => 'Pramuniaga',
         'kasir' => 'Kasir',
@@ -78,12 +69,6 @@ class EbitdamaxKdkmp extends Model
         'report_date',
         'target_revenue',
         'plan_revenue',
-        'plan_revenue_makanan',
-        'plan_revenue_minuman',
-        'plan_revenue_rumahan',
-        'plan_revenue_subsidi',
-        'plan_revenue_expenses',
-        'plan_revenue_obat_obatan',
         'plan_revenue_requires_review',
         'actual_revenue',
         'target_cost',
@@ -129,17 +114,6 @@ class EbitdamaxKdkmp extends Model
         }
 
         return (float) $planRevenue < (float) self::TARGET_REVENUE;
-    }
-
-    /**
-     * @param  array<string, string>  $categoryValues
-     */
-    public static function calculatePlanRevenue(array $categoryValues): string
-    {
-        $total = collect(array_keys(self::PLAN_REVENUE_CATEGORIES))
-            ->sum(fn (string $field): float => (float) $categoryValues[$field]);
-
-        return rtrim(rtrim(number_format($total, 2, '.', ''), '0'), '.');
     }
 
     public static function calculateActualEbitdaMargin(?string $actualRevenue): ?string
@@ -231,12 +205,6 @@ class EbitdamaxKdkmp extends Model
             'operational_attendance' => 'array',
             'operational_attendance_saved_at' => 'datetime',
             'plan_revenue_requires_review' => 'boolean',
-            'plan_revenue_makanan' => 'decimal:2',
-            'plan_revenue_minuman' => 'decimal:2',
-            'plan_revenue_rumahan' => 'decimal:2',
-            'plan_revenue_subsidi' => 'decimal:2',
-            'plan_revenue_expenses' => 'decimal:2',
-            'plan_revenue_obat_obatan' => 'decimal:2',
         ];
     }
 }

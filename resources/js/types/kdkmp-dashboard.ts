@@ -21,15 +21,6 @@ export type KdkmpDashboardFields = {
     performance_scoring: string | null;
 };
 
-export type KdkmpPlanRevenueCategoryFields = {
-    plan_revenue_makanan: string | null;
-    plan_revenue_minuman: string | null;
-    plan_revenue_rumahan: string | null;
-    plan_revenue_subsidi: string | null;
-    plan_revenue_expenses: string | null;
-    plan_revenue_obat_obatan: string | null;
-};
-
 export type KdkmpOperationalAttendanceKey =
     | 'pramuniaga'
     | 'kasir'
@@ -52,8 +43,7 @@ export type KdkmpComputedValues = Pick<
     time_compliance_rate: number;
 };
 
-export type KdkmpDailyEntry = KdkmpDashboardFields &
-    KdkmpPlanRevenueCategoryFields & {
+export type KdkmpDailyEntry = KdkmpDashboardFields & {
         id: number;
         report_date: string;
         is_complete: boolean;
