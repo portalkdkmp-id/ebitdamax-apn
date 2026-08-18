@@ -137,12 +137,13 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
                 <CardTitle className="text-xl text-foreground">
                     The <span className="text-primary">EBITDA Matrix</span>{' '}
                     <span className="font-normal text-muted-foreground">
-                        (Fokus: Finansial)
+                        (Indikator Finansial untuk Proses Bisnis)
                     </span>
                 </CardTitle>
                 <CardDescription>
-                    Perbandingan pendapatan serta akumulasi biaya untuk setiap
-                    urutan task hari ini.
+                    {/* Perbandingan pendapatan serta akumulasi biaya untuk setiap
+                    urutan task hari ini. */}
+                    Integrasi BPM dengan TD-ABC dan EBITDA untuk setiap urutan task hari ini.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5 p-5">
