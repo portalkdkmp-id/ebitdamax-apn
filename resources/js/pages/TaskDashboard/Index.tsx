@@ -580,11 +580,8 @@ export default function TaskDashboardIndex({
                                             <TableHead className="bg-muted/40 p-4 text-right max-[650px]:hidden">
                                                 Estimasi Waktu
                                             </TableHead>
-                                            <TableHead className="bg-muted/40 p-4 max-[650px]:hidden">
+                                            <TableHead className="rounded-r-xl bg-muted/40 p-4 max-[650px]:hidden">
                                                 Status
-                                            </TableHead>
-                                            <TableHead className="w-[190px] rounded-r-xl bg-muted/40 p-4 text-right max-[650px]:hidden">
-                                                Aksi
                                             </TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -592,7 +589,7 @@ export default function TaskDashboardIndex({
                                         {tasks.length === 0 && (
                                             <TableRow className="border-0 hover:bg-transparent">
                                                 <TableCell
-                                                    colSpan={6}
+                                                    colSpan={5}
                                                     className="rounded-xl border border-dashed bg-muted/20 p-8 text-center text-muted-foreground"
                                                 >
                                                     Belum ada task untuk role
@@ -605,7 +602,7 @@ export default function TaskDashboardIndex({
                                             <Fragment key={group.category.id}>
                                                 <TableRow className="border-0 hover:bg-transparent">
                                                     <TableCell
-                                                        colSpan={6}
+                                                        colSpan={5}
                                                         className="rounded-xl border border-primary/15 bg-primary/5 p-3"
                                                     >
                                                         <div className="inline-flex rounded-md border border-primary/25 bg-primary/10 px-4 py-2 text-sm font-semibold text-foreground">
@@ -654,6 +651,22 @@ export default function TaskDashboardIndex({
                                                                             task.description
                                                                         }
                                                                     />
+                                                                    {task.status !==
+                                                                        'completed' && (
+                                                                        <div className="mt-3">
+                                                                            <TaskActionButton
+                                                                                task={
+                                                                                    task
+                                                                                }
+                                                                                onStart={
+                                                                                    setStartTask
+                                                                                }
+                                                                                onFinish={
+                                                                                    setFinishTask
+                                                                                }
+                                                                            />
+                                                                        </div>
+                                                                    )}
                                                                     <div className="mt-4 hidden space-y-3 border-t pt-3 max-[650px]:block">
                                                                         <div className="grid grid-cols-2 gap-3">
                                                                             <div>
@@ -692,31 +705,6 @@ export default function TaskDashboardIndex({
                                                                                 </Badge>
                                                                             </div>
                                                                         </div>
-                                                                        <div className="space-y-2">
-                                                                            <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-                                                                                Aksi
-                                                                            </p>
-                                                                            {task.status ===
-                                                                            'completed' ? (
-                                                                                <p className="text-xs text-muted-foreground">
-                                                                                    Tidak
-                                                                                    ada
-                                                                                    aksi
-                                                                                </p>
-                                                                            ) : (
-                                                                                <TaskActionButton
-                                                                                    task={
-                                                                                        task
-                                                                                    }
-                                                                                    onStart={
-                                                                                        setStartTask
-                                                                                    }
-                                                                                    onFinish={
-                                                                                        setFinishTask
-                                                                                    }
-                                                                                />
-                                                                            )}
-                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -746,25 +734,12 @@ export default function TaskDashboardIndex({
                                                             {task.time_require}{' '}
                                                             menit
                                                         </TableCell>
-                                                        <TableCell className="border-y bg-card p-4 max-[650px]:hidden">
+                                                        <TableCell className="rounded-r-xl border-y border-r bg-card p-4 max-[650px]:hidden">
                                                             <Badge variant="outline">
                                                                 {
                                                                     task.status_label
                                                                 }
                                                             </Badge>
-                                                        </TableCell>
-                                                        <TableCell className="rounded-r-xl border-y border-r bg-card p-4 max-[650px]:hidden">
-                                                            <div className="flex justify-end gap-2">
-                                                                <TaskActionButton
-                                                                    task={task}
-                                                                    onStart={
-                                                                        setStartTask
-                                                                    }
-                                                                    onFinish={
-                                                                        setFinishTask
-                                                                    }
-                                                                />
-                                                            </div>
                                                         </TableCell>
                                                     </TableRow>
                                                 ))}
