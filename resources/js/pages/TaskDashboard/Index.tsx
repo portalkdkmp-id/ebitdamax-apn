@@ -44,7 +44,9 @@ import {
     finish as finishTaskRoute,
     start as startTaskRoute,
 } from '@/routes/tasks';
+import { store as storeBmcSelection } from '@/routes/task-dashboard/bmc-selection';
 import type {
+    BmcPointOption,
     TaskAdditionalFieldItem,
     TaskItem,
     TaskReportDocument,
@@ -63,6 +65,12 @@ type DashboardTask = TaskItem & {
 type Props = {
     tasks: DashboardTask[];
     operationalAttendance: OperationalAttendanceContext | null;
+    bmcSelection: {
+        business_date: string;
+        is_locked: boolean;
+        selected_point: BmcPointOption | null;
+        points: BmcPointOption[];
+    };
     summary: {
         total: number;
         pending: number;
@@ -391,10 +399,16 @@ async function compressImage(file: File): Promise<File> {
 export default function TaskDashboardIndex({
     tasks,
     operationalAttendance,
+    bmcSelection,
     summary,
 }: Props) {
     const [startTask, setStartTask] = useState<DashboardTask | null>(null);
     const [finishTask, setFinishTask] = useState<DashboardTask | null>(null);
+    const bmcSelectionForm = useForm<{ bmc_point_id: string }>({
+        bmc_point_id: bmcSelection.selected_point
+            ? String(bmcSelection.selected_point.id)
+            : '',
+    });
     const taskGroups = useMemo(() => {
         const groups = new Map<
             number,
@@ -430,6 +444,16 @@ export default function TaskDashboardIndex({
         () => fieldsFor(finishTask, 'finish'),
         [finishTask],
     );
+
+    const submitBmcSelection = () => {
+        if (!bmcSelectionForm.data.bmc_point_id || bmcSelection.is_locked) {
+            return;
+        }
+
+        bmcSelectionForm.post(storeBmcSelection.url(), {
+            preserveScroll: true,
+        });
+    };
 
     return (
         <>
@@ -467,6 +491,73 @@ export default function TaskDashboardIndex({
                             value={summary.completed}
                         />
                     </section>
+
+                    {bmcSelection.points.length > 0 && (
+                        <Card className="rounded-2xl border border-primary/20 bg-primary/5 shadow-sm">
+                            <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-end lg:justify-between">
+                                <div>
+                                    <p className="text-sm font-semibold text-primary uppercase">
+                                        Kegiatan Strategis Pilihan
+                                    </p>
+                                    <h2 className="mt-1 text-lg font-semibold text-foreground">
+                                        Pilih Poin BMC Hari Ini
+                                    </h2>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Pilih satu poin BMC untuk menampilkan
+                                        task strategis yang dapat dikerjakan
+                                        hari ini.
+                                    </p>
+                                </div>
+                                <div className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-xl">
+                                    <select
+                                        className="h-9 min-w-64 flex-1 rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                                        value={bmcSelectionForm.data.bmc_point_id}
+                                        disabled={bmcSelection.is_locked}
+                                        onChange={(event) =>
+                                            bmcSelectionForm.setData(
+                                                'bmc_point_id',
+                                                event.target.value,
+                                            )
+                                        }
+                                    >
+                                        <option value="">Pilih poin BMC</option>
+                                        {bmcSelection.points.map((point) => (
+                                            <option
+                                                key={point.id}
+                                                value={point.id}
+                                            >
+                                                {point.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <Button
+                                        type="button"
+                                        onClick={submitBmcSelection}
+                                        disabled={
+                                            bmcSelection.is_locked ||
+                                            !bmcSelectionForm.data
+                                                .bmc_point_id ||
+                                            bmcSelectionForm.processing
+                                        }
+                                    >
+                                        {bmcSelectionForm.processing
+                                            ? 'Menyimpan...'
+                                            : bmcSelection.is_locked
+                                              ? 'Pilihan Dikunci'
+                                              : 'Pilih Poin'}
+                                    </Button>
+                                </div>
+                                {bmcSelectionForm.errors.bmc_point_id && (
+                                    <p className="text-sm text-destructive">
+                                        {
+                                            bmcSelectionForm.errors
+                                                .bmc_point_id
+                                        }
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
 
                     <Card className="rounded-2xl border bg-card shadow-sm">
                         <CardHeader className="border-b px-5 py-4">
@@ -541,6 +632,19 @@ export default function TaskDashboardIndex({
                                                                             task.name
                                                                         }
                                                                     </p>
+                                                                    {task.bmc_point && (
+                                                                        <Badge
+                                                                            variant="outline"
+                                                                            className="mt-1"
+                                                                        >
+                                                                            BMC:{' '}
+                                                                            {
+                                                                                task
+                                                                                    .bmc_point
+                                                                                    .name
+                                                                            }
+                                                                        </Badge>
+                                                                    )}
                                                                     <p className="text-xs break-words text-muted-foreground max-[650px]:hidden">
                                                                         {task.description ??
                                                                             '-'}

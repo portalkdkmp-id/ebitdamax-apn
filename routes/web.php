@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\BmcPointController;
 use App\Http\Controllers\BusinessProcessController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardRedirectController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\PlanEbitdaMatrixController;
 use App\Http\Controllers\RevenuePlanController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SdmKdkmpEntryController;
+use App\Http\Controllers\TaskBmcDailySelectionController;
 use App\Http\Controllers\TaskCategoryController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDashboardController;
@@ -82,6 +84,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard/tasks/completed', [TaskDashboardController::class, 'completed'])
         ->middleware('role.level:staff,manager,superadmin')
         ->name('task-dashboard.completed');
+
+    Route::post('/dashboard/tasks/bmc-selection', [TaskBmcDailySelectionController::class, 'store'])
+        ->middleware('role.level:staff,manager,superadmin')
+        ->name('task-dashboard.bmc-selection.store');
 
     Route::post('/tasks/{task}/start', [TaskReportController::class, 'start'])
         ->middleware('role.level:staff,manager,superadmin')
@@ -197,6 +203,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::resource('task-categories', TaskCategoryController::class)
             ->except(['create', 'edit', 'show']);
+
+        Route::resource('bmc-points', BmcPointController::class)
+            ->only(['store', 'update', 'destroy']);
 
         Route::resource('tasks', TaskController::class)
             ->except(['create', 'edit', 'show']);

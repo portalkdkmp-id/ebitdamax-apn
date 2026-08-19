@@ -5,10 +5,13 @@ namespace App\Http\Controllers;
 use App\Enums\RoleLevel;
 use App\Enums\TaskPeriod;
 use App\Enums\TaskReportStatus;
+use App\Enums\TaskType;
+use App\Models\BmcPoint;
 use App\Models\EbitdamaxKdkmp;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskAdditionalField;
+use App\Models\TaskBmcDailySelection;
 use App\Models\TaskReport;
 use App\Models\User;
 use App\Services\KdkmpOperationalAllocationService;
@@ -29,15 +32,35 @@ class TaskDashboardController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
+        $businessDate = CarbonImmutable::now((string) config('app.kdkmp_business_timezone'));
+        $dailySelection = $user instanceof User
+            ? TaskBmcDailySelection::query()
+                ->with('bmcPoint:id,name,slug,description')
+                ->where('user_id', $user->id)
+                ->whereDate('selection_date', $businessDate->toDateString())
+                ->first()
+            : null;
+        $bmcPoints = $this->availableBmcPointsForUser($user);
 
         $tasks = Task::query()
-            ->with(['taskCategory', 'roles', 'additionalFields'])
+            ->with(['taskCategory', 'bmcPoint', 'roles', 'additionalFields'])
             ->active()
             ->when(
                 $user?->role_id,
                 fn ($query) => $query->whereHas('roles', fn ($roleQuery) => $roleQuery->whereKey($user->role_id)),
                 fn ($query) => $query->whereRaw('1 = 0')
             )
+            ->where(function ($query) use ($dailySelection): void {
+                $query->where('task_type', TaskType::Regular->value);
+
+                if ($dailySelection) {
+                    $query->orWhere(function ($bmcTaskQuery) use ($dailySelection): void {
+                        $bmcTaskQuery
+                            ->where('task_type', TaskType::KegiatanStrategisPilihan->value)
+                            ->where('bmc_point_id', $dailySelection->bmc_point_id);
+                    });
+                }
+            })
             ->orderByRaw('CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END')
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -75,6 +98,17 @@ class TaskDashboardController extends Controller
         return Inertia::render('TaskDashboard/Index', [
             'tasks' => $tasks,
             'operationalAttendance' => $this->operationalAttendanceForUser($user),
+            'bmcSelection' => [
+                'business_date' => $businessDate->toDateString(),
+                'is_locked' => $this->isBmcSelectionLocked($user, $businessDate),
+                'selected_point' => $dailySelection?->bmcPoint ? [
+                    'id' => $dailySelection->bmcPoint->id,
+                    'name' => $dailySelection->bmcPoint->name,
+                    'slug' => $dailySelection->bmcPoint->slug,
+                    'description' => $dailySelection->bmcPoint->description,
+                ] : null,
+                'points' => $bmcPoints,
+            ],
             'summary' => [
                 'total' => $tasks->count(),
                 'pending' => $tasks->where('status', 'pending')->count(),
@@ -127,13 +161,23 @@ class TaskDashboardController extends Controller
         $historyEnd = now()->endOfDay();
 
         $reports = TaskReport::query()
-            ->with(['task.taskCategory', 'task.roles', 'user'])
+            ->with(['task.taskCategory', 'task.bmcPoint', 'task.roles', 'user'])
             ->when(! $isSuperadmin, fn ($query) => $query->where('user_id', $user?->id))
             ->where('status', TaskReportStatus::Completed->value)
             ->whereNotNull('finished_at')
             ->whereBetween('finished_at', [$historyStart, $historyEnd])
             ->latest('finished_at')
             ->get();
+
+        $dailySelectionsByDate = TaskBmcDailySelection::query()
+            ->when(! $isSuperadmin, fn ($query) => $query->where('user_id', $user?->id))
+            ->whereBetween('selection_date', [
+                $historyStart->toDateString(),
+                $historyEnd->toDateString(),
+            ])
+            ->get(['user_id', 'bmc_point_id', 'selection_date'])
+            ->groupBy(fn (TaskBmcDailySelection $selection): string => $selection->selection_date->toDateString())
+            ->map(fn (Collection $selections): Collection => $selections->keyBy('user_id'));
 
         $tasksByRole = $this->activeTasksByRole();
         $dailyReports = $reports
@@ -144,6 +188,7 @@ class TaskDashboardController extends Controller
                 user: $user,
                 isSuperadmin: $isSuperadmin,
                 tasksByRole: $tasksByRole,
+                dailySelectionsByUser: $dailySelectionsByDate->get($date, collect()),
             ))
             ->sortByDesc('date')
             ->values();
@@ -173,7 +218,7 @@ class TaskDashboardController extends Controller
     private function activeTasksByRole(): Collection
     {
         $tasks = Task::query()
-            ->with(['taskCategory', 'roles'])
+            ->with(['taskCategory', 'bmcPoint', 'roles'])
             ->active()
             ->get([
                 'id',
@@ -183,6 +228,8 @@ class TaskDashboardController extends Controller
                 'description',
                 'time_require',
                 'period',
+                'task_type',
+                'bmc_point_id',
             ]);
 
         $tasksByRole = collect();
@@ -203,6 +250,7 @@ class TaskDashboardController extends Controller
     /**
      * @param  Collection<int, TaskReport>  $dayReports
      * @param  Collection<int, Collection<int, Task>>  $tasksByRole
+     * @param  Collection<int, TaskBmcDailySelection>  $dailySelectionsByUser
      * @return array<string, mixed>
      */
     private function transformDailySummary(
@@ -211,12 +259,14 @@ class TaskDashboardController extends Controller
         ?User $user,
         bool $isSuperadmin,
         Collection $tasksByRole,
+        Collection $dailySelectionsByUser,
     ): array {
         $expectedTasks = $this->expectedTasksForDay(
             dayReports: $dayReports,
             user: $user,
             isSuperadmin: $isSuperadmin,
             tasksByRole: $tasksByRole,
+            dailySelectionsByUser: $dailySelectionsByUser,
         );
         $completedReports = $dayReports
             ->unique(fn (TaskReport $report): string => $this->reportKey($report))
@@ -255,6 +305,7 @@ class TaskDashboardController extends Controller
     /**
      * @param  Collection<int, TaskReport>  $dayReports
      * @param  Collection<int, Collection<int, Task>>  $tasksByRole
+     * @param  Collection<int, TaskBmcDailySelection>  $dailySelectionsByUser
      * @return Collection<string, array{user_id: int, task: Task, user: User|null}>
      */
     private function expectedTasksForDay(
@@ -262,6 +313,7 @@ class TaskDashboardController extends Controller
         ?User $user,
         bool $isSuperadmin,
         Collection $tasksByRole,
+        Collection $dailySelectionsByUser,
     ): Collection {
         $usersById = $dayReports
             ->mapWithKeys(fn (TaskReport $report): array => [
@@ -283,7 +335,17 @@ class TaskDashboardController extends Controller
                 continue;
             }
 
+            $selectedBmcPointId = $dailySelectionsByUser
+                ->get((int) $userId)?->bmc_point_id;
+
             foreach ($tasksByRole->get((int) $roleId, collect()) as $task) {
+                if (
+                    $task->task_type === TaskType::KegiatanStrategisPilihan
+                    && $task->bmc_point_id !== $selectedBmcPointId
+                ) {
+                    continue;
+                }
+
                 $expectedTasks->put($this->assignmentKey((int) $userId, $task), [
                     'user_id' => (int) $userId,
                     'task' => $task,
@@ -344,11 +406,20 @@ class TaskDashboardController extends Controller
             'name' => $task->name,
             'description' => $task->description,
             'time_require' => $task->time_require,
+            'task_type' => $task->task_type->value,
+            'task_type_label' => $task->task_type->label(),
+            'bmc_point_id' => $task->bmc_point_id,
             'task_category' => [
                 'id' => $task->taskCategory->id,
                 'name' => $task->taskCategory->name,
                 'slug' => $task->taskCategory->slug,
             ],
+            'bmc_point' => $task->bmcPoint ? [
+                'id' => $task->bmcPoint->id,
+                'name' => $task->bmcPoint->name,
+                'slug' => $task->bmcPoint->slug,
+                'description' => $task->bmcPoint->description,
+            ] : null,
             'roles' => $task->roles
                 ->map(fn (Role $role): array => [
                     'id' => $role->id,
@@ -410,6 +481,15 @@ class TaskDashboardController extends Controller
                 'name' => $task->taskCategory->name,
                 'slug' => $task->taskCategory->slug,
             ],
+            'task_type' => $task->task_type->value,
+            'task_type_label' => $task->task_type->label(),
+            'bmc_point_id' => $task->bmc_point_id,
+            'bmc_point' => $task->bmcPoint ? [
+                'id' => $task->bmcPoint->id,
+                'name' => $task->bmcPoint->name,
+                'slug' => $task->bmcPoint->slug,
+                'description' => $task->bmcPoint->description,
+            ] : null,
             'role' => $firstRole ? [
                 'id' => $firstRole->id,
                 'name' => $firstRole->name,
@@ -495,5 +575,53 @@ class TaskDashboardController extends Controller
             TaskPeriod::Weekly => $date->isoWeekYear().'-W'.str_pad((string) $date->isoWeek(), 2, '0', STR_PAD_LEFT),
             TaskPeriod::Monthly => $date->format('Y-m'),
         };
+    }
+
+    /**
+     * @return array<int, array{id: int, name: string, slug: string, description: string|null}>
+     */
+    private function availableBmcPointsForUser(?User $user): array
+    {
+        if ($user?->role_id === null) {
+            return [];
+        }
+
+        return BmcPoint::query()
+            ->whereHas('tasks', function ($query) use ($user): void {
+                $query
+                    ->active()
+                    ->where('task_type', TaskType::KegiatanStrategisPilihan->value)
+                    ->whereHas('roles', fn ($roleQuery) => $roleQuery->whereKey($user->role_id));
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'description'])
+            ->map(fn (BmcPoint $bmcPoint): array => [
+                'id' => $bmcPoint->id,
+                'name' => $bmcPoint->name,
+                'slug' => $bmcPoint->slug,
+                'description' => $bmcPoint->description,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function isBmcSelectionLocked(?User $user, CarbonImmutable $businessDate): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return TaskReport::query()
+            ->where('user_id', $user->id)
+            ->where('period_key', $businessDate->toDateString())
+            ->whereIn('status', [
+                TaskReportStatus::InProgress->value,
+                TaskReportStatus::Completed->value,
+            ])
+            ->whereHas(
+                'task',
+                fn ($query) => $query->where('task_type', TaskType::KegiatanStrategisPilihan->value),
+            )
+            ->exists();
     }
 }

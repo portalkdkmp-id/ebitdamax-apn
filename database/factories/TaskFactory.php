@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\TaskType;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskCategory;
@@ -23,6 +24,8 @@ class TaskFactory extends Factory
         return [
             'uuid' => (string) Str::uuid(),
             'task_category_id' => TaskCategory::factory(),
+            'task_type' => TaskType::Regular,
+            'bmc_point_id' => null,
             'name' => fake()->sentence(3),
             'description' => fake()->optional()->sentence(),
             'time_require' => fake()->numberBetween(15, 240),

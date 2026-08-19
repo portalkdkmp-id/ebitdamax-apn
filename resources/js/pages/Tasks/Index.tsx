@@ -47,7 +47,13 @@ import {
     store as storeTask,
     update as updateTask,
 } from '@/routes/tasks';
+import {
+    destroy as destroyBmcPoint,
+    store as storeBmcPoint,
+    update as updateBmcPoint,
+} from '@/routes/bmc-points';
 import type {
+    BmcPointOption,
     TaskAdditionalFieldInputType,
     TaskAdditionalFieldItem,
     TaskAdditionalFieldShowWhen,
@@ -57,13 +63,16 @@ import type {
     TaskPaginatedResponse,
     TaskPeriod,
     TaskSelectOption,
+    TaskType,
 } from '@/types/task';
 import type { UserRole } from '@/types/user';
 
 type Props = {
     tasks: TaskPaginatedResponse;
     taskCategories: TaskCategoryOption[];
+    bmcPoints: BmcPointOption[];
     roles: UserRole[];
+    taskTypeOptions: TaskSelectOption[];
     inputTypeOptions: TaskSelectOption[];
     showWhenOptions: TaskSelectOption[];
     periodOptions: TaskSelectOption[];
@@ -72,6 +81,8 @@ type Props = {
 
 type TaskFormData = {
     task_category_id: string;
+    task_type: TaskType;
+    bmc_point_id: string;
     role_ids: string[];
     sort_order: string;
     name: string;
@@ -83,6 +94,11 @@ type TaskFormData = {
     period: TaskPeriod;
     is_active: boolean;
     additional_fields: TaskAdditionalFieldItem[];
+};
+
+type BmcPointFormData = {
+    name: string;
+    description: string;
 };
 
 const optionTypes = ['select', 'radio', 'checkbox'];
@@ -97,6 +113,8 @@ const emptyField = (): TaskAdditionalFieldItem => ({
 
 const defaultForm: TaskFormData = {
     task_category_id: '',
+    task_type: 'regular',
+    bmc_point_id: '',
     role_ids: [],
     sort_order: '',
     name: '',
@@ -146,6 +164,8 @@ function timeThresholdLabel(task: TaskItem): string {
 function toFormData(task: TaskItem): TaskFormData {
     return {
         task_category_id: String(task.task_category_id),
+        task_type: task.task_type,
+        bmc_point_id: task.bmc_point_id ? String(task.bmc_point_id) : '',
         role_ids: task.role_ids.map((roleId) => String(roleId)),
         sort_order: task.sort_order === null ? '' : String(task.sort_order),
         name: task.name,
@@ -176,7 +196,9 @@ function toFormData(task: TaskItem): TaskFormData {
 export default function TasksIndex({
     tasks,
     taskCategories,
+    bmcPoints,
     roles,
+    taskTypeOptions,
     inputTypeOptions,
     showWhenOptions,
     periodOptions,
@@ -185,6 +207,11 @@ export default function TasksIndex({
     const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
     const [detailTask, setDetailTask] = useState<TaskItem | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<TaskItem | null>(null);
+    const [selectedBmcPoint, setSelectedBmcPoint] =
+        useState<BmcPointOption | null>(null);
+    const [deleteBmcPointTarget, setDeleteBmcPointTarget] =
+        useState<BmcPointOption | null>(null);
+    const [isBmcPointFormOpen, setIsBmcPointFormOpen] = useState(false);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [filterForm, setFilterForm] = useState({
         search: filters.search ?? '',
@@ -192,6 +219,8 @@ export default function TasksIndex({
             ? String(filters.task_category_id)
             : 'all',
         role_id: filters.role_id ? String(filters.role_id) : 'all',
+        task_type: filters.task_type ?? 'all',
+        bmc_point_id: filters.bmc_point_id ? String(filters.bmc_point_id) : 'all',
         status: filters.status ?? 'active',
         sort: filters.sort ?? 'sort_order',
         direction: filters.direction ?? 'asc',
@@ -199,6 +228,10 @@ export default function TasksIndex({
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
         useForm<TaskFormData>(defaultForm);
+    const bmcPointForm = useForm<BmcPointFormData>({
+        name: '',
+        description: '',
+    });
 
     const submitFilters = (event: FormEvent) => {
         event.preventDefault();
@@ -215,6 +248,14 @@ export default function TasksIndex({
                     filterForm.role_id === 'all'
                         ? undefined
                         : filterForm.role_id,
+                task_type:
+                    filterForm.task_type === 'all'
+                        ? undefined
+                        : filterForm.task_type,
+                bmc_point_id:
+                    filterForm.bmc_point_id === 'all'
+                        ? undefined
+                        : filterForm.bmc_point_id,
                 status: filterForm.status,
                 sort: filterForm.sort,
                 direction: filterForm.direction,
@@ -239,6 +280,58 @@ export default function TasksIndex({
         clearErrors();
         setData(toFormData(task));
         setIsFormOpen(true);
+    };
+
+    const openCreateBmcPointForm = () => {
+        setSelectedBmcPoint(null);
+        bmcPointForm.clearErrors();
+        bmcPointForm.reset();
+        setIsBmcPointFormOpen(true);
+    };
+
+    const openEditBmcPointForm = (bmcPoint: BmcPointOption) => {
+        setSelectedBmcPoint(bmcPoint);
+        bmcPointForm.clearErrors();
+        bmcPointForm.setData({
+            name: bmcPoint.name,
+            description: bmcPoint.description ?? '',
+        });
+        setIsBmcPointFormOpen(true);
+    };
+
+    const closeBmcPointForm = () => {
+        setIsBmcPointFormOpen(false);
+        setSelectedBmcPoint(null);
+        bmcPointForm.reset();
+        bmcPointForm.clearErrors();
+    };
+
+    const submitBmcPoint = (event: FormEvent) => {
+        event.preventDefault();
+
+        const options = {
+            preserveScroll: true,
+            onSuccess: closeBmcPointForm,
+        };
+
+        if (selectedBmcPoint) {
+            bmcPointForm.put(updateBmcPoint.url(selectedBmcPoint.slug), options);
+
+            return;
+        }
+
+        bmcPointForm.post(storeBmcPoint.url(), options);
+    };
+
+    const confirmDeleteBmcPoint = () => {
+        if (!deleteBmcPointTarget) {
+            return;
+        }
+
+        router.delete(destroyBmcPoint.url(deleteBmcPointTarget.slug), {
+            preserveScroll: true,
+            onSuccess: () => setDeleteBmcPointTarget(null),
+        });
     };
 
     const closeForm = () => {
@@ -381,10 +474,74 @@ export default function TasksIndex({
                     </section>
 
                     <Card className="rounded-lg border bg-card shadow-sm">
+                        <CardHeader className="border-b">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <CardTitle>Master Poin BMC</CardTitle>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Kelola poin Business Model Canvas untuk
+                                        task kegiatan strategis pilihan.
+                                    </p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={openCreateBmcPointForm}
+                                >
+                                    <Plus className="size-4" />
+                                    Tambah Poin BMC
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="flex flex-wrap gap-3 p-5">
+                            {bmcPoints.map((bmcPoint) => (
+                                <div
+                                    key={bmcPoint.id}
+                                    className="flex min-w-52 flex-1 items-center justify-between gap-3 rounded-lg border bg-muted/20 p-3"
+                                >
+                                    <div>
+                                        <p className="text-sm font-medium">
+                                            {bmcPoint.name}
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {bmcPoint.tasks_count ?? 0} task
+                                            terkait
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() =>
+                                                openEditBmcPointForm(bmcPoint)
+                                            }
+                                        >
+                                            <Pencil className="size-4" />
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() =>
+                                                setDeleteBmcPointTarget(
+                                                    bmcPoint,
+                                                )
+                                            }
+                                        >
+                                            <Trash2 className="size-4 text-destructive" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="rounded-lg border bg-card shadow-sm">
                         <CardContent className="p-5">
                             <form
                                 onSubmit={submitFilters}
-                                className="grid gap-4 lg:grid-cols-[1fr_190px_190px_150px_150px_140px_auto]"
+                                className="grid gap-4 lg:grid-cols-[1fr_190px_190px_180px_190px_150px_150px_140px_auto]"
                             >
                                 <div className="space-y-2">
                                     <Label>Search</Label>
@@ -431,6 +588,33 @@ export default function TasksIndex({
                                     items={roles.map((role) => ({
                                         value: String(role.id),
                                         label: role.name,
+                                    }))}
+                                />
+
+                                <FilterSelect
+                                    label="Jenis Task"
+                                    value={filterForm.task_type}
+                                    onValueChange={(value) =>
+                                        setFilterForm((current) => ({
+                                            ...current,
+                                            task_type: value,
+                                        }))
+                                    }
+                                    items={taskTypeOptions}
+                                />
+
+                                <FilterSelect
+                                    label="Poin BMC"
+                                    value={filterForm.bmc_point_id}
+                                    onValueChange={(value) =>
+                                        setFilterForm((current) => ({
+                                            ...current,
+                                            bmc_point_id: value,
+                                        }))
+                                    }
+                                    items={bmcPoints.map((bmcPoint) => ({
+                                        value: String(bmcPoint.id),
+                                        label: bmcPoint.name,
                                     }))}
                                 />
 
@@ -541,6 +725,9 @@ export default function TasksIndex({
                                             Kategori
                                         </TableHead>
                                         <TableHead className="p-4">
+                                            Jenis / BMC
+                                        </TableHead>
+                                        <TableHead className="p-4">
                                             PIC Roles
                                         </TableHead>
                                         <TableHead className="p-4">
@@ -564,7 +751,7 @@ export default function TasksIndex({
                                     {tasks.data.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={9}
+                                                colSpan={10}
                                                 className="p-8 text-center text-muted-foreground"
                                             >
                                                 Data task belum tersedia.
@@ -599,6 +786,21 @@ export default function TasksIndex({
                                             </TableCell>
                                             <TableCell className="p-4">
                                                 {task.task_category.name}
+                                            </TableCell>
+                                            <TableCell className="p-4">
+                                                <div className="space-y-1">
+                                                    <Badge variant="outline">
+                                                        {task.task_type_label}
+                                                    </Badge>
+                                                    {task.bmc_point && (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {
+                                                                task.bmc_point
+                                                                    .name
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </TableCell>
                                             <TableCell className="p-4">
                                                 <div className="flex flex-wrap gap-2">
@@ -731,6 +933,47 @@ export default function TasksIndex({
 
                         <div className="grid gap-4 md:grid-cols-2">
                             <FormSelect
+                                label="Jenis Task"
+                                value={data.task_type}
+                                onValueChange={(value) => {
+                                    const taskType = value as TaskType;
+
+                                    setData({
+                                        ...data,
+                                        task_type: taskType,
+                                        bmc_point_id:
+                                            taskType === 'regular'
+                                                ? ''
+                                                : data.bmc_point_id,
+                                        period:
+                                            taskType ===
+                                            'kegiatan_strategis_pilihan'
+                                                ? 'daily'
+                                                : data.period,
+                                    });
+                                }}
+                                items={taskTypeOptions}
+                                error={errors.task_type}
+                            />
+
+                            {data.task_type ===
+                                'kegiatan_strategis_pilihan' && (
+                                <FormSelect
+                                    label="Poin BMC"
+                                    value={data.bmc_point_id}
+                                    onValueChange={(value) =>
+                                        setData('bmc_point_id', value)
+                                    }
+                                    placeholder="Pilih poin BMC"
+                                    items={bmcPoints.map((bmcPoint) => ({
+                                        value: String(bmcPoint.id),
+                                        label: bmcPoint.name,
+                                    }))}
+                                    error={errors.bmc_point_id}
+                                />
+                            )}
+
+                            <FormSelect
                                 label="Kategori"
                                 value={data.task_category_id}
                                 onValueChange={(value) =>
@@ -804,7 +1047,15 @@ export default function TasksIndex({
                                     setData('period', value as TaskPeriod)
                                 }
                                 placeholder="Pilih periode"
-                                items={periodOptions}
+                                items={
+                                    data.task_type ===
+                                    'kegiatan_strategis_pilihan'
+                                        ? periodOptions.filter(
+                                              (option) =>
+                                                  option.value === 'daily',
+                                          )
+                                        : periodOptions
+                                }
                                 error={errors.period}
                             />
 
@@ -1146,6 +1397,78 @@ export default function TasksIndex({
             </Dialog>
 
             <Dialog
+                open={isBmcPointFormOpen}
+                onOpenChange={(open) => !open && closeBmcPointForm()}
+            >
+                <DialogContent className="sm:max-w-lg">
+                    <form onSubmit={submitBmcPoint} className="space-y-5">
+                        <DialogHeader>
+                            <DialogTitle>
+                                {selectedBmcPoint
+                                    ? 'Edit Poin BMC'
+                                    : 'Tambah Poin BMC'}
+                            </DialogTitle>
+                            <DialogDescription>
+                                Poin ini dapat dipetakan ke task kegiatan
+                                strategis pilihan.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-2">
+                            <Label>Nama Poin BMC</Label>
+                            <Input
+                                value={bmcPointForm.data.name}
+                                onChange={(event) =>
+                                    bmcPointForm.setData(
+                                        'name',
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="Contoh: Key Activities"
+                            />
+                            <FieldError message={bmcPointForm.errors.name} />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Deskripsi</Label>
+                            <textarea
+                                className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none"
+                                value={bmcPointForm.data.description}
+                                onChange={(event) =>
+                                    bmcPointForm.setData(
+                                        'description',
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="Opsional"
+                            />
+                            <FieldError
+                                message={bmcPointForm.errors.description}
+                            />
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={closeBmcPointForm}
+                            >
+                                Batal
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={bmcPointForm.processing}
+                            >
+                                {bmcPointForm.processing
+                                    ? 'Menyimpan...'
+                                    : 'Simpan'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
                 open={detailTask !== null}
                 onOpenChange={(open) => !open && setDetailTask(null)}
             >
@@ -1175,6 +1498,14 @@ export default function TasksIndex({
                                 <DetailItem
                                     label="Kategori"
                                     value={detailTask.task_category.name}
+                                />
+                                <DetailItem
+                                    label="Jenis Task"
+                                    value={detailTask.task_type_label}
+                                />
+                                <DetailItem
+                                    label="Poin BMC"
+                                    value={detailTask.bmc_point?.name ?? '-'}
                                 />
                                 <DetailItem
                                     label="PIC Roles"
@@ -1314,6 +1645,38 @@ export default function TasksIndex({
                             type="button"
                             variant="destructive"
                             onClick={confirmDelete}
+                        >
+                            Hapus
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={deleteBmcPointTarget !== null}
+                onOpenChange={(open) => !open && setDeleteBmcPointTarget(null)}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Hapus Poin BMC</DialogTitle>
+                        <DialogDescription>
+                            Poin BMC {deleteBmcPointTarget?.name} akan
+                            dihapus. Poin yang sudah digunakan oleh task atau
+                            riwayat tidak dapat dihapus.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setDeleteBmcPointTarget(null)}
+                        >
+                            Batal
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={confirmDeleteBmcPoint}
                         >
                             Hapus
                         </Button>

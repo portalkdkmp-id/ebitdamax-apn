@@ -29,6 +29,15 @@ export type TaskAdditionalFieldInputType =
 
 export type TaskAdditionalFieldShowWhen = 'start' | 'finish';
 export type TaskPeriod = 'once' | 'daily' | 'weekly' | 'monthly';
+export type TaskType = 'regular' | 'kegiatan_strategis_pilihan';
+
+export type BmcPointOption = {
+    id: number;
+    name: string;
+    slug: string;
+    description: string | null;
+    tasks_count?: number;
+};
 
 export type TaskReportDocument = {
     phase: 'start' | 'finish';
@@ -74,6 +83,9 @@ export type TaskItem = {
     id: number;
     uuid: string;
     task_category_id: number;
+    task_type: TaskType;
+    task_type_label: string;
+    bmc_point_id: number | null;
     role_id: number | null;
     role_ids: number[];
     sort_order: number | null;
@@ -87,6 +99,7 @@ export type TaskItem = {
     period_label: string;
     is_active: boolean;
     task_category: TaskCategoryOption;
+    bmc_point: BmcPointOption | null;
     role: UserRole | null;
     roles: UserRole[];
     additional_fields: TaskAdditionalFieldItem[];
@@ -98,6 +111,8 @@ export type TaskFilters = {
     search: string;
     task_category_id: number | null;
     role_id: number | null;
+    task_type: TaskType | 'all';
+    bmc_point_id: number | null;
     status: 'active' | 'inactive' | 'all';
     sort: string;
     direction: 'asc' | 'desc';

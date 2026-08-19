@@ -7,11 +7,13 @@ use App\Enums\TaskAdditionalFieldInputType;
 use App\Enums\TaskAdditionalFieldShowWhen;
 use App\Enums\TaskPeriod;
 use App\Enums\TaskReportStatus;
+use App\Enums\TaskType;
 use App\Http\Requests\FinishTaskRequest;
 use App\Http\Requests\StartTaskRequest;
 use App\Models\EbitdamaxKdkmp;
 use App\Models\Task;
 use App\Models\TaskAdditionalField;
+use App\Models\TaskBmcDailySelection;
 use App\Models\TaskReport;
 use App\Models\TaskReportValue;
 use App\Models\User;
@@ -44,6 +46,8 @@ class TaskReportController extends Controller
 
         try {
             DB::transaction(function () use ($businessDate, $request, $task, $periodKey, &$storedFiles): void {
+                $this->ensureBmcSelectionAllowsTask($request, $task, $businessDate);
+
                 $completedReportExists = TaskReport::query()
                     ->where('task_id', $task->id)
                     ->where('user_id', $request->user()->id)
@@ -378,6 +382,28 @@ class TaskReportController extends Controller
 
         return $roleId !== null
             && $task->roles()->whereKey($roleId)->exists();
+    }
+
+    private function ensureBmcSelectionAllowsTask(
+        StartTaskRequest $request,
+        Task $task,
+        CarbonImmutable $businessDate,
+    ): void {
+        if ($task->task_type !== TaskType::KegiatanStrategisPilihan) {
+            return;
+        }
+
+        $selection = TaskBmcDailySelection::query()
+            ->where('user_id', $request->user()?->id)
+            ->whereDate('selection_date', $businessDate->toDateString())
+            ->lockForUpdate()
+            ->first();
+
+        if ($selection?->bmc_point_id !== $task->bmc_point_id) {
+            throw ValidationException::withMessages([
+                'task' => 'Pilih poin BMC yang sesuai terlebih dahulu sebelum memulai task ini.',
+            ]);
+        }
     }
 
     private function businessDate(): CarbonImmutable
