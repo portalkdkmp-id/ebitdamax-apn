@@ -54,7 +54,7 @@ type CompletedTaskReport = {
         time_require: number;
         lower_time_threshold_minutes: number | null;
         upper_time_threshold_minutes: number | null;
-        task_category: TaskCategoryOption;
+        task_category: TaskCategoryOption | null;
         roles: UserRole[];
     };
 };
@@ -265,7 +265,8 @@ export default function KdkmpDashboardTaskReports({
                                                 </div>
                                             </TableCell>
                                             <TableCell className="p-4">
-                                                {report.task.task_category.name}
+                                                {report.task.task_category?.name ??
+                                                    'Kegiatan Strategis Pilihan'}
                                             </TableCell>
                                             <TableCell className="p-4">
                                                 <div className="flex flex-wrap gap-2">
@@ -338,7 +339,8 @@ export default function KdkmpDashboardTaskReports({
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     <Badge variant="secondary">
-                                        {selectedReport.task.task_category.name}
+                                        {selectedReport.task.task_category?.name ??
+                                            'Kegiatan Strategis Pilihan'}
                                     </Badge>
                                     {selectedReport.task.roles.map((role) => (
                                         <Badge key={role.id} variant="outline">

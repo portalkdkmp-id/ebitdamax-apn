@@ -26,7 +26,17 @@ class StoreTaskRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'task_category_id' => ['required', 'exists:task_categories,id'],
+            'task_category_id' => [
+                'nullable',
+                'integer',
+                'exists:task_categories,id',
+                Rule::requiredIf(
+                    fn (): bool => $this->input('task_type') !== TaskType::KegiatanStrategisPilihan->value,
+                ),
+                Rule::prohibitedIf(
+                    fn (): bool => $this->input('task_type') === TaskType::KegiatanStrategisPilihan->value,
+                ),
+            ],
             'task_type' => ['required', Rule::enum(TaskType::class)],
             'bmc_point_id' => [
                 'nullable',

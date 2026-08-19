@@ -82,7 +82,7 @@ export type TaskAdditionalFieldItem = {
 export type TaskItem = {
     id: number;
     uuid: string;
-    task_category_id: number;
+    task_category_id: number | null;
     task_type: TaskType;
     task_type_label: string;
     bmc_point_id: number | null;
@@ -98,7 +98,7 @@ export type TaskItem = {
     period: TaskPeriod;
     period_label: string;
     is_active: boolean;
-    task_category: TaskCategoryOption;
+    task_category: TaskCategoryOption | null;
     bmc_point: BmcPointOption | null;
     role: UserRole | null;
     roles: UserRole[];

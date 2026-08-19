@@ -157,7 +157,7 @@ class TaskController extends Controller
     private function taskPayload(array $payload): array
     {
         return [
-            'task_category_id' => $payload['task_category_id'],
+            'task_category_id' => $payload['task_category_id'] ?? null,
             'task_type' => $payload['task_type'],
             'bmc_point_id' => $payload['task_type'] === TaskType::KegiatanStrategisPilihan->value
                 ? (int) $payload['bmc_point_id']
@@ -330,11 +330,11 @@ class TaskController extends Controller
             'period' => $task->period->value,
             'period_label' => $task->period->label(),
             'is_active' => $task->is_active,
-            'task_category' => [
+            'task_category' => $task->taskCategory ? [
                 'id' => $task->taskCategory->id,
                 'name' => $task->taskCategory->name,
                 'slug' => $task->taskCategory->slug,
-            ],
+            ] : null,
             'bmc_point' => $task->bmcPoint ? [
                 'id' => $task->bmcPoint->id,
                 'name' => $task->bmcPoint->name,

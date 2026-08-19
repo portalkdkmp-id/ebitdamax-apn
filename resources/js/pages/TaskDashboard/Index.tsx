@@ -409,16 +409,34 @@ export default function TaskDashboardIndex({
             ? String(bmcSelection.selected_point.id)
             : '',
     });
+    const regularTasks = useMemo(
+        () =>
+            tasks.filter(
+                (task) => task.task_type === 'regular',
+            ),
+        [tasks],
+    );
+    const strategicTasks = useMemo(
+        () =>
+            tasks.filter(
+                (task) => task.task_type === 'kegiatan_strategis_pilihan',
+            ),
+        [tasks],
+    );
     const taskGroups = useMemo(() => {
         const groups = new Map<
             number,
             {
-                category: DashboardTask['task_category'];
+                category: NonNullable<DashboardTask['task_category']>;
                 tasks: DashboardTask[];
             }
         >();
 
-        tasks.forEach((task) => {
+        regularTasks.forEach((task) => {
+            if (!task.task_category) {
+                return;
+            }
+
             const group = groups.get(task.task_category.id);
 
             if (group) {
@@ -434,7 +452,7 @@ export default function TaskDashboardIndex({
         });
 
         return Array.from(groups.values());
-    }, [tasks]);
+    }, [regularTasks]);
 
     const startFields = useMemo(
         () => fieldsFor(startTask, 'start'),
@@ -561,7 +579,17 @@ export default function TaskDashboardIndex({
 
                     <Card className="rounded-2xl border bg-card shadow-sm">
                         <CardHeader className="border-b px-5 py-4">
-                            <CardTitle>Daftar Task</CardTitle>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <CardTitle>Task Reguler</CardTitle>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Task operasional berdasarkan kategori.
+                                    </p>
+                                </div>
+                                <Badge variant="outline">
+                                    {regularTasks.length} task
+                                </Badge>
+                            </div>
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="px-3 pb-3 sm:px-4">
@@ -586,14 +614,14 @@ export default function TaskDashboardIndex({
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {tasks.length === 0 && (
+                                        {regularTasks.length === 0 && (
                                             <TableRow className="border-0 hover:bg-transparent">
                                                 <TableCell
                                                     colSpan={5}
                                                     className="rounded-xl border border-dashed bg-muted/20 p-8 text-center text-muted-foreground"
                                                 >
-                                                    Belum ada task untuk role
-                                                    ini.
+                                                    Belum ada task reguler untuk
+                                                    role ini.
                                                 </TableCell>
                                             </TableRow>
                                         )}
@@ -750,6 +778,82 @@ export default function TaskDashboardIndex({
                             </div>
                         </CardContent>
                     </Card>
+
+                    {strategicTasks.length > 0 && (
+                        <Card className="rounded-2xl border border-primary/20 bg-primary/[0.03] shadow-sm">
+                            <CardHeader className="border-b border-primary/10 px-5 py-4">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <CardTitle className="text-primary">
+                                            Kegiatan Strategis Pilihan
+                                        </CardTitle>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            Task strategis berdasarkan Poin BMC
+                                            yang dipilih hari ini.
+                                        </p>
+                                    </div>
+                                    <Badge variant="secondary">
+                                        {strategicTasks.length} task
+                                    </Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="grid gap-3 p-4 sm:p-5">
+                                {strategicTasks.map((task) => (
+                                    <article
+                                        key={task.uuid}
+                                        className="rounded-xl border border-primary/15 bg-card p-4 shadow-sm"
+                                    >
+                                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                            <div className="flex min-w-0 items-start gap-3">
+                                                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                                    <ClipboardList className="size-5" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <h3 className="font-semibold text-foreground">
+                                                            {task.name}
+                                                        </h3>
+                                                        {task.bmc_point && (
+                                                            <Badge variant="outline">
+                                                                BMC:{' '}
+                                                                {
+                                                                    task
+                                                                        .bmc_point
+                                                                        .name
+                                                                }
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="mt-1 text-sm text-muted-foreground">
+                                                        {task.description ??
+                                                            'Tidak ada deskripsi.'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex shrink-0 flex-wrap items-center gap-3 lg:justify-end">
+                                                <div className="text-sm text-muted-foreground">
+                                                    <span className="font-medium text-foreground">
+                                                        {task.execution_time ??
+                                                            '-'}
+                                                    </span>{' '}
+                                                    · {task.time_require} menit
+                                                </div>
+                                                <Badge variant="outline">
+                                                    {task.status_label}
+                                                </Badge>
+                                                <TaskActionButton
+                                                    task={task}
+                                                    onStart={setStartTask}
+                                                    onFinish={setFinishTask}
+                                                />
+                                            </div>
+                                        </div>
+                                    </article>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </main>
 

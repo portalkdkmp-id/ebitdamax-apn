@@ -409,11 +409,11 @@ class TaskDashboardController extends Controller
             'task_type' => $task->task_type->value,
             'task_type_label' => $task->task_type->label(),
             'bmc_point_id' => $task->bmc_point_id,
-            'task_category' => [
+            'task_category' => $task->taskCategory ? [
                 'id' => $task->taskCategory->id,
                 'name' => $task->taskCategory->name,
                 'slug' => $task->taskCategory->slug,
-            ],
+            ] : null,
             'bmc_point' => $task->bmcPoint ? [
                 'id' => $task->bmcPoint->id,
                 'name' => $task->bmcPoint->name,
@@ -476,11 +476,11 @@ class TaskDashboardController extends Controller
             'status' => $status?->value ?? 'pending',
             'status_label' => $status?->label() ?? 'Belum Dimulai',
             'documents' => $report ? $this->transformDocuments($report) : [],
-            'task_category' => [
+            'task_category' => $task->taskCategory ? [
                 'id' => $task->taskCategory->id,
                 'name' => $task->taskCategory->name,
                 'slug' => $task->taskCategory->slug,
-            ],
+            ] : null,
             'task_type' => $task->task_type->value,
             'task_type_label' => $task->task_type->label(),
             'bmc_point_id' => $task->bmc_point_id,

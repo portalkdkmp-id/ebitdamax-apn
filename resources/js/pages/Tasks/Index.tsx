@@ -163,7 +163,11 @@ function timeThresholdLabel(task: TaskItem): string {
 
 function toFormData(task: TaskItem): TaskFormData {
     return {
-        task_category_id: String(task.task_category_id),
+        task_category_id:
+            task.task_type === 'kegiatan_strategis_pilihan' ||
+            task.task_category_id === null
+                ? ''
+                : String(task.task_category_id),
         task_type: task.task_type,
         bmc_point_id: task.bmc_point_id ? String(task.bmc_point_id) : '',
         role_ids: task.role_ids.map((roleId) => String(roleId)),
@@ -760,7 +764,15 @@ export default function TasksIndex({
                                     )}
 
                                     {tasks.data.map((task) => (
-                                        <TableRow key={task.uuid}>
+                                        <TableRow
+                                            key={task.uuid}
+                                            className={
+                                                task.task_type ===
+                                                'kegiatan_strategis_pilihan'
+                                                    ? 'bg-primary/5'
+                                                    : undefined
+                                            }
+                                        >
                                             <TableCell className="p-4 text-center font-medium">
                                                 {task.sort_order ?? '-'}
                                             </TableCell>
@@ -785,11 +797,27 @@ export default function TasksIndex({
                                                 </div>
                                             </TableCell>
                                             <TableCell className="p-4">
-                                                {task.task_category.name}
+                                                {task.task_category ? (
+                                                    task.task_category.name
+                                                ) : (
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="font-normal"
+                                                    >
+                                                        Tanpa kategori
+                                                    </Badge>
+                                                )}
                                             </TableCell>
                                             <TableCell className="p-4">
                                                 <div className="space-y-1">
-                                                    <Badge variant="outline">
+                                                    <Badge
+                                                        variant={
+                                                            task.task_type ===
+                                                            'kegiatan_strategis_pilihan'
+                                                                ? 'secondary'
+                                                                : 'outline'
+                                                        }
+                                                    >
                                                         {task.task_type_label}
                                                     </Badge>
                                                     {task.bmc_point && (
@@ -941,6 +969,11 @@ export default function TasksIndex({
                                     setData({
                                         ...data,
                                         task_type: taskType,
+                                        task_category_id:
+                                            taskType ===
+                                            'kegiatan_strategis_pilihan'
+                                                ? ''
+                                                : data.task_category_id,
                                         bmc_point_id:
                                             taskType === 'regular'
                                                 ? ''
@@ -973,19 +1006,21 @@ export default function TasksIndex({
                                 />
                             )}
 
-                            <FormSelect
-                                label="Kategori"
-                                value={data.task_category_id}
-                                onValueChange={(value) =>
-                                    setData('task_category_id', value)
-                                }
-                                placeholder="Pilih kategori"
-                                items={taskCategories.map((category) => ({
-                                    value: String(category.id),
-                                    label: category.name,
-                                }))}
-                                error={errors.task_category_id}
-                            />
+                            {data.task_type === 'regular' && (
+                                <FormSelect
+                                    label="Kategori"
+                                    value={data.task_category_id}
+                                    onValueChange={(value) =>
+                                        setData('task_category_id', value)
+                                    }
+                                    placeholder="Pilih kategori"
+                                    items={taskCategories.map((category) => ({
+                                        value: String(category.id),
+                                        label: category.name,
+                                    }))}
+                                    error={errors.task_category_id}
+                                />
+                            )}
 
                             <div className="space-y-2">
                                 <Label>PIC Roles</Label>
@@ -1497,7 +1532,10 @@ export default function TasksIndex({
                                 />
                                 <DetailItem
                                     label="Kategori"
-                                    value={detailTask.task_category.name}
+                                    value={
+                                        detailTask.task_category?.name ??
+                                        'Tanpa kategori (Kegiatan Strategis Pilihan)'
+                                    }
                                 />
                                 <DetailItem
                                     label="Jenis Task"
