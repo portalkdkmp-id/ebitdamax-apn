@@ -57,7 +57,7 @@ const TOUR_STEPS: TourStep[] = [
 ];
 
 const POPOVER_WIDTH = 320;
-const POPOVER_HEIGHT = 190;
+const POPOVER_HEIGHT = 240;
 
 function getTargetRect(target: HTMLElement): TargetRect {
     const rect = target.getBoundingClientRect();
@@ -234,16 +234,17 @@ export function OnboardingTour() {
                     {currentStep.description}
                 </p>
 
-                <div className="mt-5 flex items-center justify-between gap-3">
+                <div className="mt-5 flex flex-col items-stretch gap-3">
                     <Button
                         type="button"
                         variant="ghost"
                         size="sm"
+                        className="self-start"
                         onClick={completeOnboarding}
                     >
                         Lewati Onboarding
                     </Button>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-end gap-2">
                         <Button
                             type="button"
                             variant="outline"
