@@ -97,7 +97,7 @@ export default function KdkmpDashboardIndex({
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <EntryStatus entry={todayEntry} />
-                                <Button asChild>
+                                <Button asChild data-tour="kdkmp-daily-input">
                                     <Link href={inputDataToday()}>
                                         <PencilLine className="size-4" />
                                         Input Data Hari Ini

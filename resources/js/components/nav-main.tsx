@@ -61,6 +61,7 @@ export function NavMain({
                             asChild
                             isActive={isItemActive(item)}
                             tooltip={{ children: item.title }}
+                            data-tour={item.tourId}
                         >
                             {isExternalNavItem(item) ? (
                                 <a

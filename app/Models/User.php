@@ -22,6 +22,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property int $id
  * @property int|null $role_id
  * @property int|null $sdm_kdkmp_entry_id
+ * @property bool $has_completed_onboarding
  * @property string $name
  * @property string|null $username
  * @property string $email
@@ -124,6 +125,7 @@ class User extends Authenticatable implements PasskeyUser
     {
         return [
             'email_verified_at' => 'datetime',
+            'has_completed_onboarding' => 'boolean',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];

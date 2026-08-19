@@ -16,6 +16,7 @@ use App\Http\Controllers\MeetingActionItemController;
 use App\Http\Controllers\MeetingMinuteController;
 use App\Http\Controllers\MonitoringDashboardController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OrganizationCalculationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\PlanEbitdaMatrixController;
@@ -61,6 +62,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('notifications.read-all');
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markAsRead'])
         ->name('notifications.read');
+
+    Route::post('/users/complete-onboarding', [OnboardingController::class, 'complete'])
+        ->name('users.complete-onboarding');
 
     Route::get('/admin/kdkmp-dashboard', KdkmpDashboardMonitoringController::class)
         ->name('admin.kdkmp-dashboard.index');

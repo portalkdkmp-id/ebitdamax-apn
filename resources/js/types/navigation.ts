@@ -10,6 +10,7 @@ export type NavItem = {
     title: string;
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
+    tourId?: string;
     isActive?: boolean;
     items?: NavItem[];
 };

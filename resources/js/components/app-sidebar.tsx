@@ -59,6 +59,7 @@ const superadminApnNavItems: NavItem[] = [
         title: 'Dashboard',
         href: adminDashboard(),
         icon: LayoutDashboard,
+        tourId: 'dashboard',
     },
     {
         title: 'Pohon EBITDA',
@@ -97,6 +98,7 @@ const superadminKdkmpNavItems: NavItem[] = [
         title: 'Dashboard KDKMP',
         href: adminKdkmpDashboardIndex(),
         icon: Gauge,
+        tourId: 'dashboard',
     },
     {
         title: 'Role KDKMP',
@@ -120,6 +122,7 @@ const apnViewerNavItems: NavItem[] = [
         title: 'Dashboard',
         href: adminDashboard(),
         icon: LayoutDashboard,
+        tourId: 'dashboard',
     },
     {
         title: 'Pohon EBITDA',
@@ -178,6 +181,7 @@ const superadminWorkReportNavItems: NavItem[] = [
         title: 'Tasks',
         href: tasksIndex(),
         icon: SquareCheckBig,
+        tourId: 'task-dashboard',
         items: [
             {
                 title: 'Semua Tugas',
@@ -203,6 +207,7 @@ const staffWorkReportNavItems: NavItem[] = [
         title: 'Tasks',
         href: taskDashboardIndex(),
         icon: SquareCheckBig,
+        tourId: 'task-dashboard',
         items: [
             {
                 title: 'Semua Tugas',
@@ -223,6 +228,7 @@ const kdkmpManagerNavItems: NavItem[] = [
         title: 'Dashboard KDKMP',
         href: kdkmpDashboardIndex(),
         icon: Gauge,
+        tourId: 'dashboard',
     },
     {
         title: 'LMS KDKMP',
@@ -236,6 +242,7 @@ const regionalManagerNavItems: NavItem[] = [
         title: 'Dashboard KDKMP',
         href: adminKdkmpDashboardIndex(),
         icon: Gauge,
+        tourId: 'dashboard',
     },
 ];
 
@@ -258,7 +265,7 @@ export function AppSidebar() {
 
     return (
         <Sidebar collapsible="icon" variant="inset">
-            <SidebarHeader>
+            <SidebarHeader data-tour="sidebar-home">
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
@@ -270,7 +277,7 @@ export function AppSidebar() {
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent>
+            <SidebarContent data-tour="sidebar-navigation">
                 {isKdkmpSuperadmin ? (
                     <>
                         <NavMain
@@ -352,7 +359,7 @@ export function AppSidebar() {
                 )}
             </SidebarContent>
 
-            <SidebarFooter>
+            <SidebarFooter data-tour="user-menu">
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
