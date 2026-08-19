@@ -75,12 +75,19 @@
 
             composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
-            npm ci
-            npm run build
+            # Clear stale production caches before Wayfinder discovers the current routes.
+            php artisan optimize:clear
 
             php artisan migrate --force
 
-            php artisan optimize:clear
+            
+
+            # Generate ignored Wayfinder files explicitly so missing route modules fail here.
+            
+
+            npm ci
+            npm run build
+
             php artisan optimize
 
             php artisan storage:link || true
