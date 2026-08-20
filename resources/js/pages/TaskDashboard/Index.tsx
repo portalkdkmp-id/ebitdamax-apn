@@ -545,6 +545,22 @@ export default function TaskDashboardIndex({
                                                                         {task.description ??
                                                                             '-'}
                                                                     </p>
+                                                                            {task.status !==
+                                                                                'completed' && (
+                                                                                <div className="mt-3">
+                                                                                    <TaskActionButton
+                                                                                        task={
+                                                                                            task
+                                                                                        }
+                                                                                        onStart={
+                                                                                            setStartTask
+                                                                                        }
+                                                                                        onFinish={
+                                                                                            setFinishTask
+                                                                                        }
+                                                                                    />
+                                                                                </div>
+                                                                            )}
                                                                     <MobileTaskDescription
                                                                         description={
                                                                             task.description
@@ -588,31 +604,6 @@ export default function TaskDashboardIndex({
                                                                                 </Badge>
                                                                             </div>
                                                                         </div>
-                                                                        <div className="space-y-2">
-                                                                            <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-                                                                                Aksi
-                                                                            </p>
-                                                                            {task.status ===
-                                                                            'completed' ? (
-                                                                                <p className="text-xs text-muted-foreground">
-                                                                                    Tidak
-                                                                                    ada
-                                                                                    aksi
-                                                                                </p>
-                                                                            ) : (
-                                                                                <TaskActionButton
-                                                                                    task={
-                                                                                        task
-                                                                                    }
-                                                                                    onStart={
-                                                                                        setStartTask
-                                                                                    }
-                                                                                    onFinish={
-                                                                                        setFinishTask
-                                                                                    }
-                                                                                />
-                                                                            )}
-                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -650,17 +641,6 @@ export default function TaskDashboardIndex({
                                                             </Badge>
                                                         </TableCell>
                                                         <TableCell className="rounded-r-xl border-y border-r bg-card p-4 max-[650px]:hidden">
-                                                            <div className="flex justify-end gap-2">
-                                                                <TaskActionButton
-                                                                    task={task}
-                                                                    onStart={
-                                                                        setStartTask
-                                                                    }
-                                                                    onFinish={
-                                                                        setFinishTask
-                                                                    }
-                                                                />
-                                                            </div>
                                                         </TableCell>
                                                     </TableRow>
                                                 ))}
