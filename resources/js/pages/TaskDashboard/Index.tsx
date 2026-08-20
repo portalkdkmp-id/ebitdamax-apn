@@ -44,9 +44,7 @@ import {
     finish as finishTaskRoute,
     start as startTaskRoute,
 } from '@/routes/tasks';
-import { store as storeBmcSelection } from '@/routes/task-dashboard/bmc-selection';
 import type {
-    BmcPointOption,
     TaskAdditionalFieldItem,
     TaskItem,
     TaskReportDocument,
@@ -65,12 +63,6 @@ type DashboardTask = TaskItem & {
 type Props = {
     tasks: DashboardTask[];
     operationalAttendance: OperationalAttendanceContext | null;
-    bmcSelection: {
-        business_date: string;
-        is_locked: boolean;
-        selected_point: BmcPointOption | null;
-        points: BmcPointOption[];
-    };
     summary: {
         total: number;
         pending: number;
@@ -399,44 +391,20 @@ async function compressImage(file: File): Promise<File> {
 export default function TaskDashboardIndex({
     tasks,
     operationalAttendance,
-    bmcSelection,
     summary,
 }: Props) {
     const [startTask, setStartTask] = useState<DashboardTask | null>(null);
     const [finishTask, setFinishTask] = useState<DashboardTask | null>(null);
-    const bmcSelectionForm = useForm<{ bmc_point_id: string }>({
-        bmc_point_id: bmcSelection.selected_point
-            ? String(bmcSelection.selected_point.id)
-            : '',
-    });
-    const regularTasks = useMemo(
-        () =>
-            tasks.filter(
-                (task) => task.task_type === 'regular',
-            ),
-        [tasks],
-    );
-    const strategicTasks = useMemo(
-        () =>
-            tasks.filter(
-                (task) => task.task_type === 'kegiatan_strategis_pilihan',
-            ),
-        [tasks],
-    );
     const taskGroups = useMemo(() => {
         const groups = new Map<
             number,
             {
-                category: NonNullable<DashboardTask['task_category']>;
+                category: DashboardTask['task_category'];
                 tasks: DashboardTask[];
             }
         >();
 
-        regularTasks.forEach((task) => {
-            if (!task.task_category) {
-                return;
-            }
-
+        tasks.forEach((task) => {
             const group = groups.get(task.task_category.id);
 
             if (group) {
@@ -452,7 +420,7 @@ export default function TaskDashboardIndex({
         });
 
         return Array.from(groups.values());
-    }, [regularTasks]);
+    }, [tasks]);
 
     const startFields = useMemo(
         () => fieldsFor(startTask, 'start'),
@@ -462,16 +430,6 @@ export default function TaskDashboardIndex({
         () => fieldsFor(finishTask, 'finish'),
         [finishTask],
     );
-
-    const submitBmcSelection = () => {
-        if (!bmcSelectionForm.data.bmc_point_id || bmcSelection.is_locked) {
-            return;
-        }
-
-        bmcSelectionForm.post(storeBmcSelection.url(), {
-            preserveScroll: true,
-        });
-    };
 
     return (
         <>
@@ -510,86 +468,9 @@ export default function TaskDashboardIndex({
                         />
                     </section>
 
-                    {bmcSelection.points.length > 0 && (
-                        <Card className="rounded-2xl border border-primary/20 bg-primary/5 shadow-sm">
-                            <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-end lg:justify-between">
-                                <div>
-                                    <p className="text-sm font-semibold text-primary uppercase">
-                                        Kegiatan Strategis Pilihan
-                                    </p>
-                                    <h2 className="mt-1 text-lg font-semibold text-foreground">
-                                        Pilih Poin BMC Hari Ini
-                                    </h2>
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        Pilih satu poin BMC untuk menampilkan
-                                        task strategis yang dapat dikerjakan
-                                        hari ini.
-                                    </p>
-                                </div>
-                                <div className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-xl">
-                                    <select
-                                        className="h-9 min-w-64 flex-1 rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                                        value={bmcSelectionForm.data.bmc_point_id}
-                                        disabled={bmcSelection.is_locked}
-                                        onChange={(event) =>
-                                            bmcSelectionForm.setData(
-                                                'bmc_point_id',
-                                                event.target.value,
-                                            )
-                                        }
-                                    >
-                                        <option value="">Pilih poin BMC</option>
-                                        {bmcSelection.points.map((point) => (
-                                            <option
-                                                key={point.id}
-                                                value={point.id}
-                                            >
-                                                {point.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <Button
-                                        type="button"
-                                        onClick={submitBmcSelection}
-                                        disabled={
-                                            bmcSelection.is_locked ||
-                                            !bmcSelectionForm.data
-                                                .bmc_point_id ||
-                                            bmcSelectionForm.processing
-                                        }
-                                    >
-                                        {bmcSelectionForm.processing
-                                            ? 'Menyimpan...'
-                                            : bmcSelection.is_locked
-                                              ? 'Pilihan Dikunci'
-                                              : 'Pilih Poin'}
-                                    </Button>
-                                </div>
-                                {bmcSelectionForm.errors.bmc_point_id && (
-                                    <p className="text-sm text-destructive">
-                                        {
-                                            bmcSelectionForm.errors
-                                                .bmc_point_id
-                                        }
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
-
                     <Card className="rounded-2xl border bg-card shadow-sm">
                         <CardHeader className="border-b px-5 py-4">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <CardTitle>Task Reguler</CardTitle>
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        Task operasional berdasarkan kategori.
-                                    </p>
-                                </div>
-                                <Badge variant="outline">
-                                    {regularTasks.length} task
-                                </Badge>
-                            </div>
+                            <CardTitle>Daftar Task</CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="px-3 pb-3 sm:px-4">
@@ -608,20 +489,23 @@ export default function TaskDashboardIndex({
                                             <TableHead className="bg-muted/40 p-4 text-right max-[650px]:hidden">
                                                 Estimasi Waktu
                                             </TableHead>
-                                            <TableHead className="rounded-r-xl bg-muted/40 p-4 max-[650px]:hidden">
+                                            <TableHead className="bg-muted/40 p-4 max-[650px]:hidden">
                                                 Status
+                                            </TableHead>
+                                            <TableHead className="w-[190px] rounded-r-xl bg-muted/40 p-4 text-right max-[650px]:hidden">
+                                                Aksi
                                             </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {regularTasks.length === 0 && (
+                                        {tasks.length === 0 && (
                                             <TableRow className="border-0 hover:bg-transparent">
                                                 <TableCell
-                                                    colSpan={5}
+                                                    colSpan={6}
                                                     className="rounded-xl border border-dashed bg-muted/20 p-8 text-center text-muted-foreground"
                                                 >
-                                                    Belum ada task reguler untuk
-                                                    role ini.
+                                                    Belum ada task untuk role
+                                                    ini.
                                                 </TableCell>
                                             </TableRow>
                                         )}
@@ -630,7 +514,7 @@ export default function TaskDashboardIndex({
                                             <Fragment key={group.category.id}>
                                                 <TableRow className="border-0 hover:bg-transparent">
                                                     <TableCell
-                                                        colSpan={5}
+                                                        colSpan={6}
                                                         className="rounded-xl border border-primary/15 bg-primary/5 p-3"
                                                     >
                                                         <div className="inline-flex rounded-md border border-primary/25 bg-primary/10 px-4 py-2 text-sm font-semibold text-foreground">
@@ -657,19 +541,6 @@ export default function TaskDashboardIndex({
                                                                             task.name
                                                                         }
                                                                     </p>
-                                                                    {task.bmc_point && (
-                                                                        <Badge
-                                                                            variant="outline"
-                                                                            className="mt-1"
-                                                                        >
-                                                                            BMC:{' '}
-                                                                            {
-                                                                                task
-                                                                                    .bmc_point
-                                                                                    .name
-                                                                            }
-                                                                        </Badge>
-                                                                    )}
                                                                     <p className="text-xs break-words text-muted-foreground max-[650px]:hidden">
                                                                         {task.description ??
                                                                             '-'}
@@ -679,22 +550,6 @@ export default function TaskDashboardIndex({
                                                                             task.description
                                                                         }
                                                                     />
-                                                                    {task.status !==
-                                                                        'completed' && (
-                                                                        <div className="mt-3">
-                                                                            <TaskActionButton
-                                                                                task={
-                                                                                    task
-                                                                                }
-                                                                                onStart={
-                                                                                    setStartTask
-                                                                                }
-                                                                                onFinish={
-                                                                                    setFinishTask
-                                                                                }
-                                                                            />
-                                                                        </div>
-                                                                    )}
                                                                     <div className="mt-4 hidden space-y-3 border-t pt-3 max-[650px]:block">
                                                                         <div className="grid grid-cols-2 gap-3">
                                                                             <div>
@@ -733,6 +588,31 @@ export default function TaskDashboardIndex({
                                                                                 </Badge>
                                                                             </div>
                                                                         </div>
+                                                                        <div className="space-y-2">
+                                                                            <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                                Aksi
+                                                                            </p>
+                                                                            {task.status ===
+                                                                            'completed' ? (
+                                                                                <p className="text-xs text-muted-foreground">
+                                                                                    Tidak
+                                                                                    ada
+                                                                                    aksi
+                                                                                </p>
+                                                                            ) : (
+                                                                                <TaskActionButton
+                                                                                    task={
+                                                                                        task
+                                                                                    }
+                                                                                    onStart={
+                                                                                        setStartTask
+                                                                                    }
+                                                                                    onFinish={
+                                                                                        setFinishTask
+                                                                                    }
+                                                                                />
+                                                                            )}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -762,12 +642,25 @@ export default function TaskDashboardIndex({
                                                             {task.time_require}{' '}
                                                             menit
                                                         </TableCell>
-                                                        <TableCell className="rounded-r-xl border-y border-r bg-card p-4 max-[650px]:hidden">
+                                                        <TableCell className="border-y bg-card p-4 max-[650px]:hidden">
                                                             <Badge variant="outline">
                                                                 {
                                                                     task.status_label
                                                                 }
                                                             </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="rounded-r-xl border-y border-r bg-card p-4 max-[650px]:hidden">
+                                                            <div className="flex justify-end gap-2">
+                                                                <TaskActionButton
+                                                                    task={task}
+                                                                    onStart={
+                                                                        setStartTask
+                                                                    }
+                                                                    onFinish={
+                                                                        setFinishTask
+                                                                    }
+                                                                />
+                                                            </div>
                                                         </TableCell>
                                                     </TableRow>
                                                 ))}
@@ -778,82 +671,6 @@ export default function TaskDashboardIndex({
                             </div>
                         </CardContent>
                     </Card>
-
-                    {strategicTasks.length > 0 && (
-                        <Card className="rounded-2xl border border-primary/20 bg-primary/[0.03] shadow-sm">
-                            <CardHeader className="border-b border-primary/10 px-5 py-4">
-                                <div className="flex flex-wrap items-center justify-between gap-3">
-                                    <div>
-                                        <CardTitle className="text-primary">
-                                            Kegiatan Strategis Pilihan
-                                        </CardTitle>
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            Task strategis berdasarkan Poin BMC
-                                            yang dipilih hari ini.
-                                        </p>
-                                    </div>
-                                    <Badge variant="secondary">
-                                        {strategicTasks.length} task
-                                    </Badge>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="grid gap-3 p-4 sm:p-5">
-                                {strategicTasks.map((task) => (
-                                    <article
-                                        key={task.uuid}
-                                        className="rounded-xl border border-primary/15 bg-card p-4 shadow-sm"
-                                    >
-                                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                            <div className="flex min-w-0 items-start gap-3">
-                                                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                                    <ClipboardList className="size-5" />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <h3 className="font-semibold text-foreground">
-                                                            {task.name}
-                                                        </h3>
-                                                        {task.bmc_point && (
-                                                            <Badge variant="outline">
-                                                                BMC:{' '}
-                                                                {
-                                                                    task
-                                                                        .bmc_point
-                                                                        .name
-                                                                }
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    <p className="mt-1 text-sm text-muted-foreground">
-                                                        {task.description ??
-                                                            'Tidak ada deskripsi.'}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex shrink-0 flex-wrap items-center gap-3 lg:justify-end">
-                                                <div className="text-sm text-muted-foreground">
-                                                    <span className="font-medium text-foreground">
-                                                        {task.execution_time ??
-                                                            '-'}
-                                                    </span>{' '}
-                                                    · {task.time_require} menit
-                                                </div>
-                                                <Badge variant="outline">
-                                                    {task.status_label}
-                                                </Badge>
-                                                <TaskActionButton
-                                                    task={task}
-                                                    onStart={setStartTask}
-                                                    onFinish={setFinishTask}
-                                                />
-                                            </div>
-                                        </div>
-                                    </article>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    )}
                 </div>
             </main>
 

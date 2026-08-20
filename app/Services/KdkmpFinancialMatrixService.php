@@ -3,9 +3,7 @@
 namespace App\Services;
 
 use App\Enums\TaskReportStatus;
-use App\Enums\TaskType;
 use App\Models\Task;
-use App\Models\TaskBmcDailySelection;
 use App\Models\TaskReport;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -25,7 +23,7 @@ class KdkmpFinancialMatrixService
         mixed $planRevenue,
         mixed $actualRevenue,
     ): array {
-        $tasks = $this->tasksForUser($user, $businessDate);
+        $tasks = $this->tasksForUser($user);
         $totalEstimatedMinutes = (int) $tasks->sum('time_require');
         $durationsByTaskId = $this->completedDurationsByTask(
             user: $user,
@@ -112,32 +110,16 @@ class KdkmpFinancialMatrixService
     /**
      * @return Collection<int, Task>
      */
-    private function tasksForUser(User $user, CarbonImmutable $businessDate): Collection
+    private function tasksForUser(User $user): Collection
     {
         if ($user->role_id === null) {
             return collect();
         }
 
-        $selectedBmcPointId = TaskBmcDailySelection::query()
-            ->where('user_id', $user->id)
-            ->whereDate('selection_date', $businessDate->toDateString())
-            ->value('bmc_point_id');
-
         return Task::query()
             ->active()
             ->whereHas('roles', function (Builder $query) use ($user): void {
                 $query->whereKey($user->role_id);
-            })
-            ->where(function (Builder $query) use ($selectedBmcPointId): void {
-                $query->where('task_type', TaskType::Regular->value);
-
-                if ($selectedBmcPointId !== null) {
-                    $query->orWhere(function (Builder $bmcTaskQuery) use ($selectedBmcPointId): void {
-                        $bmcTaskQuery
-                            ->where('task_type', TaskType::KegiatanStrategisPilihan->value)
-                            ->where('bmc_point_id', $selectedBmcPointId);
-                    });
-                }
             })
             ->orderByRaw('CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END')
             ->orderBy('sort_order')

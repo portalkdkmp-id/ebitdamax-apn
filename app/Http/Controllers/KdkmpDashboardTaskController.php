@@ -71,11 +71,11 @@ class KdkmpDashboardTaskController extends Controller
                         'time_require' => $report->task->time_require,
                         'lower_time_threshold_minutes' => $report->task->lower_time_threshold_minutes,
                         'upper_time_threshold_minutes' => $report->task->upper_time_threshold_minutes,
-                        'task_category' => $report->task->taskCategory ? [
+                        'task_category' => [
                             'id' => $report->task->taskCategory->id,
                             'name' => $report->task->taskCategory->name,
                             'slug' => $report->task->taskCategory->slug,
-                        ] : null,
+                        ],
                         'roles' => $report->task->roles
                             ->map(fn (Role $role): array => [
                                 'id' => $role->id,

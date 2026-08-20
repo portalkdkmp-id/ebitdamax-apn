@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\TaskPeriod;
-use App\Enums\TaskType;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,8 +20,6 @@ class Task extends Model
     protected $fillable = [
         'uuid',
         'task_category_id',
-        'task_type',
-        'bmc_point_id',
         'sort_order',
         'name',
         'description',
@@ -40,7 +37,6 @@ class Task extends Model
         'lower_time_threshold_minutes' => 'integer',
         'upper_time_threshold_minutes' => 'integer',
         'period' => TaskPeriod::class,
-        'task_type' => TaskType::class,
         'is_active' => 'boolean',
     ];
 
@@ -56,11 +52,6 @@ class Task extends Model
     public function taskCategory(): BelongsTo
     {
         return $this->belongsTo(TaskCategory::class);
-    }
-
-    public function bmcPoint(): BelongsTo
-    {
-        return $this->belongsTo(BmcPoint::class);
     }
 
     public function roles(): BelongsToMany

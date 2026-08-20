@@ -4,9 +4,7 @@ namespace App\Services;
 
 use App\Enums\TaskPeriod;
 use App\Enums\TaskReportStatus;
-use App\Enums\TaskType;
 use App\Models\Task;
-use App\Models\TaskBmcDailySelection;
 use App\Models\TaskReport;
 use App\Models\TaskReportValue;
 use App\Models\User;
@@ -51,10 +49,6 @@ class KdkmpDashboardMetricsService
         $roleIds = $users->pluck('role_id')->filter()->unique()->values();
 
         $tasksByRole = $this->tasksByRole($roleIds);
-        $selectedBmcPointByUser = TaskBmcDailySelection::query()
-            ->whereIn('user_id', $ids)
-            ->whereDate('selection_date', $businessDate->toDateString())
-            ->pluck('bmc_point_id', 'user_id');
 
         $completedReportsByUser = TaskReport::query()
             ->whereIn('user_id', $ids)
@@ -95,7 +89,6 @@ class KdkmpDashboardMetricsService
             $completedReportsByUser,
             $expenseTotalsByUser,
             $tasksByRole,
-            $selectedBmcPointByUser,
             $users
         ): array {
             $roleId = $users->get($userId)?->role_id;
@@ -103,12 +96,9 @@ class KdkmpDashboardMetricsService
                 ? $tasksByRole->get((int) $roleId, collect())
                 : collect();
             $completedOnceTaskIds = $completedOnceBeforeDateByUser->get($userId, collect());
-            $selectedBmcPointId = $selectedBmcPointByUser->get($userId);
             $assignedTasks = $assignedTasks
                 ->reject(fn (Task $task): bool => $task->period === TaskPeriod::Once
                     && $completedOnceTaskIds->contains($task->id))
-                ->reject(fn (Task $task): bool => $task->task_type === TaskType::KegiatanStrategisPilihan
-                    && $task->bmc_point_id !== $selectedBmcPointId)
                 ->keyBy('id');
             $userCompletedReports = $completedReportsByUser->get($userId, collect());
             $completedReports = $userCompletedReports
@@ -162,8 +152,6 @@ class KdkmpDashboardMetricsService
             ->select([
                 'id',
                 'period',
-                'task_type',
-                'bmc_point_id',
                 'lower_time_threshold_minutes',
                 'upper_time_threshold_minutes',
             ])

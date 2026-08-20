@@ -68,11 +68,6 @@ class User extends Authenticatable implements PasskeyUser
         return $this->hasMany(UserRegionalAssignment::class);
     }
 
-    public function taskBmcDailySelections(): HasMany
-    {
-        return $this->hasMany(TaskBmcDailySelection::class);
-    }
-
     public function businessProcesses(): HasMany
     {
         return $this->hasMany(BusinessProcess::class);

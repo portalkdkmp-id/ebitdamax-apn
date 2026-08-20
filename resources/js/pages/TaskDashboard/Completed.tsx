@@ -44,7 +44,7 @@ type CompletedTask = {
     name: string;
     description: string | null;
     time_require: number;
-    task_category: TaskCategoryOption | null;
+    task_category: TaskCategoryOption;
     roles: UserRole[];
 };
 
@@ -216,8 +216,7 @@ function CompletedReportCard({
                             {report.task.name}
                         </h3>
                         <p className="text-sm text-muted-foreground">
-                            {report.task.task_category?.name ??
-                                'Kegiatan Strategis Pilihan'}
+                            {report.task.task_category.name}
                         </p>
                     </div>
                 </div>
@@ -320,8 +319,7 @@ function NotWorkedTaskList({
                             {item.task.name}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                            {item.task.task_category?.name ??
-                                'Kegiatan Strategis Pilihan'}
+                            {item.task.task_category.name}
                             {isSuperadmin && item.user
                                 ? ' · ' + item.user.name
                                 : ''}

@@ -5,10 +5,8 @@ namespace App\Http\Controllers;
 use App\Enums\TaskAdditionalFieldInputType;
 use App\Enums\TaskAdditionalFieldShowWhen;
 use App\Enums\TaskPeriod;
-use App\Enums\TaskType;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
-use App\Models\BmcPoint;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskAdditionalField;
@@ -28,8 +26,6 @@ class TaskController extends Controller
         $search = trim((string) $request->input('search', ''));
         $categoryId = $request->input('task_category_id');
         $roleId = $request->input('role_id');
-        $taskType = (string) $request->input('task_type', 'all');
-        $bmcPointId = $request->input('bmc_point_id');
         $status = (string) $request->input('status', 'active');
         $sort = (string) $request->input('sort', 'sort_order');
         $direction = (string) $request->input('direction', 'asc');
@@ -40,14 +36,9 @@ class TaskController extends Controller
         $direction = $direction === 'desc' ? 'desc' : 'asc';
 
         $tasks = Task::query()
-            ->with(['taskCategory', 'bmcPoint', 'roles', 'additionalFields'])
+            ->with(['taskCategory', 'roles', 'additionalFields'])
             ->when($categoryId, fn ($query) => $query->where('task_category_id', $categoryId))
             ->when($roleId, fn ($query) => $query->whereHas('roles', fn ($roleQuery) => $roleQuery->whereKey($roleId)))
-            ->when(
-                $taskType !== 'all',
-                fn ($query) => $query->where('task_type', $taskType),
-            )
-            ->when($bmcPointId, fn ($query) => $query->where('bmc_point_id', $bmcPointId))
             ->when($status === 'active', fn ($query) => $query->where('is_active', true))
             ->when($status === 'inactive', fn ($query) => $query->where('is_active', false))
             ->when($search !== '', function ($query) use ($search): void {
@@ -71,32 +62,19 @@ class TaskController extends Controller
             )
             ->paginate(15)
             ->through(fn (Task $task): array => $this->transformTask($task))
-            ->appends($request->only([
-                'search',
-                'task_category_id',
-                'role_id',
-                'task_type',
-                'bmc_point_id',
-                'status',
-                'sort',
-                'direction',
-            ]));
+            ->appends($request->only(['search', 'task_category_id', 'role_id', 'status', 'sort', 'direction']));
 
         return Inertia::render('Tasks/Index', [
             'tasks' => $tasks,
             'taskCategories' => $this->taskCategoryOptions(),
-            'bmcPoints' => $this->bmcPointOptions(),
             'roles' => $this->roleOptions(),
             'periodOptions' => TaskPeriod::options(),
-            'taskTypeOptions' => TaskType::options(),
             'inputTypeOptions' => TaskAdditionalFieldInputType::options(),
             'showWhenOptions' => TaskAdditionalFieldShowWhen::options(),
             'filters' => [
                 'search' => $search,
                 'task_category_id' => $categoryId ? (int) $categoryId : null,
                 'role_id' => $roleId ? (int) $roleId : null,
-                'task_type' => $taskType,
-                'bmc_point_id' => $bmcPointId ? (int) $bmcPointId : null,
                 'status' => $status,
                 'sort' => $sort,
                 'direction' => $direction,
@@ -118,17 +96,6 @@ class TaskController extends Controller
 
     public function update(UpdateTaskRequest $request, Task $task): RedirectResponse
     {
-        $payload = $this->taskPayload($request->validated());
-        $isBmcMappingChanged = $task->task_type->value !== $payload['task_type']
-            || $task->bmc_point_id !== $payload['bmc_point_id'];
-
-        if ($isBmcMappingChanged && $task->reports()->exists()) {
-            return back()->with(
-                'error',
-                'Jenis atau poin BMC task tidak dapat diubah karena sudah memiliki laporan.',
-            );
-        }
-
         DB::transaction(function () use ($request, $task): void {
             $task->update($this->taskPayload($request->validated()));
 
@@ -157,11 +124,7 @@ class TaskController extends Controller
     private function taskPayload(array $payload): array
     {
         return [
-            'task_category_id' => $payload['task_category_id'] ?? null,
-            'task_type' => $payload['task_type'],
-            'bmc_point_id' => $payload['task_type'] === TaskType::KegiatanStrategisPilihan->value
-                ? (int) $payload['bmc_point_id']
-                : null,
+            'task_category_id' => $payload['task_category_id'],
             'sort_order' => $payload['sort_order'] ?? null,
             'name' => $payload['name'],
             'description' => $payload['description'] ?? null,
@@ -264,26 +227,6 @@ class TaskController extends Controller
     }
 
     /**
-     * @return array<int, array{id: int, name: string, slug: string, description: string|null, tasks_count: int}>
-     */
-    private function bmcPointOptions(): array
-    {
-        return BmcPoint::query()
-            ->withCount('tasks')
-            ->orderBy('name')
-            ->get(['id', 'name', 'slug', 'description'])
-            ->map(fn (BmcPoint $bmcPoint): array => [
-                'id' => $bmcPoint->id,
-                'name' => $bmcPoint->name,
-                'slug' => $bmcPoint->slug,
-                'description' => $bmcPoint->description,
-                'tasks_count' => $bmcPoint->tasks_count,
-            ])
-            ->values()
-            ->all();
-    }
-
-    /**
      * @return array<int, array<string, mixed>>
      */
     private function roleOptions(): array
@@ -313,9 +256,6 @@ class TaskController extends Controller
             'id' => $task->id,
             'uuid' => $task->uuid,
             'task_category_id' => $task->task_category_id,
-            'task_type' => $task->task_type->value,
-            'task_type_label' => $task->task_type->label(),
-            'bmc_point_id' => $task->bmc_point_id,
             'sort_order' => $task->sort_order,
             'role_id' => $firstRole?->id,
             'role_ids' => $task->roles->pluck('id')->values()->all(),
@@ -330,17 +270,11 @@ class TaskController extends Controller
             'period' => $task->period->value,
             'period_label' => $task->period->label(),
             'is_active' => $task->is_active,
-            'task_category' => $task->taskCategory ? [
+            'task_category' => [
                 'id' => $task->taskCategory->id,
                 'name' => $task->taskCategory->name,
                 'slug' => $task->taskCategory->slug,
-            ] : null,
-            'bmc_point' => $task->bmcPoint ? [
-                'id' => $task->bmcPoint->id,
-                'name' => $task->bmcPoint->name,
-                'slug' => $task->bmcPoint->slug,
-                'description' => $task->bmcPoint->description,
-            ] : null,
+            ],
             'role' => $firstRole ? [
                 'id' => $firstRole->id,
                 'name' => $firstRole->name,

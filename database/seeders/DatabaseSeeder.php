@@ -13,7 +13,6 @@ class DatabaseSeeder extends Seeder
             OrganizationProfileSeeder::class,
             OrganizationCalculationSeeder::class,
             EbitdaValueSeeder::class,
-            BmcPointSeeder::class,
             KdkmpGeraiBusinessProcessSeeder::class,
             KdkmpGeraiUnitCostAssumptionSeeder::class,
             KdkmpGeraiRevenuePlanSeeder::class,

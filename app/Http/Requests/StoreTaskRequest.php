@@ -5,19 +5,11 @@ namespace App\Http\Requests;
 use App\Enums\TaskAdditionalFieldInputType;
 use App\Enums\TaskAdditionalFieldShowWhen;
 use App\Enums\TaskPeriod;
-use App\Enums\TaskType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreTaskRequest extends FormRequest
 {
-    protected function prepareForValidation(): void
-    {
-        if ($this->input('task_type') === TaskType::KegiatanStrategisPilihan->value) {
-            $this->merge(['period' => TaskPeriod::Daily->value]);
-        }
-    }
-
     public function authorize(): bool
     {
         return true;
@@ -26,25 +18,7 @@ class StoreTaskRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'task_category_id' => [
-                'nullable',
-                'integer',
-                'exists:task_categories,id',
-                Rule::requiredIf(
-                    fn (): bool => $this->input('task_type') !== TaskType::KegiatanStrategisPilihan->value,
-                ),
-                Rule::prohibitedIf(
-                    fn (): bool => $this->input('task_type') === TaskType::KegiatanStrategisPilihan->value,
-                ),
-            ],
-            'task_type' => ['required', Rule::enum(TaskType::class)],
-            'bmc_point_id' => [
-                'nullable',
-                'integer',
-                'exists:bmc_points,id',
-                'required_if:task_type,'.TaskType::KegiatanStrategisPilihan->value,
-                'prohibited_unless:task_type,'.TaskType::KegiatanStrategisPilihan->value,
-            ],
+            'task_category_id' => ['required', 'exists:task_categories,id'],
             'role_ids' => ['required', 'array', 'min:1'],
             'role_ids.*' => ['required', 'integer', 'distinct', 'exists:roles,id'],
             'sort_order' => [
