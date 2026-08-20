@@ -393,6 +393,8 @@ class TaskDashboardController extends Controller
             'sort_order' => $task->sort_order,
             'name' => $task->name,
             'description' => $task->description,
+            'bmc_status' => $task->bmc_status->value,
+            'bmc_status_label' => $task->bmc_status->label(),
             'execution_time' => $task->execution_time
                 ? substr((string) $task->execution_time, 0, 5)
                 : null,

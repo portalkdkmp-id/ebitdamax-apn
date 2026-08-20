@@ -29,6 +29,17 @@ export type TaskAdditionalFieldInputType =
 
 export type TaskAdditionalFieldShowWhen = 'start' | 'finish';
 export type TaskPeriod = 'once' | 'daily' | 'weekly' | 'monthly';
+export type TaskBmcStatus =
+    | 'belum_dipetakan'
+    | 'key_partnerships'
+    | 'key_activities'
+    | 'key_resources'
+    | 'value_propositions'
+    | 'customer_relationships'
+    | 'channels'
+    | 'customer_segments'
+    | 'cost_structure'
+    | 'revenue_streams';
 
 export type TaskReportDocument = {
     phase: 'start' | 'finish';
@@ -74,6 +85,8 @@ export type TaskItem = {
     id: number;
     uuid: string;
     task_category_id: number;
+    bmc_status: TaskBmcStatus;
+    bmc_status_label: string;
     role_id: number | null;
     role_ids: number[];
     sort_order: number | null;

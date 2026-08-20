@@ -67,11 +67,13 @@ type Props = {
     inputTypeOptions: TaskSelectOption[];
     showWhenOptions: TaskSelectOption[];
     periodOptions: TaskSelectOption[];
+    bmcStatusOptions: TaskSelectOption[];
     filters: TaskFilters;
 };
 
 type TaskFormData = {
     task_category_id: string;
+    bmc_status: string;
     role_ids: string[];
     sort_order: string;
     name: string;
@@ -97,6 +99,7 @@ const emptyField = (): TaskAdditionalFieldItem => ({
 
 const defaultForm: TaskFormData = {
     task_category_id: '',
+    bmc_status: '',
     role_ids: [],
     sort_order: '',
     name: '',
@@ -146,6 +149,8 @@ function timeThresholdLabel(task: TaskItem): string {
 function toFormData(task: TaskItem): TaskFormData {
     return {
         task_category_id: String(task.task_category_id),
+        bmc_status:
+            task.bmc_status === 'belum_dipetakan' ? '' : task.bmc_status,
         role_ids: task.role_ids.map((roleId) => String(roleId)),
         sort_order: task.sort_order === null ? '' : String(task.sort_order),
         name: task.name,
@@ -180,6 +185,7 @@ export default function TasksIndex({
     inputTypeOptions,
     showWhenOptions,
     periodOptions,
+    bmcStatusOptions,
     filters,
 }: Props) {
     const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
@@ -541,6 +547,9 @@ export default function TasksIndex({
                                             Kategori
                                         </TableHead>
                                         <TableHead className="p-4">
+                                            Poin BMC
+                                        </TableHead>
+                                        <TableHead className="p-4">
                                             PIC Roles
                                         </TableHead>
                                         <TableHead className="p-4">
@@ -564,7 +573,7 @@ export default function TasksIndex({
                                     {tasks.data.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={9}
+                                                colSpan={10}
                                                 className="p-8 text-center text-muted-foreground"
                                             >
                                                 Data task belum tersedia.
@@ -599,6 +608,18 @@ export default function TasksIndex({
                                             </TableCell>
                                             <TableCell className="p-4">
                                                 {task.task_category.name}
+                                            </TableCell>
+                                            <TableCell className="p-4">
+                                                <Badge
+                                                    variant={
+                                                        task.bmc_status ===
+                                                        'belum_dipetakan'
+                                                            ? 'outline'
+                                                            : 'secondary'
+                                                    }
+                                                >
+                                                    {task.bmc_status_label}
+                                                </Badge>
                                             </TableCell>
                                             <TableCell className="p-4">
                                                 <div className="flex flex-wrap gap-2">
@@ -729,7 +750,7 @@ export default function TasksIndex({
                             </DialogDescription>
                         </DialogHeader>
 
-                        <div className="grid gap-4 md:grid-cols-2">
+                        <div className="grid gap-4 md:grid-cols-3">
                             <FormSelect
                                 label="Kategori"
                                 value={data.task_category_id}
@@ -742,6 +763,17 @@ export default function TasksIndex({
                                     label: category.name,
                                 }))}
                                 error={errors.task_category_id}
+                            />
+
+                            <FormSelect
+                                label="Poin BMC"
+                                value={data.bmc_status}
+                                onValueChange={(value) =>
+                                    setData('bmc_status', value)
+                                }
+                                placeholder="Pilih poin BMC"
+                                items={bmcStatusOptions}
+                                error={errors.bmc_status}
                             />
 
                             <div className="space-y-2">
@@ -1175,6 +1207,10 @@ export default function TasksIndex({
                                 <DetailItem
                                     label="Kategori"
                                     value={detailTask.task_category.name}
+                                />
+                                <DetailItem
+                                    label="Poin BMC"
+                                    value={detailTask.bmc_status_label}
                                 />
                                 <DetailItem
                                     label="PIC Roles"

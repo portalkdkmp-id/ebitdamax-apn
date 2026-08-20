@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TaskBmcStatus;
 use App\Enums\TaskPeriod;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +21,7 @@ class Task extends Model
     protected $fillable = [
         'uuid',
         'task_category_id',
+        'bmc_status',
         'sort_order',
         'name',
         'description',
@@ -31,7 +33,12 @@ class Task extends Model
         'is_active',
     ];
 
+    protected $attributes = [
+        'bmc_status' => TaskBmcStatus::Unmapped->value,
+    ];
+
     protected $casts = [
+        'bmc_status' => TaskBmcStatus::class,
         'sort_order' => 'integer',
         'time_require' => 'integer',
         'lower_time_threshold_minutes' => 'integer',

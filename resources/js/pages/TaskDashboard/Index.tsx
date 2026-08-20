@@ -555,6 +555,19 @@ export default function TaskDashboardIndex({
                                                                             task.name
                                                                         }
                                                                     </p>
+                                                                    <Badge
+                                                                        variant={
+                                                                            task.bmc_status ===
+                                                                            'belum_dipetakan'
+                                                                                ? 'outline'
+                                                                                : 'secondary'
+                                                                        }
+                                                                        className="mt-1"
+                                                                    >
+                                                                        {
+                                                                            task.bmc_status_label
+                                                                        }
+                                                                    </Badge>
                                                                     <p className="text-xs break-words text-muted-foreground max-[650px]:hidden">
                                                                         {truncateTaskDescription(
                                                                             task.description,

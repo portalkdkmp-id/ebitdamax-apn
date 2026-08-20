@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\TaskAdditionalFieldInputType;
 use App\Enums\TaskAdditionalFieldShowWhen;
+use App\Enums\TaskBmcStatus;
 use App\Enums\TaskPeriod;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -21,6 +22,11 @@ class UpdateTaskRequest extends FormRequest
 
         return [
             'task_category_id' => ['required', 'exists:task_categories,id'],
+            'bmc_status' => [
+                'required',
+                Rule::enum(TaskBmcStatus::class),
+                Rule::notIn([TaskBmcStatus::Unmapped->value]),
+            ],
             'role_ids' => ['required', 'array', 'min:1'],
             'role_ids.*' => ['required', 'integer', 'distinct', 'exists:roles,id'],
             'sort_order' => [
@@ -66,6 +72,7 @@ class UpdateTaskRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'bmc_status' => 'poin BMC',
             'sort_order' => 'nomor urut',
             'execution_time' => 'jam pelaksanaan',
             'lower_time_threshold_minutes' => 'ambang waktu bawah',

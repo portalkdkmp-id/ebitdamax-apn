@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\TaskAdditionalFieldInputType;
 use App\Enums\TaskAdditionalFieldShowWhen;
+use App\Enums\TaskBmcStatus;
 use App\Enums\TaskPeriod;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
@@ -69,6 +70,7 @@ class TaskController extends Controller
             'taskCategories' => $this->taskCategoryOptions(),
             'roles' => $this->roleOptions(),
             'periodOptions' => TaskPeriod::options(),
+            'bmcStatusOptions' => TaskBmcStatus::options(),
             'inputTypeOptions' => TaskAdditionalFieldInputType::options(),
             'showWhenOptions' => TaskAdditionalFieldShowWhen::options(),
             'filters' => [
@@ -125,6 +127,7 @@ class TaskController extends Controller
     {
         return [
             'task_category_id' => $payload['task_category_id'],
+            'bmc_status' => $payload['bmc_status'],
             'sort_order' => $payload['sort_order'] ?? null,
             'name' => $payload['name'],
             'description' => $payload['description'] ?? null,
@@ -256,6 +259,8 @@ class TaskController extends Controller
             'id' => $task->id,
             'uuid' => $task->uuid,
             'task_category_id' => $task->task_category_id,
+            'bmc_status' => $task->bmc_status->value,
+            'bmc_status_label' => $task->bmc_status->label(),
             'sort_order' => $task->sort_order,
             'role_id' => $firstRole?->id,
             'role_ids' => $task->roles->pluck('id')->values()->all(),
