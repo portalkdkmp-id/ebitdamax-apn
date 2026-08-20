@@ -232,7 +232,7 @@ const kdkmpManagerNavItems: NavItem[] = [
     },
     {
         title: 'LMS KDKMP',
-        href: 'https://lms.dev-agrinas.id/',
+        href: 'https://lms.agrinaspangan.id/',
         icon: GraduationCap,
     },
 ];
