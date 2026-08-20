@@ -91,7 +91,7 @@ type TaskActionFormData = {
 
 const MAX_DOCUMENT_COUNT = 10;
 const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024;
-const MOBILE_DESCRIPTION_PREVIEW_LENGTH = 50;
+const TASK_DESCRIPTION_PREVIEW_LENGTH = 120;
 const ADDITIONAL_FIELD_FILE_ACCEPT =
     '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png';
 
@@ -166,6 +166,20 @@ function TaskActionButton({
     return null;
 }
 
+function truncateTaskDescription(description: string | null): string {
+    const fullDescription = description?.trim() || '-';
+    const descriptionCharacters = Array.from(fullDescription);
+
+    if (descriptionCharacters.length <= TASK_DESCRIPTION_PREVIEW_LENGTH) {
+        return fullDescription;
+    }
+
+    return `${descriptionCharacters
+        .slice(0, TASK_DESCRIPTION_PREVIEW_LENGTH)
+        .join('')
+        .trimEnd()}…`;
+}
+
 function MobileTaskDescription({
     description,
 }: {
@@ -175,10 +189,10 @@ function MobileTaskDescription({
     const fullDescription = description?.trim() || '-';
     const descriptionCharacters = Array.from(fullDescription);
     const canExpand =
-        descriptionCharacters.length > MOBILE_DESCRIPTION_PREVIEW_LENGTH;
+        descriptionCharacters.length > TASK_DESCRIPTION_PREVIEW_LENGTH;
     const previewDescription = canExpand
         ? `${descriptionCharacters
-              .slice(0, MOBILE_DESCRIPTION_PREVIEW_LENGTH)
+              .slice(0, TASK_DESCRIPTION_PREVIEW_LENGTH)
               .join('')
               .trimEnd()}…`
         : fullDescription;
@@ -542,8 +556,9 @@ export default function TaskDashboardIndex({
                                                                         }
                                                                     </p>
                                                                     <p className="text-xs break-words text-muted-foreground max-[650px]:hidden">
-                                                                        {task.description ??
-                                                                            '-'}
+                                                                        {truncateTaskDescription(
+                                                                            task.description,
+                                                                        )}
                                                                     </p>
                                                                             {task.status !==
                                                                                 'completed' && (
