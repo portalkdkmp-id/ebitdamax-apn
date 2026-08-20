@@ -10,6 +10,7 @@ use App\Http\Controllers\ExcelImportController;
 use App\Http\Controllers\KdkmpDashboardController;
 use App\Http\Controllers\KdkmpDashboardMonitoringController;
 use App\Http\Controllers\KdkmpDashboardTaskController;
+use App\Http\Controllers\LmsKdkmpController;
 use App\Http\Controllers\LumbungChatController;
 use App\Http\Controllers\MeetingActionItemController;
 use App\Http\Controllers\MeetingMinuteController;
@@ -39,6 +40,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/lumbung-kms/chat', LumbungChatController::class)
         ->name('lumbung-kms.chat');
+
+    Route::get('/lms-kdkmp', LmsKdkmpController::class)
+        ->name('lms-kdkmp.index');
 
     Route::get('/dashboard/kdkmp', [KdkmpDashboardController::class, 'index'])
         ->name('kdkmp-dashboard.index');

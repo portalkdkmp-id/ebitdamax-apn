@@ -48,4 +48,11 @@ return [
         'chat_url' => env('LUMBUNG_KMS_CHAT_URL', 'https://lumbung.sibisa.site/chat'),
     ],
 
+    'lms_kdkmp' => [
+        'learning_paths_url' => env(
+            'LMS_KDKMP_LEARNING_PATHS_URL',
+            'https://lms.agrinaspangan.id/learning-paths',
+        ),
+    ],
+
 ];
