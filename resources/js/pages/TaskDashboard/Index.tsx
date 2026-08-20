@@ -550,24 +550,26 @@ export default function TaskDashboardIndex({
                                                                     <ClipboardList className="size-5" />
                                                                 </div>
                                                                 <div className="min-w-0">
-                                                                    <p className="font-medium text-foreground">
-                                                                        {
-                                                                            task.name
-                                                                        }
-                                                                    </p>
-                                                                    <Badge
-                                                                        variant={
-                                                                            task.bmc_status ===
-                                                                            'belum_dipetakan'
+                                                                    <div className='flex gap-1.5 mb-3'>
+                                                                        <p className="font-medium text-foreground">
+                                                                            {
+                                                                                task.name
+                                                                            }
+                                                                        </p>
+                                                                        <Badge
+                                                                            variant={
+                                                                                task.bmc_status ===
+                                                                                'belum_dipetakan'
                                                                                 ? 'outline'
                                                                                 : 'secondary'
-                                                                        }
-                                                                        className="mt-1"
-                                                                    >
-                                                                        {
-                                                                            task.bmc_status_label
-                                                                        }
-                                                                    </Badge>
+                                                                            }
+                                                                            
+                                                                            >
+                                                                            {
+                                                                                task.bmc_status_label
+                                                                            }
+                                                                        </Badge>
+                                                                    </div> 
                                                                     <p className="text-xs break-words text-muted-foreground max-[650px]:hidden">
                                                                         {truncateTaskDescription(
                                                                             task.description,
