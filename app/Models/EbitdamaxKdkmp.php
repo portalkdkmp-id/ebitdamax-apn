@@ -48,7 +48,6 @@ class EbitdamaxKdkmp extends Model
     ];
 
     public const EDITABLE_FIELDS = [
-        'actual_revenue',
         'plan_cost',
     ];
 

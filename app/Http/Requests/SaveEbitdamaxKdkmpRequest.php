@@ -22,7 +22,7 @@ class SaveEbitdamaxKdkmpRequest extends FormRequest
     {
         $rules = [
             'plan_revenue' => ['required', 'string', 'regex:/^\d+(?:\.\d{1,2})?$/', 'max:255'],
-            'actual_revenue' => ['nullable', 'string', 'regex:/^\d+(?:\.\d{1,2})?$/', 'max:255'],
+            'actual_revenue' => ['prohibited'],
             'variable_cost' => ['nullable', 'string', 'regex:/^\d+(?:\.\d{1,2})?$/', 'max:255'],
         ];
 

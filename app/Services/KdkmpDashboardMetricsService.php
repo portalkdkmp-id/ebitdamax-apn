@@ -16,8 +16,12 @@ class KdkmpDashboardMetricsService
 {
     private const EXPENSE_TASK_NAME = 'Catat pengeluaran harian';
 
+    private const REVENUE_TASK_NAME = 'Penyetoran Struk dan Uang';
+
+    private const REVENUE_FIELD_NAME = 'rekonsiliasi_uang_masuk';
+
     /**
-     * @return array{actual_cost: string, total_duration: string, task_completion_rate: float, time_compliance_rate: float}
+     * @return array{actual_revenue: string, actual_cost: string, total_duration: string, task_completion_rate: float, time_compliance_rate: float}
      */
     public function forUser(int $userId, CarbonImmutable $businessDate): array
     {
@@ -26,7 +30,7 @@ class KdkmpDashboardMetricsService
 
     /**
      * @param  iterable<int, int>  $userIds
-     * @return Collection<int, array{actual_cost: string, total_duration: string, task_completion_rate: float, time_compliance_rate: float}>
+     * @return Collection<int, array{actual_revenue: string, actual_cost: string, total_duration: string, task_completion_rate: float, time_compliance_rate: float}>
      */
     public function forUsers(iterable $userIds, CarbonImmutable $businessDate): Collection
     {
@@ -93,11 +97,27 @@ class KdkmpDashboardMetricsService
                 'task_report_values.value',
             ])
             ->groupBy('user_id');
+        $revenueValuesByUser = TaskReportValue::query()
+            ->join('task_reports', 'task_reports.id', '=', 'task_report_values.task_report_id')
+            ->join('tasks', 'tasks.id', '=', 'task_reports.task_id')
+            ->join('task_additional_fields', 'task_additional_fields.id', '=', 'task_report_values.task_additional_field_id')
+            ->whereIn('task_reports.user_id', $ids)
+            ->where('task_reports.status', TaskReportStatus::Completed->value)
+            ->whereBetween('task_reports.finished_at', [$startOfDay, $endOfDay])
+            ->where('tasks.name', self::REVENUE_TASK_NAME)
+            ->where('task_additional_fields.field_name', self::REVENUE_FIELD_NAME)
+            ->get([
+                'task_report_values.id',
+                'task_reports.user_id',
+                'task_report_values.value',
+            ])
+            ->groupBy('user_id');
 
         return $ids->mapWithKeys(function (int $userId) use (
             $completedOnceBeforeDateByUser,
             $completedReportsByUser,
             $expenseValuesByUser,
+            $revenueValuesByUser,
             $selectedTaskIdsByKdkmpEntry,
             $tasksByRole,
             $users
@@ -132,6 +152,9 @@ class KdkmpDashboardMetricsService
                 ->get($userId, collect())
                 ->filter(fn (TaskReportValue $value): bool => $assignedTasks->has($value->task_id))
                 ->sum(fn (TaskReportValue $value): float => $this->numericValue($value->value) ?? 0.0);
+            $revenueTotal = $revenueValuesByUser
+                ->get($userId, collect())
+                ->sum(fn (TaskReportValue $value): float => $this->numericValue($value->value) ?? 0.0);
             $reportsWithThreshold = $completedReports->filter(function (TaskReport $report) use ($assignedTasks): bool {
                 $task = $assignedTasks->get($report->task_id);
 
@@ -150,6 +173,7 @@ class KdkmpDashboardMetricsService
 
             return [
                 $userId => [
+                    'actual_revenue' => $this->formatNumber($revenueTotal),
                     'actual_cost' => $this->formatNumber($expenseTotal),
                     'total_duration' => $this->formatDuration($durationMinutes),
                     'task_completion_rate' => $this->percentage(
@@ -282,11 +306,12 @@ class KdkmpDashboardMetricsService
     }
 
     /**
-     * @return array{actual_cost: string, total_duration: string, task_completion_rate: float, time_compliance_rate: float}
+     * @return array{actual_revenue: string, actual_cost: string, total_duration: string, task_completion_rate: float, time_compliance_rate: float}
      */
     private function emptyMetrics(): array
     {
         return [
+            'actual_revenue' => '0',
             'actual_cost' => '0',
             'total_duration' => '0 menit',
             'task_completion_rate' => 0.0,

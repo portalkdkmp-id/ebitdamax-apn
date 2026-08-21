@@ -1,7 +1,7 @@
 import { useForm } from '@inertiajs/react';
 import { AlertTriangle, Save } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,7 +31,6 @@ import type {
 
 type DailyForm = {
     plan_revenue: string;
-    actual_revenue: string;
     variable_cost: string;
 };
 
@@ -40,10 +39,8 @@ type OperationalAttendanceForm = {
 };
 
 type Props = {
-    businessDate: string;
     todayEntry: KdkmpDailyEntry | null;
     computedValues: KdkmpComputedValues;
-    kdkmpId: number;
 };
 
 const ACTUAL_EBITDA_MARGIN_FIXED_COST = 9_235_467;
@@ -51,8 +48,6 @@ const TASK_COMPLETION_WEIGHT = 55;
 const TIME_COMPLIANCE_WEIGHT = 30;
 const REVENUE_WEIGHT = 15;
 const POS_ACTUAL_REVENUE = '0';
-const MANUAL_ACTUAL_REVENUE_STORAGE_PREFIX =
-    'ebitdamax-kdkmp.manual-actual-revenue';
 
 function inputValue(value: string | null | undefined): string {
     return value ?? '';
@@ -136,7 +131,6 @@ function RupiahInput({
 function formDataFrom(entry: KdkmpDailyEntry | null): DailyForm {
     return {
         plan_revenue: inputValue(entry?.plan_revenue) || '0',
-        actual_revenue: inputValue(entry?.actual_revenue),
         variable_cost: inputValue(entry?.variable_cost),
     };
 }
@@ -148,31 +142,6 @@ function operationalAttendanceFormDataFrom(
         operational_attendance:
             entry?.operational_attendance ?? emptyKdkmpOperationalAttendance(),
     };
-}
-
-function isRevenueValue(value: string): boolean {
-    return value === '' || /^\d+(?:\.\d{1,2})?$/.test(value);
-}
-
-function calculateActualRevenue(manualRevenue: string): string {
-    const manualRevenueValue = manualRevenue === '' ? 0 : Number(manualRevenue);
-    const posRevenueValue = Number(POS_ACTUAL_REVENUE);
-
-    if (
-        !Number.isFinite(manualRevenueValue) ||
-        !Number.isFinite(posRevenueValue)
-    ) {
-        return POS_ACTUAL_REVENUE;
-    }
-
-    return (manualRevenueValue + posRevenueValue)
-        .toFixed(2)
-        .replace(/\.00$/, '')
-        .replace(/(\.\d)0$/, '$1');
-}
-
-function manualRevenueStorageKey(kdkmpId: number, businessDate: string): string {
-    return `${MANUAL_ACTUAL_REVENUE_STORAGE_PREFIX}:${kdkmpId}:${businessDate}`;
 }
 
 function calculateActualEbitdaMargin(actualRevenue: string): string {
@@ -230,27 +199,28 @@ function dashboardFieldValue(
     data: DailyForm,
     field: keyof KdkmpDashboardFields,
     computedValues: KdkmpComputedValues,
+    actualRevenue: string,
 ): string {
     if (field === 'target_revenue') {
         return inputValue(computedValues.target_revenue);
     }
 
-    if (
-        field === 'plan_revenue' ||
-        field === 'actual_revenue' ||
-        field === 'variable_cost'
-    ) {
+    if (field === 'actual_revenue') {
+        return actualRevenue;
+    }
+
+    if (field === 'plan_revenue' || field === 'variable_cost') {
         return data[field];
     }
 
     if (field === 'actual_ebitda_margin') {
-        return calculateActualEbitdaMargin(data.actual_revenue);
+        return calculateActualEbitdaMargin(actualRevenue);
     }
 
     if (field === 'performance_scoring') {
         return calculatePerformanceScoring(
             data.plan_revenue,
-            data.actual_revenue,
+            actualRevenue,
             computedValues.task_completion_rate,
             computedValues.time_compliance_rate,
         );
@@ -276,10 +246,8 @@ function formatManualValue(value: string | null, isRupiah: boolean): string {
 }
 
 export default function KdkmpDashboardDailyInputForm({
-    businessDate,
     todayEntry,
     computedValues,
-    kdkmpId,
 }: Props) {
     const { data, setData, put, processing, errors } = useForm<DailyForm>(
         formDataFrom(todayEntry),
@@ -295,44 +263,7 @@ export default function KdkmpDashboardDailyInputForm({
     );
     const [showLowPlanRevenueConfirmation, setShowLowPlanRevenueConfirmation] =
         useState(false);
-    const [manualActualRevenue, setManualActualRevenue] = useState(() =>
-        inputValue(todayEntry?.actual_revenue),
-    );
-    const storageKey = manualRevenueStorageKey(kdkmpId, businessDate);
-
-    useEffect(() => {
-        let storedManualRevenue: string | null = null;
-
-        try {
-            storedManualRevenue = window.localStorage.getItem(storageKey);
-        } catch {
-            storedManualRevenue = null;
-        }
-
-        const restoredManualRevenue =
-            storedManualRevenue !== null && isRevenueValue(storedManualRevenue)
-                ? storedManualRevenue
-                : inputValue(todayEntry?.actual_revenue);
-
-        setManualActualRevenue(restoredManualRevenue);
-        setData(
-            'actual_revenue',
-            calculateActualRevenue(restoredManualRevenue),
-        );
-    }, [storageKey, todayEntry?.actual_revenue, setData]);
-
-    const updateManualActualRevenue = (value: string) => {
-        const normalizedValue = value.startsWith('-') ? '' : value;
-
-        setManualActualRevenue(normalizedValue);
-        setData('actual_revenue', calculateActualRevenue(normalizedValue));
-
-        try {
-            window.localStorage.setItem(storageKey, normalizedValue);
-        } catch {
-            return;
-        }
-    };
+    const actualRevenue = inputValue(todayEntry?.actual_revenue) || '0';
 
     const save = () => {
         setShowLowPlanRevenueConfirmation(false);
@@ -386,7 +317,12 @@ export default function KdkmpDashboardDailyInputForm({
             field.key === 'plan_revenue' || field.key === 'variable_cost'
                 ? field.key
                 : null;
-        const fieldValue = dashboardFieldValue(data, field.key, computedValues);
+        const fieldValue = dashboardFieldValue(
+            data,
+            field.key,
+            computedValues,
+            actualRevenue,
+        );
 
         return (
             <div key={field.key} className="space-y-2">
@@ -458,36 +394,19 @@ export default function KdkmpDashboardDailyInputForm({
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="actual-revenue-manual">
+                                        <Label>
                                             Pendapatan Manual
                                         </Label>
-                                        <RupiahInput
-                                            id="actual-revenue-manual"
-                                            value={manualActualRevenue}
-                                            onValueChange={
-                                                updateManualActualRevenue
-                                            }
-                                        />
-                                        <p className="text-xs text-muted-foreground">
-                                            Disimpan sementara pada browser ini
-                                            untuk KDKMP dan tanggal laporan
-                                            tersebut.
-                                        </p>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label>Actual Revenue</Label>
                                         <p className="py-2 text-sm font-semibold text-foreground tabular-nums">
                                             {formatManualValue(
-                                                calculateActualRevenue(
-                                                    manualActualRevenue,
-                                                ),
+                                                actualRevenue,
                                                 true,
                                             )}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            Akumulasi Pendapatan POS dan
-                                            Pendapatan Manual.
+                                            Otomatis dari nilai Rekonsiliasi
+                                            Uang Masuk saat task Penyetoran
+                                            Struk dan Uang diselesaikan.
                                         </p>
                                     </div>
                                 </div>

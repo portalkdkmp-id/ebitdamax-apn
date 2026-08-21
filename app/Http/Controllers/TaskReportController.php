@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\StoreTaskReportDocumentsAction;
+use App\Actions\SyncKdkmpActualRevenueAction;
 use App\Enums\TaskAdditionalFieldInputType;
 use App\Enums\TaskAdditionalFieldShowWhen;
 use App\Enums\TaskPeriod;
@@ -34,6 +35,7 @@ class TaskReportController extends Controller
         private readonly StoreTaskReportDocumentsAction $storeTaskReportDocuments,
         private readonly KdkmpOperationalAllocationService $operationalAllocation,
         private readonly KdkmpTaskSelectionService $taskSelection,
+        private readonly SyncKdkmpActualRevenueAction $syncKdkmpActualRevenue,
     ) {}
 
     public function start(StartTaskRequest $request, Task $task): RedirectResponse
@@ -144,11 +146,15 @@ class TaskReportController extends Controller
     {
         abort_unless($this->canAccessTask($request, $task), 403);
 
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
         $periodKey = $this->periodKey($task->period, now());
+        $businessDate = $this->businessDate();
         $storedFiles = [];
 
         try {
-            DB::transaction(function () use ($request, $task, $periodKey, &$storedFiles): void {
+            DB::transaction(function () use ($businessDate, $request, $task, $periodKey, $user, &$storedFiles): void {
                 $report = TaskReport::query()
                     ->where('task_id', $task->id)
                     ->where('user_id', $request->user()->id)
@@ -192,6 +198,8 @@ class TaskReportController extends Controller
                     showWhen: TaskAdditionalFieldShowWhen::Finish,
                     storedFiles: $storedFiles,
                 );
+
+                $this->syncKdkmpActualRevenue->handle($user, $businessDate);
             });
         } catch (Throwable $exception) {
             $this->deleteStoredFiles($storedFiles);

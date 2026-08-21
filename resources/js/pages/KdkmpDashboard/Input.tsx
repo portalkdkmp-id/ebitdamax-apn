@@ -418,10 +418,8 @@ export default function KdkmpDashboardInput({
                             </div>
 
                             <KdkmpDashboardDailyInputForm
-                                businessDate={businessDate}
                                 todayEntry={todayEntry}
                                 computedValues={computedValues}
-                                kdkmpId={kdkmp.id}
                             />
 
                             <KdkmpTaskSelectionForm

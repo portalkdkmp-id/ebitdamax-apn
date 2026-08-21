@@ -51,7 +51,7 @@ class KdkmpDashboardController extends Controller
             ...$metrics,
             'performance_scoring' => EbitdamaxKdkmp::calculatePerformanceScoring(
                 $todayEntry?->plan_revenue,
-                $todayEntry?->actual_revenue,
+                $metrics['actual_revenue'],
                 $metrics['task_completion_rate'],
                 $metrics['time_compliance_rate'],
             ),
@@ -82,7 +82,7 @@ class KdkmpDashboardController extends Controller
                 user: $user,
                 businessDate: $businessDate,
                 planRevenue: $todayEntry?->plan_revenue,
-                actualRevenue: $todayEntry?->actual_revenue,
+                actualRevenue: $metrics['actual_revenue'],
                 variableCost: $todayEntry?->plan_cost,
             ),
             'history' => $history,
@@ -109,7 +109,7 @@ class KdkmpDashboardController extends Controller
             ...$metrics,
             'performance_scoring' => EbitdamaxKdkmp::calculatePerformanceScoring(
                 $todayEntry?->plan_revenue,
-                $todayEntry?->actual_revenue,
+                $metrics['actual_revenue'],
                 $metrics['task_completion_rate'],
                 $metrics['time_compliance_rate'],
             ),
@@ -154,7 +154,7 @@ class KdkmpDashboardController extends Controller
 
         $metrics = $this->dashboardMetrics->forUser($user->id, $businessDate);
         $planRevenue = $request->validated('plan_revenue');
-        $actualRevenue = $request->validated('actual_revenue');
+        $actualRevenue = $metrics['actual_revenue'];
         $payload = [
             'plan_revenue' => $planRevenue,
             'target_revenue' => EbitdamaxKdkmp::TARGET_REVENUE,
