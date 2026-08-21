@@ -1,17 +1,28 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import {
     ArrowLeft,
     Building2,
     CalendarDays,
+    Clock3,
+    ListChecks,
     MapPin,
     Store,
 } from 'lucide-react';
+import type { FormEvent } from 'react';
 import KdkmpDashboardDailyInputForm from '@/components/kdkmp-dashboard-daily-input-form';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { index as dashboardIndex } from '@/routes/kdkmp-dashboard';
+import { save as saveTaskSelection } from '@/routes/kdkmp-dashboard/task-selection';
 import type {
     KdkmpComputedValues,
     KdkmpDailyEntry,
@@ -23,7 +34,49 @@ type Props = {
     kdkmp: KdkmpIdentity | null;
     todayEntry: KdkmpDailyEntry | null;
     computedValues: KdkmpComputedValues;
+    taskSelection: {
+        tasks: SelectableTask[];
+        selected_task_ids: number[];
+    };
 };
+
+type SelectableTask = {
+    id: number;
+    name: string;
+    description: string | null;
+    execution_time: string | null;
+    time_require: number;
+    is_mandatory: boolean;
+    is_locked: boolean;
+    bmc_status: string;
+    bmc_status_label: string;
+    task_category_name: string | null;
+};
+
+type SelectableTaskGroup = {
+    bmcStatus: string;
+    bmcStatusLabel: string;
+    tasks: SelectableTask[];
+};
+
+const bmcStatusOrder = [
+    'key_partnerships',
+    'key_activities',
+    'key_resources',
+    'value_propositions',
+    'customer_relationships',
+    'channels',
+    'customer_segments',
+    'cost_structure',
+    'revenue_streams',
+    'belum_dipetakan',
+];
+
+function bmcStatusPosition(status: string): number {
+    const position = bmcStatusOrder.indexOf(status);
+
+    return position === -1 ? bmcStatusOrder.length : position;
+}
 
 function formatDate(value: string): string {
     return new Intl.DateTimeFormat('id-ID', {
@@ -50,11 +103,207 @@ function EntryStatus({ entry }: { entry: KdkmpDailyEntry | null }) {
     );
 }
 
+function KdkmpTaskSelectionForm({
+    taskSelection,
+}: {
+    taskSelection: Props['taskSelection'];
+}) {
+    const { data, setData, put, processing, errors } = useForm({
+        selected_task_ids: taskSelection.selected_task_ids,
+    });
+    const taskGroups = taskSelection.tasks
+        .reduce<SelectableTaskGroup[]>((groups, task) => {
+            const group = groups.find(
+                (item) => item.bmcStatus === task.bmc_status,
+            );
+
+            if (group) {
+                group.tasks.push(task);
+
+                return groups;
+            }
+
+            groups.push({
+                bmcStatus: task.bmc_status,
+                bmcStatusLabel: task.bmc_status_label,
+                tasks: [task],
+            });
+
+            return groups;
+        }, [])
+        .sort(
+            (left, right) =>
+                bmcStatusPosition(left.bmcStatus) -
+                bmcStatusPosition(right.bmcStatus),
+        );
+
+    const toggleTask = (taskId: number, isChecked: boolean) => {
+        setData(
+            'selected_task_ids',
+            isChecked
+                ? [...new Set([...data.selected_task_ids, taskId])]
+                : data.selected_task_ids.filter(
+                      (selectedTaskId) => selectedTaskId !== taskId,
+                  ),
+        );
+    };
+
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+
+        put(saveTaskSelection.url(), {
+            preserveScroll: true,
+        });
+    };
+
+    return (
+        <Card>
+            <CardHeader className="border-b">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            <ListChecks className="size-5 text-primary" />
+                            Pilih Task Hari Ini
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                            Task wajib selalu dijalankan. Pilih task tambahan
+                            sesuai kondisi operasional KDKMP hari ini.
+                        </CardDescription>
+                    </div>
+                    <Badge variant="outline">
+                        {taskSelection.tasks.length} task tersedia
+                    </Badge>
+                </div>
+            </CardHeader>
+            <CardContent className="p-5">
+                {taskSelection.tasks.length === 0 ? (
+                    <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
+                        Belum ada task aktif yang ditugaskan ke role Anda.
+                    </p>
+                ) : (
+                    <form onSubmit={submit} className="space-y-4">
+                        <div className="space-y-5">
+                            {taskGroups.map((group) => (
+                                <section
+                                    key={group.bmcStatus}
+                                    className="overflow-hidden rounded-xl border bg-muted/10"
+                                >
+                                    <header className="flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-3">
+                                        <div>
+                                            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                                Poin BMC
+                                            </p>
+                                            <h3 className="mt-0.5 font-semibold text-foreground">
+                                                {group.bmcStatusLabel}
+                                            </h3>
+                                        </div>
+                                        <Badge variant="secondary">
+                                            {group.tasks.length} task
+                                        </Badge>
+                                    </header>
+                                    <div className="space-y-3 p-3 sm:p-4">
+                                        {group.tasks.map((task) => {
+                                            const isChecked =
+                                                task.is_mandatory ||
+                                                data.selected_task_ids.includes(
+                                                    task.id,
+                                                );
+                                            const isDisabled =
+                                                task.is_mandatory ||
+                                                task.is_locked;
+
+                                            return (
+                                                <label
+                                                    key={task.id}
+                                                    className="flex items-start gap-3 rounded-lg border bg-background p-4 transition-colors hover:bg-muted/30"
+                                                >
+                                                    <Checkbox
+                                                        checked={isChecked}
+                                                        disabled={isDisabled}
+                                                        onCheckedChange={(checked) =>
+                                                            toggleTask(
+                                                                task.id,
+                                                                checked === true,
+                                                            )
+                                                        }
+                                                    />
+                                                    <span className="min-w-0 flex-1">
+                                                        <span className="flex flex-wrap items-center gap-2">
+                                                            <span className="font-medium text-foreground">
+                                                                {task.name}
+                                                            </span>
+                                                            <Badge
+                                                                variant={
+                                                                    task.is_mandatory
+                                                                        ? 'default'
+                                                                        : 'outline'
+                                                                }
+                                                            >
+                                                                {task.is_mandatory
+                                                                    ? 'Wajib'
+                                                                    : 'Pilihan'}
+                                                            </Badge>
+                                                            {task.is_locked && (
+                                                                <Badge variant="secondary">
+                                                                    Sedang dikerjakan
+                                                                </Badge>
+                                                            )}
+                                                        </span>
+                                                        <span className="mt-1 block text-sm text-muted-foreground">
+                                                            {task.task_category_name ??
+                                                                'Tanpa kategori'}
+                                                            {task.execution_time &&
+                                                                ` · ${task.execution_time}`}
+                                                            {' · '}
+                                                            {task.time_require} menit
+                                                        </span>
+                                                        {task.description && (
+                                                            <span className="mt-2 line-clamp-2 block text-sm text-muted-foreground">
+                                                                {task.description}
+                                                            </span>
+                                                        )}
+                                                        {task.is_locked && (
+                                                            <span className="mt-2 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+                                                                <Clock3 className="size-3.5" />
+                                                                Selesaikan task ini sebelum
+                                                                mengubah pilihannya.
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+                            ))}
+                        </div>
+
+                        {errors.selected_task_ids && (
+                            <p className="text-sm text-destructive">
+                                {errors.selected_task_ids}
+                            </p>
+                        )}
+
+                        <div className="flex justify-end">
+                            <Button type="submit" disabled={processing}>
+                                {processing
+                                    ? 'Menyimpan...'
+                                    : 'Simpan Pilihan Task'}
+                            </Button>
+                        </div>
+                    </form>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 export default function KdkmpDashboardInput({
     businessDate,
     kdkmp,
     todayEntry,
     computedValues,
+    taskSelection,
 }: Props) {
     return (
         <>
@@ -173,6 +422,10 @@ export default function KdkmpDashboardInput({
                                 todayEntry={todayEntry}
                                 computedValues={computedValues}
                                 kdkmpId={kdkmp.id}
+                            />
+
+                            <KdkmpTaskSelectionForm
+                                taskSelection={taskSelection}
                             />
                         </>
                     )}

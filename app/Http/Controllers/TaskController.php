@@ -137,6 +137,7 @@ class TaskController extends Controller
             'upper_time_threshold_minutes' => $payload['upper_time_threshold_minutes'] ?? null,
             'period' => $payload['period'],
             'is_active' => $payload['is_active'],
+            'is_mandatory' => $payload['is_mandatory'],
         ];
     }
 
@@ -275,6 +276,7 @@ class TaskController extends Controller
             'period' => $task->period->value,
             'period_label' => $task->period->label(),
             'is_active' => $task->is_active,
+            'is_mandatory' => $task->is_mandatory,
             'task_category' => [
                 'id' => $task->taskCategory->id,
                 'name' => $task->taskCategory->name,

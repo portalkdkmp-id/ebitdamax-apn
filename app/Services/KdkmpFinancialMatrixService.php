@@ -12,18 +12,23 @@ use Illuminate\Support\Collection;
 
 class KdkmpFinancialMatrixService
 {
-    private const DAILY_COST_BUDGET = 9_172_133;
+    private const DAILY_FIXED_COST = 9_235_467;
+
+    public function __construct(
+        private readonly KdkmpTaskSelectionService $taskSelection,
+    ) {}
 
     /**
-     * @return array{daily_cost_budget: float, total_estimated_minutes: int, total_actual_duration_minutes: int, total_plan_cost: float|null, total_actual_cost: float|null, plan_revenue: float|null, actual_revenue: float|null, plan_ebitda: float|null, actual_ebitda: float|null, points: array<int, array{process: int, task_id: int, task_name: string, estimated_minutes: int, actual_duration_minutes: int, plan_cost: float|null, actual_cost: float|null, cumulative_plan_cost: float|null, cumulative_actual_cost: float|null}>}
+     * @return array{fixed_cost: float, total_variable_cost: float, total_estimated_minutes: int, total_actual_duration_minutes: int, total_plan_cost: float, total_actual_cost: float|null, plan_revenue: float|null, actual_revenue: float|null, plan_ebitda: float|null, actual_ebitda: float|null, points: array<int, array{process: int, task_id: int, task_name: string, estimated_minutes: int, actual_duration_minutes: int, variable_cost: float|null, actual_cost: float|null, cumulative_variable_cost: float|null, cumulative_actual_cost: float|null}>}
      */
     public function forUser(
         User $user,
         CarbonImmutable $businessDate,
         mixed $planRevenue,
         mixed $actualRevenue,
+        mixed $variableCost,
     ): array {
-        $tasks = $this->tasksForUser($user);
+        $tasks = $this->tasksForUser($user, $businessDate);
         $totalEstimatedMinutes = (int) $tasks->sum('time_require');
         $durationsByTaskId = $this->completedDurationsByTask(
             user: $user,
@@ -32,7 +37,8 @@ class KdkmpFinancialMatrixService
         );
         $totalActualDurationMinutes = (int) $durationsByTaskId->sum();
         $hasCostAllocation = $totalEstimatedMinutes > 0;
-        $cumulativePlanCost = 0.0;
+        $normalizedVariableCost = $this->numericValue($variableCost) ?? 0.0;
+        $cumulativeVariableCost = 0.0;
         $cumulativeActualCost = 0.0;
         $lastTaskIndex = $tasks->count() - 1;
 
@@ -44,7 +50,8 @@ class KdkmpFinancialMatrixService
                 $lastTaskIndex,
                 $totalEstimatedMinutes,
                 &$cumulativeActualCost,
-                &$cumulativePlanCost,
+                &$cumulativeVariableCost,
+                $normalizedVariableCost,
             ): array {
                 $estimatedMinutes = (int) $task->time_require;
                 $actualDurationMinutes = (int) $durationsByTaskId->get($task->id, 0);
@@ -56,18 +63,18 @@ class KdkmpFinancialMatrixService
                         'task_name' => $task->name,
                         'estimated_minutes' => $estimatedMinutes,
                         'actual_duration_minutes' => $actualDurationMinutes,
-                        'plan_cost' => null,
+                        'variable_cost' => null,
                         'actual_cost' => null,
-                        'cumulative_plan_cost' => null,
+                        'cumulative_variable_cost' => null,
                         'cumulative_actual_cost' => null,
                     ];
                 }
 
-                $planCost = $index === $lastTaskIndex
-                    ? self::DAILY_COST_BUDGET - $cumulativePlanCost
-                    : ($estimatedMinutes / $totalEstimatedMinutes) * self::DAILY_COST_BUDGET;
-                $actualCost = ($actualDurationMinutes / $totalEstimatedMinutes) * self::DAILY_COST_BUDGET;
-                $cumulativePlanCost += $planCost;
+                $allocatedVariableCost = $index === $lastTaskIndex
+                    ? $normalizedVariableCost - $cumulativeVariableCost
+                    : ($estimatedMinutes / $totalEstimatedMinutes) * $normalizedVariableCost;
+                $actualCost = ($actualDurationMinutes / $totalEstimatedMinutes) * self::DAILY_FIXED_COST;
+                $cumulativeVariableCost += $allocatedVariableCost;
                 $cumulativeActualCost += $actualCost;
 
                 return [
@@ -76,21 +83,22 @@ class KdkmpFinancialMatrixService
                     'task_name' => $task->name,
                     'estimated_minutes' => $estimatedMinutes,
                     'actual_duration_minutes' => $actualDurationMinutes,
-                    'plan_cost' => round($planCost, 2),
+                    'variable_cost' => round($allocatedVariableCost, 2),
                     'actual_cost' => round($actualCost, 2),
-                    'cumulative_plan_cost' => round($cumulativePlanCost, 2),
+                    'cumulative_variable_cost' => round($cumulativeVariableCost, 2),
                     'cumulative_actual_cost' => round($cumulativeActualCost, 2),
                 ];
             })
             ->all();
 
-        $totalPlanCost = $hasCostAllocation ? (float) self::DAILY_COST_BUDGET : null;
+        $totalPlanCost = round(self::DAILY_FIXED_COST + $normalizedVariableCost, 2);
         $totalActualCost = $hasCostAllocation ? round($cumulativeActualCost, 2) : null;
         $normalizedPlanRevenue = $this->numericValue($planRevenue);
         $normalizedActualRevenue = $this->numericValue($actualRevenue);
 
         return [
-            'daily_cost_budget' => (float) self::DAILY_COST_BUDGET,
+            'fixed_cost' => (float) self::DAILY_FIXED_COST,
+            'total_variable_cost' => round($normalizedVariableCost, 2),
             'total_estimated_minutes' => $totalEstimatedMinutes,
             'total_actual_duration_minutes' => $totalActualDurationMinutes,
             'total_plan_cost' => $totalPlanCost,
@@ -110,7 +118,7 @@ class KdkmpFinancialMatrixService
     /**
      * @return Collection<int, Task>
      */
-    private function tasksForUser(User $user): Collection
+    private function tasksForUser(User $user, CarbonImmutable $businessDate): Collection
     {
         if ($user->role_id === null) {
             return collect();
@@ -121,6 +129,12 @@ class KdkmpFinancialMatrixService
             ->whereHas('roles', function (Builder $query) use ($user): void {
                 $query->whereKey($user->role_id);
             })
+            ->when(
+                $user->isKdkmpManager(),
+                fn (Builder $query) => $query->forKdkmpExecution(
+                    $this->taskSelection->executionTaskIdsForUser($user, $businessDate),
+                )
+            )
             ->orderByRaw('CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END')
             ->orderBy('sort_order')
             ->orderBy('id')

@@ -32,7 +32,7 @@ import type {
 type DailyForm = {
     plan_revenue: string;
     actual_revenue: string;
-    plan_cost: string;
+    variable_cost: string;
 };
 
 type OperationalAttendanceForm = {
@@ -46,7 +46,7 @@ type Props = {
     kdkmpId: number;
 };
 
-const ACTUAL_EBITDA_MARGIN_FIXED_COST = 9_172_133;
+const ACTUAL_EBITDA_MARGIN_FIXED_COST = 9_235_467;
 const TASK_COMPLETION_WEIGHT = 55;
 const TIME_COMPLIANCE_WEIGHT = 30;
 const REVENUE_WEIGHT = 15;
@@ -137,7 +137,7 @@ function formDataFrom(entry: KdkmpDailyEntry | null): DailyForm {
     return {
         plan_revenue: inputValue(entry?.plan_revenue) || '0',
         actual_revenue: inputValue(entry?.actual_revenue),
-        plan_cost: inputValue(entry?.plan_cost),
+        variable_cost: inputValue(entry?.variable_cost),
     };
 }
 
@@ -238,7 +238,7 @@ function dashboardFieldValue(
     if (
         field === 'plan_revenue' ||
         field === 'actual_revenue' ||
-        field === 'plan_cost'
+        field === 'variable_cost'
     ) {
         return data[field];
     }
@@ -369,7 +369,7 @@ export default function KdkmpDashboardDailyInputForm({
     );
     const costFields = kdkmpDashboardFields.filter(
         (field) =>
-            field.key === 'plan_cost' ||
+            field.key === 'variable_cost' ||
             field.key === 'actual_cost' ||
             field.key === 'actual_ebitda_margin',
     );
@@ -383,7 +383,7 @@ export default function KdkmpDashboardDailyInputForm({
         field: (typeof kdkmpDashboardFields)[number],
     ) => {
         const editableField =
-            field.key === 'plan_revenue' || field.key === 'plan_cost'
+            field.key === 'plan_revenue' || field.key === 'variable_cost'
                 ? field.key
                 : null;
         const fieldValue = dashboardFieldValue(data, field.key, computedValues);
@@ -507,9 +507,9 @@ export default function KdkmpDashboardDailyInputForm({
 
                                 <div className="grid gap-5 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label>Target Cost</Label>
+                                        <Label>Fixed Cost</Label>
                                         <p className="py-2 text-sm font-semibold text-foreground tabular-nums">
-                                            Rp9.172.133
+                                            Rp9.235.467
                                         </p>
                                     </div>
                                     {costFields.map(renderDashboardField)}

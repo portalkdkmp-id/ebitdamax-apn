@@ -30,6 +30,7 @@ class TaskFactory extends Factory
             'time_require' => fake()->numberBetween(15, 240),
             'period' => 'once',
             'is_active' => true,
+            'is_mandatory' => false,
         ];
     }
 

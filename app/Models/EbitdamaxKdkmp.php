@@ -12,7 +12,7 @@ class EbitdamaxKdkmp extends Model
 {
     public const TARGET_REVENUE = '20000000';
 
-    public const ACTUAL_EBITDA_MARGIN_FIXED_COST = 9_172_133;
+    public const ACTUAL_EBITDA_MARGIN_FIXED_COST = 9_235_467;
 
     public const TASK_COMPLETION_WEIGHT = 55;
 
@@ -82,6 +82,7 @@ class EbitdamaxKdkmp extends Model
         'total_duration',
         'performance_scoring',
         'operational_attendance',
+        'selected_task_ids',
         'operational_attendance_saved_at',
         'created_by',
         'updated_by',
@@ -157,6 +158,19 @@ class EbitdamaxKdkmp extends Model
         return $this->operational_attendance_saved_at !== null;
     }
 
+    /**
+     * @return array<int, int>
+     */
+    public function selectedTaskIds(): array
+    {
+        return collect($this->selected_task_ids ?? [])
+            ->map(fn (mixed $taskId): int => (int) $taskId)
+            ->filter(fn (int $taskId): bool => $taskId > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public static function calculatePerformanceScoring(
         ?string $planRevenue,
         ?string $actualRevenue,
@@ -203,6 +217,7 @@ class EbitdamaxKdkmp extends Model
         return [
             'report_date' => 'date',
             'operational_attendance' => 'array',
+            'selected_task_ids' => 'array',
             'operational_attendance_saved_at' => 'datetime',
             'plan_revenue_requires_review' => 'boolean',
         ];

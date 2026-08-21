@@ -24,7 +24,7 @@ export const kdkmpDashboardFields: KdkmpDashboardField[] = [
         description: 'Diisi manual. Nilai 0 diperbolehkan.',
     },
     { key: 'actual_revenue', label: 'Actual Revenue', isRupiah: true },
-    { key: 'plan_cost', label: 'Plan Cost', isRupiah: true },
+    { key: 'variable_cost', label: 'Variable Cost', isRupiah: true },
     {
         key: 'actual_cost',
         label: 'Actual Cost',
@@ -38,7 +38,7 @@ export const kdkmpDashboardFields: KdkmpDashboardField[] = [
         label: 'Actual EBITDA Margin (%)',
         isDisabled: true,
         description:
-            'Dihitung otomatis: ((Actual Revenue - Rp9.172.133) / Actual Revenue) x 100%.',
+            'Dihitung otomatis: ((Actual Revenue - Rp9.235.467) / Actual Revenue) x 100%.',
     },
     {
         key: 'total_duration',

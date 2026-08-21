@@ -53,6 +53,7 @@ class StoreTaskRequest extends FormRequest
             ],
             'period' => ['required', Rule::enum(TaskPeriod::class)],
             'is_active' => ['required', 'boolean'],
+            'is_mandatory' => ['required', 'boolean'],
             'additional_fields' => ['nullable', 'array'],
             'additional_fields.*.id' => ['nullable', 'integer', 'exists:task_additional_fields,id'],
             'additional_fields.*.label' => ['required', 'string', 'max:255'],
@@ -75,6 +76,7 @@ class StoreTaskRequest extends FormRequest
             'execution_time' => 'jam pelaksanaan',
             'lower_time_threshold_minutes' => 'ambang waktu bawah',
             'upper_time_threshold_minutes' => 'ambang waktu atas',
+            'is_mandatory' => 'status task wajib',
         ];
     }
 }

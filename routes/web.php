@@ -53,6 +53,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/dashboard/kdkmp/today', [KdkmpDashboardController::class, 'upsert'])
         ->name('kdkmp-dashboard.upsert');
 
+    Route::put('/dashboard/kdkmp/today/task-selection', [KdkmpDashboardController::class, 'saveTaskSelection'])
+        ->name('kdkmp-dashboard.task-selection.save');
+
     Route::put(
         '/dashboard/kdkmp/today/operational-attendance',
         [KdkmpDashboardController::class, 'saveOperationalAttendance']

@@ -495,9 +495,6 @@ export default function TaskDashboardIndex({
                                                 Nama Task
                                             </TableHead>
                                             <TableHead className="bg-muted/40 p-4 max-[650px]:hidden">
-                                                PIC Roles
-                                            </TableHead>
-                                            <TableHead className="bg-muted/40 p-4 max-[650px]:hidden">
                                                 Jam Pelaksanaan
                                             </TableHead>
                                             <TableHead className="bg-muted/40 p-4 text-right max-[650px]:hidden">
@@ -505,9 +502,6 @@ export default function TaskDashboardIndex({
                                             </TableHead>
                                             <TableHead className="bg-muted/40 p-4 max-[650px]:hidden">
                                                 Status
-                                            </TableHead>
-                                            <TableHead className="w-[190px] rounded-r-xl bg-muted/40 p-4 text-right max-[650px]:hidden">
-                                                Aksi
                                             </TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -636,23 +630,6 @@ export default function TaskDashboardIndex({
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell className="border-y bg-card p-4 max-[650px]:hidden">
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {task.roles.map(
-                                                                    (role) => (
-                                                                        <Badge
-                                                                            key={
-                                                                                role.id
-                                                                            }
-                                                                        >
-                                                                            {
-                                                                                role.name
-                                                                            }
-                                                                        </Badge>
-                                                                    ),
-                                                                )}
                                                             </div>
                                                         </TableCell>
                                                         <TableCell className="border-y bg-card p-4 max-[650px]:hidden">

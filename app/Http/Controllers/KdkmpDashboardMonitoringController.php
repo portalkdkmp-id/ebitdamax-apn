@@ -199,6 +199,13 @@ class KdkmpDashboardMonitoringController extends Controller
             ];
 
             foreach (EbitdamaxKdkmp::ACTIVE_FIELDS as $field) {
+                if ($field === 'plan_cost') {
+                    $dailyEntryData['variable_cost'] = $overrides['variable_cost']
+                        ?? $dailyEntry->plan_cost;
+
+                    continue;
+                }
+
                 $dailyEntryData[$field] = $overrides[$field] ?? $dailyEntry->getAttribute($field);
             }
 

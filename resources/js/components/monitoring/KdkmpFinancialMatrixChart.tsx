@@ -102,17 +102,17 @@ function MatrixTooltip({ active, payload }: Partial<TooltipContentProps>) {
                 <span className="text-right font-medium text-foreground tabular-nums">
                     {formatDuration(point.actual_duration_minutes)}
                 </span>
-                <span>Plan Cost</span>
+                <span>Variable Cost</span>
                 <span className="text-right font-medium text-foreground tabular-nums">
-                    {formatRupiah(point.plan_cost)}
+                    {formatRupiah(point.variable_cost)}
                 </span>
                 <span>Actual Cost</span>
                 <span className="text-right font-medium text-foreground tabular-nums">
                     {formatRupiah(point.actual_cost)}
                 </span>
-                <span>Plan Cost kumulatif</span>
+                <span>Variable Cost kumulatif</span>
                 <span className="text-right font-medium text-foreground tabular-nums">
-                    {formatRupiah(point.cumulative_plan_cost)}
+                    {formatRupiah(point.cumulative_variable_cost)}
                 </span>
                 <span>Actual Cost kumulatif</span>
                 <span className="text-right font-medium text-foreground tabular-nums">
@@ -129,7 +129,7 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
         plan_revenue: matrix.plan_revenue,
         actual_revenue: matrix.actual_revenue,
     }));
-    const hasCostAllocation = matrix.total_plan_cost !== null;
+    const hasCostAllocation = matrix.total_estimated_minutes > 0;
 
     return (
         <Card className="overflow-hidden border shadow-sm">
@@ -249,8 +249,8 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
                                     />
                                     <Line
                                         type="linear"
-                                        dataKey="cumulative_plan_cost"
-                                        name="Plan Costs Kumulatif"
+                                        dataKey="cumulative_variable_cost"
+                                        name="Variable Costs Kumulatif"
                                         stroke="#64748b"
                                         strokeWidth={3}
                                         strokeDasharray="2 7"
@@ -271,7 +271,7 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
                     </div>
                 )}
 
-                <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
+                <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-4">
                     <p>
                         Total estimasi:{' '}
                         <span className="font-medium text-foreground">
@@ -287,9 +287,15 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
                         </span>
                     </p>
                     <p>
-                        Budget biaya harian:{' '}
+                        Fixed Cost:{' '}
                         <span className="font-medium text-foreground">
-                            {formatRupiah(matrix.daily_cost_budget)}
+                            {formatRupiah(matrix.fixed_cost)}
+                        </span>
+                    </p>
+                    <p>
+                        Total Variable Cost:{' '}
+                        <span className="font-medium text-foreground">
+                            {formatRupiah(matrix.total_variable_cost)}
                         </span>
                     </p>
                 </div>

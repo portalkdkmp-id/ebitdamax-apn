@@ -99,6 +99,7 @@ export type TaskItem = {
     period: TaskPeriod;
     period_label: string;
     is_active: boolean;
+    is_mandatory: boolean;
     task_category: TaskCategoryOption;
     role: UserRole | null;
     roles: UserRole[];
