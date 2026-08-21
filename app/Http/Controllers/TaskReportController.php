@@ -16,6 +16,7 @@ use App\Models\TaskReport;
 use App\Models\TaskReportValue;
 use App\Models\User;
 use App\Services\KdkmpOperationalAllocationService;
+use App\Services\KdkmpTaskSelectionService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
@@ -32,6 +33,7 @@ class TaskReportController extends Controller
     public function __construct(
         private readonly StoreTaskReportDocumentsAction $storeTaskReportDocuments,
         private readonly KdkmpOperationalAllocationService $operationalAllocation,
+        private readonly KdkmpTaskSelectionService $taskSelection,
     ) {}
 
     public function start(StartTaskRequest $request, Task $task): RedirectResponse
@@ -59,6 +61,11 @@ class TaskReportController extends Controller
 
                 $attendanceEntry = $this->lockedOperationalAttendanceForStart(
                     request: $request,
+                    businessDate: $businessDate,
+                );
+                $this->ensureTaskSelectionForStart(
+                    request: $request,
+                    task: $task,
                     businessDate: $businessDate,
                 );
                 $report = TaskReport::query()
@@ -374,10 +381,39 @@ class TaskReportController extends Controller
 
     private function canAccessTask(StartTaskRequest|FinishTaskRequest $request, Task $task): bool
     {
-        $roleId = $request->user()?->role_id;
+        $user = $request->user();
+        $roleId = $user?->role_id;
 
-        return $roleId !== null
-            && $task->roles()->whereKey($roleId)->exists();
+        if ($roleId === null || ! $task->roles()->whereKey($roleId)->exists()) {
+            return false;
+        }
+
+        return ! ($request instanceof StartTaskRequest)
+            || ! $user instanceof User
+            || $this->taskSelection->canStartTask(
+                $user,
+                $task,
+                $this->businessDate(),
+            );
+    }
+
+    private function ensureTaskSelectionForStart(
+        StartTaskRequest $request,
+        Task $task,
+        CarbonImmutable $businessDate,
+    ): void {
+        $user = $request->user();
+
+        if (
+            ! $user instanceof User
+            || $this->taskSelection->canStartTask($user, $task, $businessDate)
+        ) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'task' => 'Task pilihan belum dipilih untuk dilaksanakan hari ini.',
+        ]);
     }
 
     private function businessDate(): CarbonImmutable

@@ -14,7 +14,7 @@ export type KdkmpDashboardFields = {
     target_revenue: string | null;
     plan_revenue: string | null;
     actual_revenue: string | null;
-    plan_cost: string | null;
+    variable_cost: string | null;
     actual_cost: string | null;
     actual_ebitda_margin: string | null;
     total_duration: string | null;
@@ -59,17 +59,18 @@ export type KdkmpFinancialMatrixPoint = {
     task_name: string;
     estimated_minutes: number;
     actual_duration_minutes: number;
-    plan_cost: number | null;
+    variable_cost: number | null;
     actual_cost: number | null;
-    cumulative_plan_cost: number | null;
+    cumulative_variable_cost: number | null;
     cumulative_actual_cost: number | null;
 };
 
 export type KdkmpFinancialMatrix = {
-    daily_cost_budget: number;
+    fixed_cost: number;
+    total_variable_cost: number;
     total_estimated_minutes: number;
     total_actual_duration_minutes: number;
-    total_plan_cost: number | null;
+    total_plan_cost: number;
     total_actual_cost: number | null;
     plan_revenue: number | null;
     actual_revenue: number | null;

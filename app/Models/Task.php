@@ -31,10 +31,12 @@ class Task extends Model
         'upper_time_threshold_minutes',
         'period',
         'is_active',
+        'is_mandatory',
     ];
 
     protected $attributes = [
         'bmc_status' => TaskBmcStatus::Unmapped->value,
+        'is_mandatory' => false,
     ];
 
     protected $casts = [
@@ -45,6 +47,7 @@ class Task extends Model
         'upper_time_threshold_minutes' => 'integer',
         'period' => TaskPeriod::class,
         'is_active' => 'boolean',
+        'is_mandatory' => 'boolean',
     ];
 
     protected static function booted(): void
@@ -82,5 +85,25 @@ class Task extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * @param  iterable<int, int>  $selectedTaskIds
+     */
+    public function scopeForKdkmpExecution(Builder $query, iterable $selectedTaskIds): Builder
+    {
+        $taskIds = collect($selectedTaskIds)
+            ->map(fn (mixed $taskId): int => (int) $taskId)
+            ->filter(fn (int $taskId): bool => $taskId > 0)
+            ->unique()
+            ->values();
+
+        return $query->where(function (Builder $executionQuery) use ($taskIds): void {
+            $executionQuery->where('is_mandatory', true);
+
+            if ($taskIds->isNotEmpty()) {
+                $executionQuery->orWhereIn('id', $taskIds);
+            }
+        });
     }
 }

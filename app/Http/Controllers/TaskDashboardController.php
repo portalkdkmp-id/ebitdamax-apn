@@ -12,6 +12,7 @@ use App\Models\TaskAdditionalField;
 use App\Models\TaskReport;
 use App\Models\User;
 use App\Services\KdkmpOperationalAllocationService;
+use App\Services\KdkmpTaskSelectionService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
@@ -24,11 +25,13 @@ class TaskDashboardController extends Controller
 {
     public function __construct(
         private readonly KdkmpOperationalAllocationService $operationalAllocation,
+        private readonly KdkmpTaskSelectionService $taskSelection,
     ) {}
 
     public function index(Request $request): Response
     {
         $user = $request->user();
+        $businessDate = CarbonImmutable::now((string) config('app.kdkmp_business_timezone'));
 
         $tasks = Task::query()
             ->with(['taskCategory', 'roles', 'additionalFields'])
@@ -37,6 +40,12 @@ class TaskDashboardController extends Controller
                 $user?->role_id,
                 fn ($query) => $query->whereHas('roles', fn ($roleQuery) => $roleQuery->whereKey($user->role_id)),
                 fn ($query) => $query->whereRaw('1 = 0')
+            )
+            ->when(
+                $user instanceof User && $user->isKdkmpManager(),
+                fn ($query) => $query->forKdkmpExecution(
+                    $this->taskSelection->executionTaskIdsForUser($user, $businessDate),
+                )
             )
             ->orderByRaw('CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END')
             ->orderBy('sort_order')
@@ -127,7 +136,7 @@ class TaskDashboardController extends Controller
         $historyEnd = now()->endOfDay();
 
         $reports = TaskReport::query()
-            ->with(['task.taskCategory', 'task.roles', 'user'])
+            ->with(['task.taskCategory', 'task.roles', 'user.role'])
             ->when(! $isSuperadmin, fn ($query) => $query->where('user_id', $user?->id))
             ->where('status', TaskReportStatus::Completed->value)
             ->whereNotNull('finished_at')
@@ -136,6 +145,20 @@ class TaskDashboardController extends Controller
             ->get();
 
         $tasksByRole = $this->activeTasksByRole();
+        $sdmKdkmpEntryIds = $reports
+            ->pluck('user')
+            ->filter(fn (mixed $participant): bool => $participant instanceof User && $participant->isKdkmpManager())
+            ->pluck('sdm_kdkmp_entry_id')
+            ->filter()
+            ->map(fn (mixed $entryId): int => (int) $entryId)
+            ->unique()
+            ->values();
+        $selectedTaskIdsByKdkmpEntryAndDate = $this->taskSelection
+            ->dailySelectedTaskIdsByKdkmpEntryAndDate(
+                $sdmKdkmpEntryIds,
+                CarbonImmutable::instance($historyStart),
+                CarbonImmutable::instance($historyEnd),
+            );
         $dailyReports = $reports
             ->groupBy(fn (TaskReport $report): string => $report->finished_at->toDateString())
             ->map(fn (Collection $dayReports, string $date): array => $this->transformDailySummary(
@@ -144,6 +167,7 @@ class TaskDashboardController extends Controller
                 user: $user,
                 isSuperadmin: $isSuperadmin,
                 tasksByRole: $tasksByRole,
+                selectedTaskIdsByKdkmpEntryAndDate: $selectedTaskIdsByKdkmpEntryAndDate,
             ))
             ->sortByDesc('date')
             ->values();
@@ -183,6 +207,7 @@ class TaskDashboardController extends Controller
                 'description',
                 'time_require',
                 'period',
+                'is_mandatory',
             ]);
 
         $tasksByRole = collect();
@@ -203,6 +228,7 @@ class TaskDashboardController extends Controller
     /**
      * @param  Collection<int, TaskReport>  $dayReports
      * @param  Collection<int, Collection<int, Task>>  $tasksByRole
+     * @param  Collection<string, Collection<int, int>>  $selectedTaskIdsByKdkmpEntryAndDate
      * @return array<string, mixed>
      */
     private function transformDailySummary(
@@ -211,12 +237,15 @@ class TaskDashboardController extends Controller
         ?User $user,
         bool $isSuperadmin,
         Collection $tasksByRole,
+        Collection $selectedTaskIdsByKdkmpEntryAndDate,
     ): array {
         $expectedTasks = $this->expectedTasksForDay(
+            date: $date,
             dayReports: $dayReports,
             user: $user,
             isSuperadmin: $isSuperadmin,
             tasksByRole: $tasksByRole,
+            selectedTaskIdsByKdkmpEntryAndDate: $selectedTaskIdsByKdkmpEntryAndDate,
         );
         $completedReports = $dayReports
             ->unique(fn (TaskReport $report): string => $this->reportKey($report))
@@ -255,13 +284,16 @@ class TaskDashboardController extends Controller
     /**
      * @param  Collection<int, TaskReport>  $dayReports
      * @param  Collection<int, Collection<int, Task>>  $tasksByRole
+     * @param  Collection<string, Collection<int, int>>  $selectedTaskIdsByKdkmpEntryAndDate
      * @return Collection<string, array{user_id: int, task: Task, user: User|null}>
      */
     private function expectedTasksForDay(
+        string $date,
         Collection $dayReports,
         ?User $user,
         bool $isSuperadmin,
         Collection $tasksByRole,
+        Collection $selectedTaskIdsByKdkmpEntryAndDate,
     ): Collection {
         $usersById = $dayReports
             ->mapWithKeys(fn (TaskReport $report): array => [
@@ -283,7 +315,25 @@ class TaskDashboardController extends Controller
                 continue;
             }
 
-            foreach ($tasksByRole->get((int) $roleId, collect()) as $task) {
+            $assignedTasks = $tasksByRole->get((int) $roleId, collect());
+            $manager = $isSuperadmin ? $participant : $user;
+
+            if (
+                $manager instanceof User
+                && $manager->isKdkmpManager()
+                && $manager->sdm_kdkmp_entry_id !== null
+            ) {
+                $selectedTaskIds = $selectedTaskIdsByKdkmpEntryAndDate->get(
+                    $manager->sdm_kdkmp_entry_id.'|'.$date,
+                    collect(),
+                );
+                $assignedTasks = $assignedTasks->filter(
+                    fn (Task $task): bool => $task->is_mandatory
+                        || $selectedTaskIds->has($task->id),
+                );
+            }
+
+            foreach ($assignedTasks as $task) {
                 $expectedTasks->put($this->assignmentKey((int) $userId, $task), [
                     'user_id' => (int) $userId,
                     'task' => $task,

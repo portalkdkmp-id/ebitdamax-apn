@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\SaveEbitdamaxKdkmpRequest;
 use App\Http\Requests\SaveOperationalAttendanceRequest;
+use App\Http\Requests\UpdateKdkmpTaskSelectionRequest;
 use App\Models\EbitdamaxKdkmp;
 use App\Models\SdmKdkmpEntry;
+use App\Models\Task;
 use App\Models\User;
 use App\Services\KdkmpDashboardMetricsService;
 use App\Services\KdkmpFinancialMatrixService;
 use App\Services\KdkmpOperationalAllocationService;
+use App\Services\KdkmpTaskSelectionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +28,7 @@ class KdkmpDashboardController extends Controller
         private readonly KdkmpDashboardMetricsService $dashboardMetrics,
         private readonly KdkmpFinancialMatrixService $financialMatrix,
         private readonly KdkmpOperationalAllocationService $operationalAllocation,
+        private readonly KdkmpTaskSelectionService $taskSelection,
     ) {}
 
     public function index(Request $request): Response
@@ -79,6 +83,7 @@ class KdkmpDashboardController extends Controller
                 businessDate: $businessDate,
                 planRevenue: $todayEntry?->plan_revenue,
                 actualRevenue: $todayEntry?->actual_revenue,
+                variableCost: $todayEntry?->plan_cost,
             ),
             'history' => $history,
         ]);
@@ -119,6 +124,16 @@ class KdkmpDashboardController extends Controller
                 ? $this->transformEntry($todayEntry, $computedValues)
                 : null,
             'computedValues' => $computedValues,
+            'taskSelection' => [
+                'tasks' => $this->taskSelection
+                    ->tasksForInput($user, $businessDate)
+                    ->map(fn (Task $task): array => $this->transformSelectableTask($task))
+                    ->values()
+                    ->all(),
+                'selected_task_ids' => $this->taskSelection
+                    ->executionTaskIdsForUser($user, $businessDate)
+                    ->all(),
+            ],
         ]);
     }
 
@@ -156,9 +171,8 @@ class KdkmpDashboardController extends Controller
             'updated_by' => $user->id,
         ];
 
-        foreach (EbitdamaxKdkmp::EDITABLE_FIELDS as $field) {
-            $payload[$field] = $request->validated($field);
-        }
+        $payload['actual_revenue'] = $actualRevenue;
+        $payload['plan_cost'] = $request->validated('variable_cost');
 
         $entry->fill($payload);
         $entry->save();
@@ -224,6 +238,52 @@ class KdkmpDashboardController extends Controller
         return back()->with('success', 'Kehadiran anggota hari ini berhasil disimpan.');
     }
 
+    public function saveTaskSelection(
+        UpdateKdkmpTaskSelectionRequest $request
+    ): RedirectResponse {
+        $user = $request->user();
+        abort_unless($user instanceof User && $user->sdm_kdkmp_entry_id !== null, 403);
+
+        $businessDate = $this->businessDate();
+        $selectedTaskIds = collect($request->validated('selected_task_ids', []))
+            ->map(fn (mixed $taskId): int => (int) $taskId)
+            ->unique()
+            ->values()
+            ->all();
+
+        DB::transaction(function () use ($businessDate, $selectedTaskIds, $user): void {
+            $entry = EbitdamaxKdkmp::query()
+                ->where('sdm_kdkmp_entry_id', $user->sdm_kdkmp_entry_id)
+                ->whereDate('report_date', $businessDate->toDateString())
+                ->lockForUpdate()
+                ->first();
+
+            if (! $entry) {
+                $entry = new EbitdamaxKdkmp([
+                    'sdm_kdkmp_entry_id' => $user->sdm_kdkmp_entry_id,
+                    'report_date' => $businessDate->toDateString(),
+                    'created_by' => $user->id,
+                ]);
+            }
+
+            $lockedTaskIds = $this->taskSelection->inProgressTaskIdsForUser($user);
+
+            if ($lockedTaskIds->diff($selectedTaskIds)->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'selected_task_ids' => 'Task yang sedang dikerjakan tidak dapat dilepas dari pilihan hari ini.',
+                ]);
+            }
+
+            $entry->fill([
+                'selected_task_ids' => $selectedTaskIds,
+                'updated_by' => $user->id,
+            ]);
+            $entry->save();
+        });
+
+        return back()->with('success', 'Pilihan task hari ini berhasil disimpan.');
+    }
+
     /**
      * @return array<string, array<string, int>|int|float|string|bool|null>
      */
@@ -244,6 +304,13 @@ class KdkmpDashboardController extends Controller
         ];
 
         foreach (EbitdamaxKdkmp::ACTIVE_FIELDS as $field) {
+            if ($field === 'plan_cost') {
+                $data['variable_cost'] = $overrides['variable_cost']
+                    ?? $entry->plan_cost;
+
+                continue;
+            }
+
             $data[$field] = $overrides[$field] ?? $entry->getAttribute($field);
         }
 
@@ -267,6 +334,27 @@ class KdkmpDashboardController extends Controller
             'kecamatan' => $entry->kecamatan,
             'kota_kabupaten' => $entry->kota_kabupaten,
             'provinsi' => $entry->provinsi,
+        ];
+    }
+
+    /**
+     * @return array<string, bool|int|string|null>
+     */
+    private function transformSelectableTask(Task $task): array
+    {
+        return [
+            'id' => $task->id,
+            'name' => $task->name,
+            'description' => $task->description,
+            'execution_time' => $task->execution_time
+                ? substr((string) $task->execution_time, 0, 5)
+                : null,
+            'time_require' => $task->time_require,
+            'is_mandatory' => $task->is_mandatory,
+            'is_locked' => (bool) $task->getAttribute('is_locked_for_today'),
+            'bmc_status' => $task->bmc_status->value,
+            'bmc_status_label' => $task->bmc_status->label(),
+            'task_category_name' => $task->taskCategory?->name,
         ];
     }
 

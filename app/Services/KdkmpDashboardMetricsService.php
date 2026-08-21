@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\TaskPeriod;
 use App\Enums\TaskReportStatus;
+use App\Models\EbitdamaxKdkmp;
 use App\Models\Task;
 use App\Models\TaskReport;
 use App\Models\TaskReportValue;
@@ -43,12 +44,23 @@ class KdkmpDashboardMetricsService
         $endOfDay = $businessDate->endOfDay()->utc();
 
         $users = User::query()
+            ->with('role:id,domain,slug')
             ->whereIn('id', $ids)
-            ->get(['id', 'role_id'])
+            ->get(['id', 'role_id', 'sdm_kdkmp_entry_id'])
             ->keyBy('id');
         $roleIds = $users->pluck('role_id')->filter()->unique()->values();
 
         $tasksByRole = $this->tasksByRole($roleIds);
+        $selectedTaskIdsByKdkmpEntry = EbitdamaxKdkmp::query()
+            ->whereIn(
+                'sdm_kdkmp_entry_id',
+                $users->pluck('sdm_kdkmp_entry_id')->filter()->unique(),
+            )
+            ->whereDate('report_date', $businessDate->toDateString())
+            ->get(['sdm_kdkmp_entry_id', 'selected_task_ids'])
+            ->mapWithKeys(fn (EbitdamaxKdkmp $entry): array => [
+                $entry->sdm_kdkmp_entry_id => collect($entry->selectedTaskIds())->flip(),
+            ]);
 
         $completedReportsByUser = TaskReport::query()
             ->whereIn('user_id', $ids)
@@ -67,34 +79,45 @@ class KdkmpDashboardMetricsService
             ->groupBy('user_id')
             ->map(fn (Collection $reports): Collection => $reports->pluck('task_id')->unique());
 
-        $expenseTotalsByUser = TaskReportValue::query()
+        $expenseValuesByUser = TaskReportValue::query()
             ->join('task_reports', 'task_reports.id', '=', 'task_report_values.task_report_id')
             ->join('tasks', 'tasks.id', '=', 'task_reports.task_id')
             ->whereIn('task_reports.user_id', $ids)
             ->where('task_reports.status', TaskReportStatus::Completed->value)
             ->whereBetween('task_reports.finished_at', [$startOfDay, $endOfDay])
             ->where('tasks.name', self::EXPENSE_TASK_NAME)
-            ->get(['task_reports.user_id', 'task_report_values.value'])
-            ->groupBy('user_id')
-            ->map(function (Collection $values): string {
-                $total = $values->sum(function (TaskReportValue $value): float {
-                    return $this->numericValue($value->value) ?? 0.0;
-                });
-
-                return $this->formatNumber($total);
-            });
+            ->get([
+                'task_report_values.id',
+                'task_reports.user_id',
+                'task_reports.task_id',
+                'task_report_values.value',
+            ])
+            ->groupBy('user_id');
 
         return $ids->mapWithKeys(function (int $userId) use (
             $completedOnceBeforeDateByUser,
             $completedReportsByUser,
-            $expenseTotalsByUser,
+            $expenseValuesByUser,
+            $selectedTaskIdsByKdkmpEntry,
             $tasksByRole,
             $users
         ): array {
-            $roleId = $users->get($userId)?->role_id;
+            $user = $users->get($userId);
+            $roleId = $user?->role_id;
             $assignedTasks = $roleId !== null
                 ? $tasksByRole->get((int) $roleId, collect())
                 : collect();
+            $selectedTaskIds = $user?->isKdkmpManager() && $user->sdm_kdkmp_entry_id !== null
+                ? $selectedTaskIdsByKdkmpEntry->get($user->sdm_kdkmp_entry_id, collect())
+                : null;
+
+            if ($selectedTaskIds instanceof Collection) {
+                $assignedTasks = $assignedTasks->filter(
+                    fn (Task $task): bool => $task->is_mandatory
+                        || $selectedTaskIds->has($task->id)
+                );
+            }
+
             $completedOnceTaskIds = $completedOnceBeforeDateByUser->get($userId, collect());
             $assignedTasks = $assignedTasks
                 ->reject(fn (Task $task): bool => $task->period === TaskPeriod::Once
@@ -104,7 +127,11 @@ class KdkmpDashboardMetricsService
             $completedReports = $userCompletedReports
                 ->filter(fn (TaskReport $report): bool => $assignedTasks->has($report->task_id))
                 ->unique('task_id');
-            $durationMinutes = (int) $userCompletedReports->sum('duration_minutes');
+            $durationMinutes = (int) $completedReports->sum('duration_minutes');
+            $expenseTotal = $expenseValuesByUser
+                ->get($userId, collect())
+                ->filter(fn (TaskReportValue $value): bool => $assignedTasks->has($value->task_id))
+                ->sum(fn (TaskReportValue $value): float => $this->numericValue($value->value) ?? 0.0);
             $reportsWithThreshold = $completedReports->filter(function (TaskReport $report) use ($assignedTasks): bool {
                 $task = $assignedTasks->get($report->task_id);
 
@@ -123,7 +150,7 @@ class KdkmpDashboardMetricsService
 
             return [
                 $userId => [
-                    'actual_cost' => (string) $expenseTotalsByUser->get($userId, '0'),
+                    'actual_cost' => $this->formatNumber($expenseTotal),
                     'total_duration' => $this->formatDuration($durationMinutes),
                     'task_completion_rate' => $this->percentage(
                         $completedReports->count(),
@@ -154,6 +181,7 @@ class KdkmpDashboardMetricsService
                 'period',
                 'lower_time_threshold_minutes',
                 'upper_time_threshold_minutes',
+                'is_mandatory',
             ])
             ->active()
             ->whereHas('roles', fn ($query) => $query->whereIn('roles.id', $roleIds))

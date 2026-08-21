@@ -84,6 +84,7 @@ type TaskFormData = {
     upper_time_threshold_minutes: string;
     period: TaskPeriod;
     is_active: boolean;
+    is_mandatory: boolean;
     additional_fields: TaskAdditionalFieldItem[];
 };
 
@@ -110,6 +111,7 @@ const defaultForm: TaskFormData = {
     upper_time_threshold_minutes: '',
     period: 'once',
     is_active: true,
+    is_mandatory: false,
     additional_fields: [],
 };
 
@@ -167,6 +169,7 @@ function toFormData(task: TaskItem): TaskFormData {
                 : String(task.upper_time_threshold_minutes),
         period: task.period,
         is_active: task.is_active,
+        is_mandatory: task.is_mandatory,
         additional_fields: task.additional_fields.map((field) => ({
             id: field.id,
             label: field.label,
@@ -592,9 +595,22 @@ export default function TasksIndex({
                                                         <ClipboardList className="size-5" />
                                                     </div>
                                                     <div>
-                                                        <p className="font-medium text-foreground">
-                                                            {task.name}
-                                                        </p>
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <p className="font-medium text-foreground">
+                                                                {task.name}
+                                                            </p>
+                                                            <Badge
+                                                                variant={
+                                                                    task.is_mandatory
+                                                                        ? 'default'
+                                                                        : 'outline'
+                                                                }
+                                                            >
+                                                                {task.is_mandatory
+                                                                    ? 'Wajib'
+                                                                    : 'Pilihan'}
+                                                            </Badge>
+                                                        </div>
                                                         <p className="text-xs text-muted-foreground">
                                                             {
                                                                 task
@@ -980,6 +996,21 @@ export default function TasksIndex({
                             Active
                         </label>
 
+                        <label className="flex items-center gap-3 rounded-lg border bg-background p-3 text-sm">
+                            <Checkbox
+                                checked={data.is_mandatory}
+                                onCheckedChange={(checked) =>
+                                    setData('is_mandatory', checked === true)
+                                }
+                            />
+                            <span>
+                                <span className="font-medium">Task wajib</span>
+                                <span className="block text-xs text-muted-foreground">
+                                    Selalu tampil untuk Manager KDKMP tanpa perlu dipilih setiap hari.
+                                </span>
+                            </span>
+                        </label>
+
                         <section className="space-y-4">
                             <div className="flex items-center justify-between gap-4">
                                 <div>
@@ -1259,6 +1290,14 @@ export default function TasksIndex({
                                         detailTask.is_active
                                             ? 'Active'
                                             : 'Non Active'
+                                    }
+                                />
+                                <DetailItem
+                                    label="Jenis Pemilihan"
+                                    value={
+                                        detailTask.is_mandatory
+                                            ? 'Task wajib'
+                                            : 'Task pilihan'
                                     }
                                 />
                             </div>
