@@ -31,6 +31,18 @@ class TaskFactory extends Factory
             'period' => 'once',
             'is_active' => true,
             'is_mandatory' => false,
+            'fixed_cost' => [
+                'man' => 0,
+                'machine' => 0,
+                'method' => 0,
+                'material' => 0,
+            ],
+            'variable_cost' => [
+                'man' => 0,
+                'machine' => 0,
+                'method' => 0,
+                'material' => 0,
+            ],
         ];
     }
 

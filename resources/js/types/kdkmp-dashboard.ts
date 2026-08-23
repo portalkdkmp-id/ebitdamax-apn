@@ -68,6 +68,7 @@ export type KdkmpFinancialMatrixPoint = {
 export type KdkmpFinancialMatrix = {
     fixed_cost: number;
     total_variable_cost: number;
+    total_actual_variable_cost: number;
     total_estimated_minutes: number;
     total_actual_duration_minutes: number;
     total_plan_cost: number;

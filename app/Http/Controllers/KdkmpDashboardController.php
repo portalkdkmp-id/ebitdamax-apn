@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\SyncKdkmpActualVariableCostAction;
 use App\Http\Requests\SaveEbitdamaxKdkmpRequest;
 use App\Http\Requests\SaveOperationalAttendanceRequest;
 use App\Http\Requests\UpdateKdkmpTaskSelectionRequest;
@@ -25,6 +26,7 @@ use Inertia\Response;
 class KdkmpDashboardController extends Controller
 {
     public function __construct(
+        private readonly SyncKdkmpActualVariableCostAction $syncActualVariableCost,
         private readonly KdkmpDashboardMetricsService $dashboardMetrics,
         private readonly KdkmpFinancialMatrixService $financialMatrix,
         private readonly KdkmpOperationalAllocationService $operationalAllocation,
@@ -45,6 +47,7 @@ class KdkmpDashboardController extends Controller
                 ->whereDate('report_date', $businessDate->toDateString())
                 ->first()
             : null;
+        $todayEntry = $this->syncActualVariableCost->handle($user, $businessDate) ?? $todayEntry;
         $metrics = $this->dashboardMetrics->forUser($user->id, $businessDate);
         $computedValues = [
             'target_revenue' => EbitdamaxKdkmp::TARGET_REVENUE,
@@ -84,6 +87,7 @@ class KdkmpDashboardController extends Controller
                 planRevenue: $todayEntry?->plan_revenue,
                 actualRevenue: $metrics['actual_revenue'],
                 variableCost: $todayEntry?->plan_cost,
+                actualVariableCost: $todayEntry?->actual_variable_cost,
             ),
             'history' => $history,
         ]);

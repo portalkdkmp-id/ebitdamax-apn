@@ -47,11 +47,13 @@ import {
     store as storeTask,
     update as updateTask,
 } from '@/routes/tasks';
+import { formatCurrency } from '@/lib/formatters';
 import type {
     TaskAdditionalFieldInputType,
     TaskAdditionalFieldItem,
     TaskAdditionalFieldShowWhen,
     TaskCategoryOption,
+    TaskCostBreakdown,
     TaskFilters,
     TaskItem,
     TaskPaginatedResponse,
@@ -85,8 +87,20 @@ type TaskFormData = {
     period: TaskPeriod;
     is_active: boolean;
     is_mandatory: boolean;
+    fixed_cost: CostBreakdownForm;
+    variable_cost: CostBreakdownForm;
     additional_fields: TaskAdditionalFieldItem[];
 };
+
+type CostBreakdownForm = {
+    man: string;
+    machine: string;
+    method: string;
+    material: string;
+};
+
+type CostBreakdownField = 'fixed_cost' | 'variable_cost';
+type CostComponent = keyof CostBreakdownForm;
 
 const optionTypes = ['select', 'radio', 'checkbox'];
 
@@ -98,9 +112,16 @@ const emptyField = (): TaskAdditionalFieldItem => ({
     options: [],
 });
 
+const emptyCostBreakdown = (): CostBreakdownForm => ({
+    man: '0',
+    machine: '0',
+    method: '0',
+    material: '0',
+});
+
 const defaultForm: TaskFormData = {
     task_category_id: '',
-    bmc_status: '',
+    bmc_status: 'belum_dipetakan',
     role_ids: [],
     sort_order: '',
     name: '',
@@ -112,8 +133,36 @@ const defaultForm: TaskFormData = {
     period: 'once',
     is_active: true,
     is_mandatory: false,
+    fixed_cost: emptyCostBreakdown(),
+    variable_cost: emptyCostBreakdown(),
     additional_fields: [],
 };
+
+function numericValue(value: string): number {
+    const parsedValue = Number(value);
+
+    return Number.isInteger(parsedValue) && parsedValue >= 0
+        ? parsedValue
+        : 0;
+}
+
+function costTotal(cost: CostBreakdownForm): number {
+    return (
+        numericValue(cost.man) +
+        numericValue(cost.machine) +
+        numericValue(cost.method) +
+        numericValue(cost.material)
+    );
+}
+
+function toCostBreakdownForm(cost: TaskCostBreakdown): CostBreakdownForm {
+    return {
+        man: String(cost.man),
+        machine: String(cost.machine),
+        method: String(cost.method),
+        material: String(cost.material),
+    };
+}
 
 function FieldError({ message }: { message?: string }) {
     if (!message) {
@@ -148,11 +197,38 @@ function timeThresholdLabel(task: TaskItem): string {
     } menit`;
 }
 
+function CostInput({
+    label,
+    value,
+    onValueChange,
+    error,
+}: {
+    label: string;
+    value: string;
+    onValueChange: (value: string) => void;
+    error?: string;
+}) {
+    return (
+        <div className="space-y-2">
+            <Label>{label}</Label>
+            <Input
+                type="number"
+                min="0"
+                step="1"
+                inputMode="numeric"
+                value={value}
+                onChange={(event) => onValueChange(event.target.value)}
+                placeholder="0"
+            />
+            <FieldError message={error} />
+        </div>
+    );
+}
+
 function toFormData(task: TaskItem): TaskFormData {
     return {
         task_category_id: String(task.task_category_id),
-        bmc_status:
-            task.bmc_status === 'belum_dipetakan' ? '' : task.bmc_status,
+        bmc_status: task.bmc_status,
         role_ids: task.role_ids.map((roleId) => String(roleId)),
         sort_order: task.sort_order === null ? '' : String(task.sort_order),
         name: task.name,
@@ -170,6 +246,8 @@ function toFormData(task: TaskItem): TaskFormData {
         period: task.period,
         is_active: task.is_active,
         is_mandatory: task.is_mandatory,
+        fixed_cost: toCostBreakdownForm(task.fixed_cost),
+        variable_cost: toCostBreakdownForm(task.variable_cost),
         additional_fields: task.additional_fields.map((field) => ({
             id: field.id,
             label: field.label,
@@ -208,6 +286,19 @@ export default function TasksIndex({
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
         useForm<TaskFormData>(defaultForm);
+    const totalFixedCost = costTotal(data.fixed_cost);
+    const totalVariableCost = costTotal(data.variable_cost);
+
+    const updateCostComponent = (
+        field: CostBreakdownField,
+        component: CostComponent,
+        value: string,
+    ) => {
+        setData(field, {
+            ...data[field],
+            [component]: value,
+        });
+    };
 
     const submitFilters = (event: FormEvent) => {
         event.preventDefault();
@@ -537,7 +628,8 @@ export default function TasksIndex({
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <Table>
+                            <div className="overflow-x-auto">
+                                <Table>
                                 <TableHeader>
                                     <TableRow className="bg-muted/40">
                                         <TableHead className="w-[100px] p-4 text-center">
@@ -564,6 +656,18 @@ export default function TasksIndex({
                                         <TableHead className="p-4 text-right">
                                             Estimasi
                                         </TableHead>
+                                        <TableHead className="min-w-[150px] p-4 text-right">
+                                            Fixed Plan Cost
+                                        </TableHead>
+                                        <TableHead className="min-w-[150px] p-4 text-right">
+                                            Fixed Actual Cost
+                                        </TableHead>
+                                        <TableHead className="min-w-[150px] p-4 text-right">
+                                            Variable Plan Cost
+                                        </TableHead>
+                                        <TableHead className="min-w-[150px] p-4 text-right">
+                                            Variable Actual Cost
+                                        </TableHead>
                                         <TableHead className="p-4">
                                             Status
                                         </TableHead>
@@ -576,7 +680,7 @@ export default function TasksIndex({
                                     {tasks.data.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={10}
+                                                colSpan={14}
                                                 className="p-8 text-center text-muted-foreground"
                                             >
                                                 Data task belum tersedia.
@@ -661,6 +765,26 @@ export default function TasksIndex({
                                                     {timeThresholdLabel(task)}
                                                 </p>
                                             </TableCell>
+                                            <TableCell className="p-4 text-right tabular-nums">
+                                                {formatCurrency(
+                                                    task.fixed_cost_total,
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="p-4 text-right tabular-nums">
+                                                {formatCurrency(
+                                                    task.fixed_cost_total,
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="p-4 text-right tabular-nums">
+                                                {formatCurrency(
+                                                    task.variable_cost_total,
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="p-4 text-right tabular-nums">
+                                                {formatCurrency(
+                                                    task.variable_cost_total,
+                                                )}
+                                            </TableCell>
                                             <TableCell className="p-4">
                                                 {task.is_active ? (
                                                     <Badge>
@@ -715,7 +839,8 @@ export default function TasksIndex({
                                         </TableRow>
                                     ))}
                                 </TableBody>
-                            </Table>
+                                </Table>
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -969,6 +1094,173 @@ export default function TasksIndex({
                                         message={
                                             errors.upper_time_threshold_minutes
                                         }
+                                    />
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                            <div>
+                                <h2 className="font-semibold text-foreground">
+                                    Indikator Fixed Cost
+                                </h2>
+                                <p className="text-sm text-muted-foreground">
+                                    Total Fixed Plan Cost dihitung otomatis dari
+                                    rincian biaya 4M. Total Fixed Actual Cost
+                                    selalu sama dengan Total Fixed Plan Cost.
+                                </p>
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                <CostInput
+                                    label="Fixed Cost - Man"
+                                    value={data.fixed_cost.man}
+                                    onValueChange={(value) =>
+                                        updateCostComponent(
+                                            'fixed_cost',
+                                            'man',
+                                            value,
+                                        )
+                                    }
+                                    error={errors['fixed_cost.man']}
+                                />
+                                <CostInput
+                                    label="Fixed Cost - Machine"
+                                    value={data.fixed_cost.machine}
+                                    onValueChange={(value) =>
+                                        updateCostComponent(
+                                            'fixed_cost',
+                                            'machine',
+                                            value,
+                                        )
+                                    }
+                                    error={errors['fixed_cost.machine']}
+                                />
+                                <CostInput
+                                    label="Fixed Cost - Method"
+                                    value={data.fixed_cost.method}
+                                    onValueChange={(value) =>
+                                        updateCostComponent(
+                                            'fixed_cost',
+                                            'method',
+                                            value,
+                                        )
+                                    }
+                                    error={errors['fixed_cost.method']}
+                                />
+                                <CostInput
+                                    label="Fixed Cost - Material"
+                                    value={data.fixed_cost.material}
+                                    onValueChange={(value) =>
+                                        updateCostComponent(
+                                            'fixed_cost',
+                                            'material',
+                                            value,
+                                        )
+                                    }
+                                    error={errors['fixed_cost.material']}
+                                />
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>Total Fixed Plan Cost</Label>
+                                    <Input
+                                        value={formatCurrency(totalFixedCost)}
+                                        readOnly
+                                        className="bg-muted font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Total Fixed Actual Cost</Label>
+                                    <Input
+                                        value={formatCurrency(totalFixedCost)}
+                                        readOnly
+                                        className="bg-muted font-medium"
+                                    />
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                            <div>
+                                <h2 className="font-semibold text-foreground">
+                                    Indikator Variable Cost
+                                </h2>
+                                <p className="text-sm text-muted-foreground">
+                                    Total Variable Plan Cost dihitung otomatis
+                                    dari rincian biaya 4M. Total Variable Actual
+                                    Cost selalu sama dengan Total Variable Plan
+                                    Cost.
+                                </p>
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                <CostInput
+                                    label="Variable Cost - Man"
+                                    value={data.variable_cost.man}
+                                    onValueChange={(value) =>
+                                        updateCostComponent(
+                                            'variable_cost',
+                                            'man',
+                                            value,
+                                        )
+                                    }
+                                    error={errors['variable_cost.man']}
+                                />
+                                <CostInput
+                                    label="Variable Cost - Machine"
+                                    value={data.variable_cost.machine}
+                                    onValueChange={(value) =>
+                                        updateCostComponent(
+                                            'variable_cost',
+                                            'machine',
+                                            value,
+                                        )
+                                    }
+                                    error={errors['variable_cost.machine']}
+                                />
+                                <CostInput
+                                    label="Variable Cost - Method"
+                                    value={data.variable_cost.method}
+                                    onValueChange={(value) =>
+                                        updateCostComponent(
+                                            'variable_cost',
+                                            'method',
+                                            value,
+                                        )
+                                    }
+                                    error={errors['variable_cost.method']}
+                                />
+                                <CostInput
+                                    label="Variable Cost - Material"
+                                    value={data.variable_cost.material}
+                                    onValueChange={(value) =>
+                                        updateCostComponent(
+                                            'variable_cost',
+                                            'material',
+                                            value,
+                                        )
+                                    }
+                                    error={errors['variable_cost.material']}
+                                />
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>Total Variable Plan Cost</Label>
+                                    <Input
+                                        value={formatCurrency(totalVariableCost)}
+                                        readOnly
+                                        className="bg-muted font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Total Variable Actual Cost</Label>
+                                    <Input
+                                        value={formatCurrency(totalVariableCost)}
+                                        readOnly
+                                        className="bg-muted font-medium"
                                     />
                                 </div>
                             </div>
@@ -1254,6 +1546,30 @@ export default function TasksIndex({
                                 <DetailItem
                                     label="Estimasi Waktu"
                                     value={`${detailTask.time_require} menit`}
+                                />
+                                <DetailItem
+                                    label="Total Fixed Plan Cost"
+                                    value={formatCurrency(
+                                        detailTask.fixed_cost_total,
+                                    )}
+                                />
+                                <DetailItem
+                                    label="Total Fixed Actual Cost"
+                                    value={formatCurrency(
+                                        detailTask.fixed_cost_total,
+                                    )}
+                                />
+                                <DetailItem
+                                    label="Total Variable Plan Cost"
+                                    value={formatCurrency(
+                                        detailTask.variable_cost_total,
+                                    )}
+                                />
+                                <DetailItem
+                                    label="Total Variable Actual Cost"
+                                    value={formatCurrency(
+                                        detailTask.variable_cost_total,
+                                    )}
                                 />
                                 <DetailItem
                                     label="Jam Pelaksanaan"

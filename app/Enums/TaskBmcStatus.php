@@ -18,7 +18,7 @@ enum TaskBmcStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Unmapped => 'Belum Dipetakan BMC',
+            self::Unmapped => 'Belum Dipetakan',
             self::KeyPartnerships => 'Key Partnerships',
             self::KeyActivities => 'Key Activities',
             self::KeyResources => 'Key Resources',
@@ -42,6 +42,7 @@ enum TaskBmcStatus: string
                 'label' => $status->label(),
             ],
             [
+                self::Unmapped,
                 self::KeyPartnerships,
                 self::KeyActivities,
                 self::KeyResources,

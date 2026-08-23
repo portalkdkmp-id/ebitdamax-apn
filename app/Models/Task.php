@@ -18,6 +18,8 @@ class Task extends Model
     /** @use HasFactory<TaskFactory> */
     use HasFactory;
 
+    private const EMPTY_COST_BREAKDOWN = '{"man":0,"machine":0,"method":0,"material":0}';
+
     protected $fillable = [
         'uuid',
         'task_category_id',
@@ -32,11 +34,15 @@ class Task extends Model
         'period',
         'is_active',
         'is_mandatory',
+        'fixed_cost',
+        'variable_cost',
     ];
 
     protected $attributes = [
         'bmc_status' => TaskBmcStatus::Unmapped->value,
         'is_mandatory' => false,
+        'fixed_cost' => self::EMPTY_COST_BREAKDOWN,
+        'variable_cost' => self::EMPTY_COST_BREAKDOWN,
     ];
 
     protected $casts = [
@@ -48,6 +54,8 @@ class Task extends Model
         'period' => TaskPeriod::class,
         'is_active' => 'boolean',
         'is_mandatory' => 'boolean',
+        'fixed_cost' => 'array',
+        'variable_cost' => 'array',
     ];
 
     protected static function booted(): void
@@ -57,6 +65,61 @@ class Task extends Model
                 $task->uuid = (string) Str::uuid();
             }
         });
+    }
+
+    /**
+     * @return array{man: int, machine: int, method: int, material: int}
+     */
+    public function fixedCostBreakdown(): array
+    {
+        return self::normalizeCostBreakdown($this->fixed_cost);
+    }
+
+    /**
+     * @return array{man: int, machine: int, method: int, material: int}
+     */
+    public function variableCostBreakdown(): array
+    {
+        return self::normalizeCostBreakdown($this->variable_cost);
+    }
+
+    public function fixedCostTotal(): int
+    {
+        return self::costTotal($this->fixed_cost);
+    }
+
+    public function variableCostTotal(): int
+    {
+        return self::costTotal($this->variable_cost);
+    }
+
+    /**
+     * @return array{man: int, machine: int, method: int, material: int}
+     */
+    public static function normalizeCostBreakdown(mixed $cost): array
+    {
+        $cost = is_array($cost) ? $cost : [];
+
+        return [
+            'man' => self::normalizeCostValue($cost['man'] ?? 0),
+            'machine' => self::normalizeCostValue($cost['machine'] ?? 0),
+            'method' => self::normalizeCostValue($cost['method'] ?? 0),
+            'material' => self::normalizeCostValue($cost['material'] ?? 0),
+        ];
+    }
+
+    public static function costTotal(mixed $cost): int
+    {
+        return array_sum(self::normalizeCostBreakdown($cost));
+    }
+
+    private static function normalizeCostValue(mixed $value): int
+    {
+        if (! is_numeric($value)) {
+            return 0;
+        }
+
+        return max(0, (int) $value);
     }
 
     public function taskCategory(): BelongsTo

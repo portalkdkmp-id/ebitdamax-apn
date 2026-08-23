@@ -147,7 +147,7 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5 p-5">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                     <MatrixMetric
                         label="Plan EBITDA"
                         value={matrix.plan_ebitda}
@@ -167,6 +167,11 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
                         label="Total Actual Cost"
                         value={matrix.total_actual_cost}
                         tone="text-amber-700 dark:text-amber-400"
+                    />
+                    <MatrixMetric
+                        label="Total Actual Variable Cost"
+                        value={matrix.total_actual_variable_cost}
+                        tone="text-violet-700 dark:text-violet-400"
                     />
                 </div>
 

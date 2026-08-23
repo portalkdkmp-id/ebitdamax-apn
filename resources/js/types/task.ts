@@ -81,6 +81,13 @@ export type TaskAdditionalFieldItem = {
     options: string[];
 };
 
+export type TaskCostBreakdown = {
+    man: number;
+    machine: number;
+    method: number;
+    material: number;
+};
+
 export type TaskItem = {
     id: number;
     uuid: string;
@@ -100,6 +107,10 @@ export type TaskItem = {
     period_label: string;
     is_active: boolean;
     is_mandatory: boolean;
+    fixed_cost: TaskCostBreakdown;
+    fixed_cost_total: number;
+    variable_cost: TaskCostBreakdown;
+    variable_cost_total: number;
     task_category: TaskCategoryOption;
     role: UserRole | null;
     roles: UserRole[];

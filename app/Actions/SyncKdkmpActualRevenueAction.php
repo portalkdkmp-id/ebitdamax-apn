@@ -4,12 +4,14 @@ namespace App\Actions;
 
 use App\Models\EbitdamaxKdkmp;
 use App\Models\User;
+use App\Services\KdkmpActualVariableCostService;
 use App\Services\KdkmpDashboardMetricsService;
 use Carbon\CarbonImmutable;
 
 final class SyncKdkmpActualRevenueAction
 {
     public function __construct(
+        private readonly KdkmpActualVariableCostService $actualVariableCost,
         private readonly KdkmpDashboardMetricsService $dashboardMetrics,
     ) {}
 
@@ -35,6 +37,7 @@ final class SyncKdkmpActualRevenueAction
         $entry->fill([
             'actual_revenue' => $actualRevenue,
             'actual_cost' => $metrics['actual_cost'],
+            'actual_variable_cost' => $this->actualVariableCost->forUser($user->id, $businessDate),
             'actual_ebitda_margin' => EbitdamaxKdkmp::calculateActualEbitdaMargin($actualRevenue),
             'performance_scoring' => EbitdamaxKdkmp::calculatePerformanceScoring(
                 $entry->plan_revenue,

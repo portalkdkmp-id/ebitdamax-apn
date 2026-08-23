@@ -125,6 +125,9 @@ class TaskController extends Controller
      */
     private function taskPayload(array $payload): array
     {
+        $fixedCost = Task::normalizeCostBreakdown($payload['fixed_cost']);
+        $variableCost = Task::normalizeCostBreakdown($payload['variable_cost']);
+
         return [
             'task_category_id' => $payload['task_category_id'],
             'bmc_status' => $payload['bmc_status'],
@@ -138,6 +141,8 @@ class TaskController extends Controller
             'period' => $payload['period'],
             'is_active' => $payload['is_active'],
             'is_mandatory' => $payload['is_mandatory'],
+            'fixed_cost' => $fixedCost,
+            'variable_cost' => $variableCost,
         ];
     }
 
@@ -255,6 +260,8 @@ class TaskController extends Controller
     private function transformTask(Task $task): array
     {
         $firstRole = $task->roles->first();
+        $fixedCost = $task->fixedCostBreakdown();
+        $variableCost = $task->variableCostBreakdown();
 
         return [
             'id' => $task->id,
@@ -277,6 +284,10 @@ class TaskController extends Controller
             'period_label' => $task->period->label(),
             'is_active' => $task->is_active,
             'is_mandatory' => $task->is_mandatory,
+            'fixed_cost' => $fixedCost,
+            'fixed_cost_total' => Task::costTotal($fixedCost),
+            'variable_cost' => $variableCost,
+            'variable_cost_total' => Task::costTotal($variableCost),
             'task_category' => [
                 'id' => $task->taskCategory->id,
                 'name' => $task->taskCategory->name,

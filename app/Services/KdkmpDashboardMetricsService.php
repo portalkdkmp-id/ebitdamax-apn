@@ -14,7 +14,7 @@ use Illuminate\Support\Collection;
 
 class KdkmpDashboardMetricsService
 {
-    private const EXPENSE_TASK_NAME = 'Catat pengeluaran harian';
+    private const EXPENSE_TASK_NAME = 'Pencatatan Pengeluaran Operasional Harian';
 
     private const REVENUE_TASK_NAME = 'Penyetoran Struk dan Uang';
 

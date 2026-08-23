@@ -66,29 +66,29 @@ class TaskDashboardController extends Controller
             ->unique(fn (TaskReport $report): string => $report->task_id.'|'.$report->period_key)
             ->keyBy(fn (TaskReport $report): string => $report->task_id.'|'.$report->period_key);
 
-        $tasks = $tasks
-            ->map(function (Task $task) use ($periodKeysByTaskId, $reportByTaskAndPeriod, $user): ?array {
+        $isSuperadmin = $user?->role?->level === RoleLevel::Superadmin;
+        $taskItems = $tasks
+            ->map(function (Task $task) use ($periodKeysByTaskId, $reportByTaskAndPeriod): array {
                 $periodKey = $periodKeysByTaskId->get($task->id);
                 $report = $reportByTaskAndPeriod->get($task->id.'|'.$periodKey);
 
-                $isSuperadmin = $user?->role?->level === RoleLevel::Superadmin;
-                if (! $isSuperadmin && $report?->status === TaskReportStatus::Completed) {
-                    return null;
-                }
-
                 return $this->transformTask($task, $report, $periodKey);
             })
-            ->filter()
             ->values();
+        $tasks = $isSuperadmin
+            ? $taskItems
+            : $taskItems
+                ->reject(fn (array $task): bool => $task['status'] === TaskReportStatus::Completed->value)
+                ->values();
 
         return Inertia::render('TaskDashboard/Index', [
             'tasks' => $tasks,
             'operationalAttendance' => $this->operationalAttendanceForUser($user),
             'summary' => [
-                'total' => $tasks->count(),
-                'pending' => $tasks->where('status', 'pending')->count(),
-                'in_progress' => $tasks->where('status', 'in_progress')->count(),
-                'completed' => $tasks->where('status', 'completed')->count(),
+                'total' => $taskItems->count(),
+                'pending' => $taskItems->where('status', 'pending')->count(),
+                'in_progress' => $taskItems->where('status', 'in_progress')->count(),
+                'completed' => $taskItems->where('status', 'completed')->count(),
             ],
         ]);
     }

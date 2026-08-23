@@ -24,14 +24,20 @@ export const kdkmpDashboardFields: KdkmpDashboardField[] = [
         description: 'Diisi manual. Nilai 0 diperbolehkan.',
     },
     { key: 'actual_revenue', label: 'Actual Revenue', isRupiah: true },
-    { key: 'variable_cost', label: 'Variable Cost', isRupiah: true },
+    {
+        key: 'variable_cost',
+        label: 'Variable Cost',
+        isRupiah: true,
+        description:
+            'Fallback input harian yang digunakan bila Variable Cost Master Task belum lengkap.',
+    },
     {
         key: 'actual_cost',
         label: 'Actual Cost',
         isRupiah: true,
         isDisabled: true,
         description:
-            'Akumulasi nilai numerik task Catat pengeluaran harian yang selesai hari ini.',
+            'Akumulasi nilai numerik task Pencatatan Pengeluaran Operasional Harian yang selesai hari ini.',
     },
     {
         key: 'actual_ebitda_margin',
