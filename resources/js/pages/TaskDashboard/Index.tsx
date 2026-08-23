@@ -91,7 +91,7 @@ type TaskActionFormData = {
 
 const MAX_DOCUMENT_COUNT = 10;
 const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024;
-const TASK_DESCRIPTION_PREVIEW_LENGTH = 80;
+const TASK_DESCRIPTION_PREVIEW_LENGTH = 150;
 const ADDITIONAL_FIELD_FILE_ACCEPT =
     '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png';
 
@@ -413,8 +413,8 @@ export default function TaskDashboardIndex({
         <>
             <Head title="Dashboard Task" />
 
-            <main className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
-                <div className="mx-auto w-full max-w-7xl space-y-6">
+            <main className="min-h-screen overflow-x-hidden bg-background p-4 sm:p-6 lg:p-8">
+                <div className="w-full space-y-6">
                     <section className="flex flex-col gap-4 rounded-lg border bg-card p-6 shadow-sm lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <p className="text-sm font-semibold text-primary uppercase">
@@ -446,13 +446,13 @@ export default function TaskDashboardIndex({
                         />
                     </section>
 
-                    <Card className="rounded-2xl border bg-card shadow-sm">
+                    <Card className="overflow-x-hidden rounded-2xl border bg-card shadow-sm">
                         <CardHeader className="border-b px-5 py-4">
                             <CardTitle>Daftar Task</CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <div className="px-3 pb-3 sm:px-4">
-                                <Table className="border-separate border-spacing-y-2">
+                            <div className="overflow-x-hidden px-3 pb-3 sm:px-4 [&_[data-slot=table-container]]:overflow-x-hidden">
+                                <Table className="w-full table-fixed border-separate border-spacing-y-2">
                                     <TableHeader className="[&_tr]:border-0">
                                         <TableRow className="border-0 hover:bg-transparent">
                                             <TableHead className="rounded-xl bg-muted/40 p-4">
@@ -487,76 +487,78 @@ export default function TaskDashboardIndex({
                                                         key={task.uuid}
                                                         className="border-0 hover:bg-transparent"
                                                     >
-                                                        <TableCell className="rounded-xl border bg-card p-4">
+                                                        <TableCell className="rounded-xl border bg-card p-4 whitespace-normal">
                                                             <div className="flex items-start gap-3 sm:px-3">
                                                                 <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                                                     <ClipboardList className="size-5" />
                                                                 </div>
-                                                                <div className="min-w-0">
-                                                                    <div className="mb-3 flex flex-wrap items-center gap-1.5">
-                                                                        <p className="font-medium text-foreground">
-                                                                            {
-                                                                                task.name
-                                                                            }
-                                                                        </p>
-                                                                        <Badge
-                                                                            variant={
-                                                                                task.bmc_status ===
-                                                                                'belum_dipetakan'
-                                                                                    ? 'outline'
-                                                                                    : 'secondary'
-                                                                            }
-                                                                        >
-                                                                            {
-                                                                                task.bmc_status_label
-                                                                            }
-                                                                        </Badge>
-                                                                    </div>
-                                                                    <p className="text-xs break-words text-muted-foreground">
-                                                                        {truncateTaskDescription(
-                                                                            task.description,
-                                                                        )}
-                                                                    </p>
-                                                                    <div className="mt-3 grid gap-3 border-t pt-3 text-xs sm:grid-cols-3">
-                                                                        <div>
-                                                                            <p className="font-semibold tracking-wide text-muted-foreground uppercase">
-                                                                                Jam
-                                                                                Pelaksanaan
-                                                                            </p>
-                                                                            <p className="mt-1 font-medium text-foreground">
-                                                                                {task.execution_time ??
-                                                                                    '-'}
-                                                                            </p>
-                                                                        </div>
-                                                                        <div>
-                                                                            <p className="font-semibold tracking-wide text-muted-foreground uppercase">
-                                                                                Estimasi
-                                                                                Waktu
-                                                                            </p>
-                                                                            <p className="mt-1 font-medium text-foreground">
+                                                                <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-end">
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                                                                            <p className="font-medium text-foreground">
                                                                                 {
-                                                                                    task.time_require
-                                                                                }{' '}
-                                                                                menit
-                                                                            </p>
-                                                                        </div>
-                                                                        <div>
-                                                                            <p className="font-semibold tracking-wide text-muted-foreground uppercase">
-                                                                                Status
+                                                                                    task.name
+                                                                                }
                                                                             </p>
                                                                             <Badge
-                                                                                variant="outline"
-                                                                                className="mt-1"
+                                                                                variant={
+                                                                                    task.bmc_status ===
+                                                                                    'belum_dipetakan'
+                                                                                        ? 'outline'
+                                                                                        : 'secondary'
+                                                                                }
                                                                             >
                                                                                 {
-                                                                                    task.status_label
+                                                                                    task.bmc_status_label
                                                                                 }
                                                                             </Badge>
+                                                                        </div>
+                                                                        <p className="text-xs break-words text-muted-foreground">
+                                                                            {truncateTaskDescription(
+                                                                                task.description,
+                                                                            )}
+                                                                        </p>
+                                                                        <div className="mt-3 grid gap-3 border-t pt-3 text-xs sm:grid-cols-3">
+                                                                            <div>
+                                                                                <p className="font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                                    Jam
+                                                                                    Pelaksanaan
+                                                                                </p>
+                                                                                <p className="mt-1 font-medium text-foreground">
+                                                                                    {task.execution_time ??
+                                                                                        '-'}
+                                                                                </p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                                    Estimasi
+                                                                                    Waktu
+                                                                                </p>
+                                                                                <p className="mt-1 font-medium text-foreground">
+                                                                                    {
+                                                                                        task.time_require
+                                                                                    }{' '}
+                                                                                    menit
+                                                                                </p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                                    Status
+                                                                                </p>
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className="mt-1"
+                                                                                >
+                                                                                    {
+                                                                                        task.status_label
+                                                                                    }
+                                                                                </Badge>
+                                                                            </div>
                                                                         </div>
                                                                     </div>
                                                                     {task.status !==
                                                                         'completed' && (
-                                                                        <div className="mt-3">
+                                                                        <div className="shrink-0 sm:ml-auto">
                                                                             <TaskActionButton
                                                                                 task={
                                                                                     task
