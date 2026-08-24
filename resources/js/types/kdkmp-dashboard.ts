@@ -59,10 +59,14 @@ export type KdkmpFinancialMatrixPoint = {
     task_name: string;
     estimated_minutes: number;
     actual_duration_minutes: number;
-    variable_cost: number | null;
-    actual_cost: number | null;
-    cumulative_variable_cost: number | null;
-    cumulative_actual_cost: number | null;
+    plan_fixed_cost: number;
+    plan_variable_cost: number;
+    plan_cost: number;
+    actual_fixed_cost: number;
+    actual_variable_cost: number;
+    actual_cost: number;
+    cumulative_plan_cost: number;
+    cumulative_actual_cost: number;
 };
 
 export type KdkmpFinancialMatrix = {
@@ -72,7 +76,7 @@ export type KdkmpFinancialMatrix = {
     total_estimated_minutes: number;
     total_actual_duration_minutes: number;
     total_plan_cost: number;
-    total_actual_cost: number | null;
+    total_actual_cost: number;
     plan_revenue: number | null;
     actual_revenue: number | null;
     plan_ebitda: number | null;
@@ -119,6 +123,7 @@ export type KdkmpConsolidationRow = {
 
 export type KdkmpManagerDashboardProps = {
     businessDate: string;
+    financialMatrixDate: string;
     kdkmp: KdkmpIdentity | null;
     todayEntry: KdkmpDailyEntry | null;
     computedValues: KdkmpComputedValues;

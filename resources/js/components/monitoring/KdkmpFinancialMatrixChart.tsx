@@ -1,4 +1,5 @@
 import {
+    Bar,
     CartesianGrid,
     ComposedChart,
     Legend,
@@ -17,6 +18,8 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type {
     KdkmpFinancialMatrix,
     KdkmpFinancialMatrixPoint,
@@ -24,6 +27,10 @@ import type {
 
 type Props = {
     matrix: KdkmpFinancialMatrix;
+    selectedDate: string;
+    maxDate: string;
+    isLoading: boolean;
+    onDateChange: (date: string) => void;
 };
 
 type ChartPoint = KdkmpFinancialMatrixPoint & {
@@ -58,6 +65,14 @@ function formatDuration(minutes: number): string {
     }
 
     return `${hours} jam ${remainingMinutes} menit`;
+}
+
+function formatDate(value: string): string {
+    return new Intl.DateTimeFormat('id-ID', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+    }).format(new Date(`${value}T00:00:00`));
 }
 
 function MatrixMetric({
@@ -102,17 +117,33 @@ function MatrixTooltip({ active, payload }: Partial<TooltipContentProps>) {
                 <span className="text-right font-medium text-foreground tabular-nums">
                     {formatDuration(point.actual_duration_minutes)}
                 </span>
-                <span>Variable Cost</span>
+                <span>Plan Fixed Cost</span>
                 <span className="text-right font-medium text-foreground tabular-nums">
-                    {formatRupiah(point.variable_cost)}
+                    {formatRupiah(point.plan_fixed_cost)}
+                </span>
+                <span>Plan Variable Cost</span>
+                <span className="text-right font-medium text-foreground tabular-nums">
+                    {formatRupiah(point.plan_variable_cost)}
+                </span>
+                <span>Plan Cost</span>
+                <span className="text-right font-medium text-foreground tabular-nums">
+                    {formatRupiah(point.plan_cost)}
+                </span>
+                <span>Actual Fixed Cost</span>
+                <span className="text-right font-medium text-foreground tabular-nums">
+                    {formatRupiah(point.actual_fixed_cost)}
+                </span>
+                <span>Actual Variable Cost</span>
+                <span className="text-right font-medium text-foreground tabular-nums">
+                    {formatRupiah(point.actual_variable_cost)}
                 </span>
                 <span>Actual Cost</span>
                 <span className="text-right font-medium text-foreground tabular-nums">
                     {formatRupiah(point.actual_cost)}
                 </span>
-                <span>Variable Cost kumulatif</span>
+                <span>Plan Cost kumulatif</span>
                 <span className="text-right font-medium text-foreground tabular-nums">
-                    {formatRupiah(point.cumulative_variable_cost)}
+                    {formatRupiah(point.cumulative_plan_cost)}
                 </span>
                 <span>Actual Cost kumulatif</span>
                 <span className="text-right font-medium text-foreground tabular-nums">
@@ -123,30 +154,63 @@ function MatrixTooltip({ active, payload }: Partial<TooltipContentProps>) {
     );
 }
 
-export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
+export default function KdkmpFinancialMatrixChart({
+    matrix,
+    selectedDate,
+    maxDate,
+    isLoading,
+    onDateChange,
+}: Props) {
     const chartData: ChartPoint[] = matrix.points.map((point) => ({
         ...point,
         plan_revenue: matrix.plan_revenue,
         actual_revenue: matrix.actual_revenue,
     }));
-    const hasCostAllocation = matrix.total_estimated_minutes > 0;
-
     return (
         <Card className="overflow-hidden border shadow-sm">
             <CardHeader className="border-b bg-muted/20">
-                <CardTitle className="text-xl text-foreground">
-                    The <span className="text-primary">EBITDA Matrix</span>{' '}
-                    <span className="font-normal text-muted-foreground">
-                        (Indikator Finansial untuk Proses Bisnis)
-                    </span>
-                </CardTitle>
-                <CardDescription>
-                    {/* Perbandingan pendapatan serta akumulasi biaya untuk setiap
-                    urutan task hari ini. */}
-                    Integrasi BPM dengan TD-ABC dan EBITDA untuk setiap urutan task hari ini.
-                </CardDescription>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="space-y-1.5">
+                        <CardTitle className="text-xl text-foreground">
+                            The{' '}
+                            <span className="text-primary">EBITDA Matrix</span>{' '}
+                            <span className="font-normal text-muted-foreground">
+                                (Indikator Finansial untuk Proses Bisnis)
+                            </span>
+                        </CardTitle>
+                        <CardDescription>
+                            Perbandingan pendapatan dan biaya per proses bisnis
+                            berdasarkan rencana serta durasi aktual task pada{' '}
+                            {formatDate(selectedDate)}.
+                        </CardDescription>
+                    </div>
+
+                    <div className="w-full space-y-2 sm:w-56">
+                        <Label htmlFor="financial-matrix-date">
+                            Tanggal Grafik
+                        </Label>
+                        <Input
+                            id="financial-matrix-date"
+                            type="date"
+                            max={maxDate}
+                            value={selectedDate}
+                            disabled={isLoading}
+                            aria-busy={isLoading}
+                            onChange={(event) =>
+                                onDateChange(event.target.value)
+                            }
+                        />
+                        {isLoading && (
+                            <p className="text-xs text-muted-foreground">
+                                Memuat data grafik...
+                            </p>
+                        )}
+                    </div>
+                </div>
             </CardHeader>
-            <CardContent className="space-y-5 p-5">
+            <CardContent
+                className={`space-y-5 p-5 transition-opacity ${isLoading ? 'opacity-60' : 'opacity-100'}`}
+            >
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                     <MatrixMetric
                         label="Plan EBITDA"
@@ -177,16 +241,11 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
 
                 {chartData.length === 0 ? (
                     <div className="flex h-80 items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                        Belum ada task aktif yang ditugaskan ke role Anda.
-                    </div>
-                ) : !hasCostAllocation ? (
-                    <div className="flex h-80 items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                        Total estimasi waktu task masih 0 menit sehingga biaya
-                        belum dapat dialokasikan.
+                        Belum ada task untuk tanggal grafik yang dipilih.
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <div className="h-[430px] min-w-[760px]">
+                        <div className="h-[500px] min-w-[1080px]">
                             <ResponsiveContainer width="100%" height="100%">
                                 <ComposedChart
                                     data={chartData}
@@ -194,7 +253,7 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
                                         top: 24,
                                         right: 28,
                                         left: 12,
-                                        bottom: 18,
+                                        bottom: 88,
                                     }}
                                 >
                                     <CartesianGrid
@@ -202,18 +261,22 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
                                         stroke="var(--border)"
                                     />
                                     <XAxis
-                                        dataKey="process"
+                                        dataKey="task_name"
+                                        angle={-42}
+                                        height={108}
+                                        interval={0}
+                                        textAnchor="end"
                                         label={{
-                                            value: 'URUTAN TASK',
+                                            value: 'BUSINESS PROCESS / TASK',
                                             position: 'insideBottom',
-                                            offset: -8,
+                                            offset: -72,
                                             fill: 'var(--foreground)',
                                             fontSize: 12,
                                             fontWeight: 600,
                                         }}
                                         tick={{
                                             fill: 'var(--muted-foreground)',
-                                            fontSize: 11,
+                                            fontSize: 10,
                                         }}
                                     />
                                     <YAxis
@@ -233,15 +296,38 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
                                         }}
                                     />
                                     <Tooltip content={<MatrixTooltip />} />
-                                    <Legend verticalAlign="top" height={32} />
+                                    <Legend verticalAlign="top" height={56} />
+                                    <Bar
+                                        dataKey="plan_cost"
+                                        name="Plan Cost"
+                                        fill="#2563eb"
+                                        maxBarSize={28}
+                                        radius={[4, 4, 0, 0]}
+                                    />
+                                    <Bar
+                                        dataKey="actual_cost"
+                                        name="Actual Cost"
+                                        fill="#dc2626"
+                                        maxBarSize={28}
+                                        radius={[4, 4, 0, 0]}
+                                    />
                                     <Line
                                         type="linear"
-                                        dataKey="actual_revenue"
-                                        name="Actual Revenue"
+                                        dataKey="cumulative_plan_cost"
+                                        name="Plan Cost Kumulatif"
+                                        stroke="#ca8a04"
+                                        strokeWidth={3}
+                                        strokeDasharray="2 7"
+                                        dot={{ r: 3 }}
+                                    />
+                                    <Line
+                                        type="linear"
+                                        dataKey="cumulative_actual_cost"
+                                        name="Actual Cost Kumulatif"
                                         stroke="#15803d"
                                         strokeWidth={3}
-                                        dot={false}
-                                        connectNulls={false}
+                                        strokeDasharray="2 7"
+                                        dot={{ r: 3 }}
                                     />
                                     <Line
                                         type="linear"
@@ -254,21 +340,12 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
                                     />
                                     <Line
                                         type="linear"
-                                        dataKey="cumulative_variable_cost"
-                                        name="Variable Costs Kumulatif"
-                                        stroke="#64748b"
+                                        dataKey="actual_revenue"
+                                        name="Actual Revenue"
+                                        stroke="#15803d"
                                         strokeWidth={3}
-                                        strokeDasharray="2 7"
-                                        dot={{ r: 3 }}
-                                    />
-                                    <Line
-                                        type="linear"
-                                        dataKey="cumulative_actual_cost"
-                                        name="Actual Costs Kumulatif"
-                                        stroke="#c6a427"
-                                        strokeWidth={3}
-                                        strokeDasharray="2 7"
-                                        dot={{ r: 3 }}
+                                        dot={false}
+                                        connectNulls={false}
                                     />
                                 </ComposedChart>
                             </ResponsiveContainer>
@@ -292,13 +369,13 @@ export default function KdkmpFinancialMatrixChart({ matrix }: Props) {
                         </span>
                     </p>
                     <p>
-                        Fixed Cost:{' '}
+                        Total Plan Fixed Cost:{' '}
                         <span className="font-medium text-foreground">
                             {formatRupiah(matrix.fixed_cost)}
                         </span>
                     </p>
                     <p>
-                        Total Variable Cost:{' '}
+                        Total Plan Variable Cost:{' '}
                         <span className="font-medium text-foreground">
                             {formatRupiah(matrix.total_variable_cost)}
                         </span>

@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 import {
     Building2,
     CalendarDays,
@@ -21,7 +22,10 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { kdkmpDashboardFields } from '@/lib/kdkmp-dashboard-fields';
-import { input as inputDataToday } from '@/routes/kdkmp-dashboard';
+import {
+    index as kdkmpDashboardIndex,
+    input as inputDataToday,
+} from '@/routes/kdkmp-dashboard';
 import type {
     KdkmpDailyEntry,
     KdkmpManagerDashboardProps,
@@ -70,11 +74,47 @@ function EntryStatus({ entry }: { entry: KdkmpDailyEntry | null }) {
 
 export default function KdkmpDashboardIndex({
     businessDate,
+    financialMatrixDate,
     kdkmp,
     todayEntry,
     financialMatrix,
     history,
 }: KdkmpManagerDashboardProps) {
+    const [selectedFinancialMatrixDate, setSelectedFinancialMatrixDate] =
+        useState(financialMatrixDate);
+    const [isFinancialMatrixLoading, setIsFinancialMatrixLoading] =
+        useState(false);
+
+    useEffect(() => {
+        setSelectedFinancialMatrixDate(financialMatrixDate);
+    }, [financialMatrixDate]);
+
+    const changeFinancialMatrixDate = (date: string) => {
+        if (date === '' || date === financialMatrixDate) {
+            return;
+        }
+
+        setSelectedFinancialMatrixDate(date);
+        setIsFinancialMatrixLoading(true);
+
+        router.get(
+            kdkmpDashboardIndex.url({ mergeQuery: { date } }),
+            {},
+            {
+                only: ['financialMatrix', 'financialMatrixDate'],
+                preserveScroll: true,
+                preserveState: true,
+                replace: true,
+                onError: () => {
+                    setSelectedFinancialMatrixDate(financialMatrixDate);
+                },
+                onFinish: () => {
+                    setIsFinancialMatrixLoading(false);
+                },
+            },
+        );
+    };
+
     return (
         <>
             <Head title="Dashboard KDKMP" />
@@ -182,6 +222,10 @@ export default function KdkmpDashboardIndex({
 
                             <KdkmpFinancialMatrixChart
                                 matrix={financialMatrix}
+                                selectedDate={selectedFinancialMatrixDate}
+                                maxDate={businessDate}
+                                isLoading={isFinancialMatrixLoading}
+                                onDateChange={changeFinancialMatrixDate}
                             />
                         </>
                     )}

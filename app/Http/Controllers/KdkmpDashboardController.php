@@ -6,10 +6,12 @@ use App\Actions\SyncKdkmpActualVariableCostAction;
 use App\Http\Requests\SaveEbitdamaxKdkmpRequest;
 use App\Http\Requests\SaveOperationalAttendanceRequest;
 use App\Http\Requests\UpdateKdkmpTaskSelectionRequest;
+use App\Http\Requests\ViewKdkmpDashboardRequest;
 use App\Models\EbitdamaxKdkmp;
 use App\Models\SdmKdkmpEntry;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\KdkmpActualVariableCostService;
 use App\Services\KdkmpDashboardMetricsService;
 use App\Services\KdkmpFinancialMatrixService;
 use App\Services\KdkmpOperationalAllocationService;
@@ -27,20 +29,24 @@ class KdkmpDashboardController extends Controller
 {
     public function __construct(
         private readonly SyncKdkmpActualVariableCostAction $syncActualVariableCost,
+        private readonly KdkmpActualVariableCostService $actualVariableCost,
         private readonly KdkmpDashboardMetricsService $dashboardMetrics,
         private readonly KdkmpFinancialMatrixService $financialMatrix,
         private readonly KdkmpOperationalAllocationService $operationalAllocation,
         private readonly KdkmpTaskSelectionService $taskSelection,
     ) {}
 
-    public function index(Request $request): Response
+    public function index(ViewKdkmpDashboardRequest $request): Response
     {
-        Gate::authorize('viewDashboard', EbitdamaxKdkmp::class);
-
         $user = $request->user();
         abort_unless($user instanceof User, 401);
 
         $businessDate = $this->businessDate();
+        $financialMatrixDate = CarbonImmutable::createFromFormat(
+            'Y-m-d',
+            (string) ($request->validated('date') ?? $businessDate->toDateString()),
+            (string) config('app.kdkmp_business_timezone')
+        )->startOfDay();
         $sdmKdkmpEntry = $user->sdmKdkmpEntry;
         $todayEntry = $sdmKdkmpEntry
             ? $sdmKdkmpEntry->dailyEbitdaRecords()
@@ -49,6 +55,18 @@ class KdkmpDashboardController extends Controller
             : null;
         $todayEntry = $this->syncActualVariableCost->handle($user, $businessDate) ?? $todayEntry;
         $metrics = $this->dashboardMetrics->forUser($user->id, $businessDate);
+        $isTodayFinancialMatrix = $financialMatrixDate->isSameDay($businessDate);
+        $financialMatrixEntry = $isTodayFinancialMatrix
+            ? $todayEntry
+            : $sdmKdkmpEntry?->dailyEbitdaRecords()
+                ->whereDate('report_date', $financialMatrixDate->toDateString())
+                ->first();
+        $financialMatrixMetrics = $isTodayFinancialMatrix
+            ? $metrics
+            : $this->dashboardMetrics->forUser($user->id, $financialMatrixDate);
+        $financialMatrixActualVariableCost = $isTodayFinancialMatrix
+            ? $todayEntry?->actual_variable_cost
+            : $this->actualVariableCost->forUser($user->id, $financialMatrixDate);
         $computedValues = [
             'target_revenue' => EbitdamaxKdkmp::TARGET_REVENUE,
             ...$metrics,
@@ -74,6 +92,7 @@ class KdkmpDashboardController extends Controller
 
         return Inertia::render('KdkmpDashboard/Index', [
             'businessDate' => $businessDate->toDateString(),
+            'financialMatrixDate' => $financialMatrixDate->toDateString(),
             'kdkmp' => $sdmKdkmpEntry
                 ? $this->transformKdkmp($sdmKdkmpEntry)
                 : null,
@@ -83,11 +102,10 @@ class KdkmpDashboardController extends Controller
             'computedValues' => $computedValues,
             'financialMatrix' => $this->financialMatrix->forUser(
                 user: $user,
-                businessDate: $businessDate,
-                planRevenue: $todayEntry?->plan_revenue,
-                actualRevenue: $metrics['actual_revenue'],
-                variableCost: $todayEntry?->plan_cost,
-                actualVariableCost: $todayEntry?->actual_variable_cost,
+                businessDate: $financialMatrixDate,
+                planRevenue: $financialMatrixEntry?->plan_revenue,
+                actualRevenue: $financialMatrixMetrics['actual_revenue'],
+                actualVariableCostOverage: $financialMatrixActualVariableCost,
             ),
             'history' => $history,
         ]);

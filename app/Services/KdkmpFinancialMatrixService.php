@@ -19,67 +19,70 @@ class KdkmpFinancialMatrixService
     ) {}
 
     /**
-     * @return array{fixed_cost: float, total_variable_cost: float, total_actual_variable_cost: float, total_estimated_minutes: int, total_actual_duration_minutes: int, total_plan_cost: float, total_actual_cost: float|null, plan_revenue: float|null, actual_revenue: float|null, plan_ebitda: float|null, actual_ebitda: float|null, points: array<int, array{process: int, task_id: int, task_name: string, estimated_minutes: int, actual_duration_minutes: int, variable_cost: float|null, actual_cost: float|null, cumulative_variable_cost: float|null, cumulative_actual_cost: float|null}>}
+     * @return array{fixed_cost: float, total_variable_cost: float, total_actual_variable_cost: float, total_estimated_minutes: int, total_actual_duration_minutes: int, total_plan_cost: float, total_actual_cost: float, plan_revenue: float|null, actual_revenue: float|null, plan_ebitda: float|null, actual_ebitda: float|null, points: array<int, array{process: int, task_id: int, task_name: string, estimated_minutes: int, actual_duration_minutes: int, plan_fixed_cost: float, plan_variable_cost: float, plan_cost: float, actual_fixed_cost: float, actual_variable_cost: float, actual_cost: float, cumulative_plan_cost: float, cumulative_actual_cost: float}>}
      */
     public function forUser(
         User $user,
         CarbonImmutable $businessDate,
         mixed $planRevenue,
         mixed $actualRevenue,
-        mixed $variableCost,
-        mixed $actualVariableCost,
+        mixed $actualVariableCostOverage,
     ): array {
         $tasks = $this->tasksForUser($user, $businessDate);
-        $fixedCost = $this->fixedCostFor($tasks);
-        $variableCostData = $this->variableCostFor($tasks, $variableCost);
         $totalEstimatedMinutes = (int) $tasks->sum('time_require');
+        $fixedCostData = $this->fixedCostDataFor($tasks);
+        $totalFixedCost = $fixedCostData['total'];
+        $totalPlanVariableCost = (float) $tasks->sum(
+            fn (Task $task): int => $task->variableCostTotal()
+        );
         $durationsByTaskId = $this->completedDurationsByTask(
             user: $user,
             businessDate: $businessDate,
             taskIds: $tasks->pluck('id'),
         );
         $totalActualDurationMinutes = (int) $durationsByTaskId->sum();
-        $hasCostAllocation = $totalEstimatedMinutes > 0;
-        $normalizedVariableCost = $variableCostData['total'];
-        $usesTaskMasterVariableCost = $variableCostData['uses_task_master'];
-        $cumulativeVariableCost = 0.0;
+        $actualVariableCostOverage = $this->numericValue($actualVariableCostOverage) ?? 0.0;
+        $totalActualVariableCost = $totalActualDurationMinutes > 0
+            ? $totalPlanVariableCost + $actualVariableCostOverage
+            : 0.0;
+        $totalPlanCost = $totalFixedCost + $totalPlanVariableCost;
+        $totalActualCost = $totalActualDurationMinutes > 0
+            ? $totalFixedCost + $totalActualVariableCost
+            : 0.0;
+        $plannedFixedCostsByTaskId = $this->plannedFixedCostsByTask(
+            tasks: $tasks,
+            totalFixedCost: $totalFixedCost,
+            totalEstimatedMinutes: $totalEstimatedMinutes,
+            usesTaskMasterFixedCost: $fixedCostData['uses_task_master'],
+        );
+        $cumulativePlanCost = 0.0;
         $cumulativeActualCost = 0.0;
-        $lastTaskIndex = $tasks->count() - 1;
 
         $points = $tasks
             ->values()
             ->map(function (Task $task, int $index) use (
                 $durationsByTaskId,
-                $hasCostAllocation,
-                $lastTaskIndex,
-                $totalEstimatedMinutes,
-                $fixedCost,
-                $usesTaskMasterVariableCost,
+                $plannedFixedCostsByTaskId,
+                $totalActualDurationMinutes,
+                $totalActualVariableCost,
+                $totalFixedCost,
                 &$cumulativeActualCost,
-                &$cumulativeVariableCost,
-                $normalizedVariableCost,
+                &$cumulativePlanCost,
             ): array {
                 $estimatedMinutes = (int) $task->time_require;
                 $actualDurationMinutes = (int) $durationsByTaskId->get($task->id, 0);
+                $planFixedCost = (float) $plannedFixedCostsByTaskId->get($task->id, 0.0);
+                $planVariableCost = (float) $task->variableCostTotal();
+                $planCost = $planFixedCost + $planVariableCost;
+                $actualAllocationRatio = $totalActualDurationMinutes > 0
+                    ? $actualDurationMinutes / $totalActualDurationMinutes
+                    : 0.0;
+                $actualFixedCost = $actualAllocationRatio * $totalFixedCost;
+                $actualVariableCost = $actualAllocationRatio * $totalActualVariableCost;
+                $actualCost = $actualFixedCost + $actualVariableCost;
 
-                $allocatedVariableCost = $usesTaskMasterVariableCost
-                    ? (float) $task->variableCostTotal()
-                    : ($hasCostAllocation
-                        ? ($index === $lastTaskIndex
-                            ? $normalizedVariableCost - $cumulativeVariableCost
-                            : ($estimatedMinutes / $totalEstimatedMinutes) * $normalizedVariableCost)
-                        : null);
-                $actualCost = $hasCostAllocation
-                    ? ($actualDurationMinutes / $totalEstimatedMinutes) * $fixedCost
-                    : null;
-
-                if ($allocatedVariableCost !== null) {
-                    $cumulativeVariableCost += $allocatedVariableCost;
-                }
-
-                if ($actualCost !== null) {
-                    $cumulativeActualCost += $actualCost;
-                }
+                $cumulativePlanCost += $planCost;
+                $cumulativeActualCost += $actualCost;
 
                 return [
                     'process' => $index + 1,
@@ -87,40 +90,34 @@ class KdkmpFinancialMatrixService
                     'task_name' => $task->name,
                     'estimated_minutes' => $estimatedMinutes,
                     'actual_duration_minutes' => $actualDurationMinutes,
-                    'variable_cost' => $allocatedVariableCost !== null
-                        ? round($allocatedVariableCost, 2)
-                        : null,
-                    'actual_cost' => $actualCost !== null ? round($actualCost, 2) : null,
-                    'cumulative_variable_cost' => $allocatedVariableCost !== null
-                        ? round($cumulativeVariableCost, 2)
-                        : null,
-                    'cumulative_actual_cost' => $actualCost !== null
-                        ? round($cumulativeActualCost, 2)
-                        : null,
+                    'plan_fixed_cost' => round($planFixedCost, 2),
+                    'plan_variable_cost' => round($planVariableCost, 2),
+                    'plan_cost' => round($planCost, 2),
+                    'actual_fixed_cost' => round($actualFixedCost, 2),
+                    'actual_variable_cost' => round($actualVariableCost, 2),
+                    'actual_cost' => round($actualCost, 2),
+                    'cumulative_plan_cost' => round($cumulativePlanCost, 2),
+                    'cumulative_actual_cost' => round($cumulativeActualCost, 2),
                 ];
             })
             ->all();
-
-        $totalPlanCost = round($fixedCost + $normalizedVariableCost, 2);
-        $totalActualCost = $hasCostAllocation ? round($cumulativeActualCost, 2) : null;
         $normalizedPlanRevenue = $this->numericValue($planRevenue);
         $normalizedActualRevenue = $this->numericValue($actualRevenue);
-        $normalizedActualVariableCost = $this->numericValue($actualVariableCost) ?? 0.0;
 
         return [
-            'fixed_cost' => $fixedCost,
-            'total_variable_cost' => round($normalizedVariableCost, 2),
-            'total_actual_variable_cost' => round($normalizedActualVariableCost, 2),
+            'fixed_cost' => round($totalFixedCost, 2),
+            'total_variable_cost' => round($totalPlanVariableCost, 2),
+            'total_actual_variable_cost' => round($totalActualVariableCost, 2),
             'total_estimated_minutes' => $totalEstimatedMinutes,
             'total_actual_duration_minutes' => $totalActualDurationMinutes,
-            'total_plan_cost' => $totalPlanCost,
-            'total_actual_cost' => $totalActualCost,
+            'total_plan_cost' => round($totalPlanCost, 2),
+            'total_actual_cost' => round($totalActualCost, 2),
             'plan_revenue' => $normalizedPlanRevenue,
             'actual_revenue' => $normalizedActualRevenue,
-            'plan_ebitda' => $normalizedPlanRevenue !== null && $totalPlanCost !== null
+            'plan_ebitda' => $normalizedPlanRevenue !== null
                 ? round($normalizedPlanRevenue - $totalPlanCost, 2)
                 : null,
-            'actual_ebitda' => $normalizedActualRevenue !== null && $totalActualCost !== null
+            'actual_ebitda' => $normalizedActualRevenue !== null
                 ? round($normalizedActualRevenue - $totalActualCost, 2)
                 : null,
             'points' => $points,
@@ -136,6 +133,12 @@ class KdkmpFinancialMatrixService
             return collect();
         }
 
+        $selectedTaskIds = $businessDate->isSameDay(
+            CarbonImmutable::now((string) config('app.kdkmp_business_timezone'))
+        )
+            ? $this->taskSelection->executionTaskIdsForUser($user, $businessDate)
+            : $this->taskSelection->dailySelectedTaskIdsForUser($user, $businessDate);
+
         return Task::query()
             ->active()
             ->whereHas('roles', function (Builder $query) use ($user): void {
@@ -144,7 +147,7 @@ class KdkmpFinancialMatrixService
             ->when(
                 $user->isKdkmpManager(),
                 fn (Builder $query) => $query->forKdkmpExecution(
-                    $this->taskSelection->executionTaskIdsForUser($user, $businessDate),
+                    $selectedTaskIds,
                 )
             )
             ->orderByRaw('CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END')
@@ -161,43 +164,73 @@ class KdkmpFinancialMatrixService
 
     /**
      * @param  Collection<int, Task>  $tasks
-     */
-    private function fixedCostFor(Collection $tasks): float
-    {
-        if (
-            $tasks->isEmpty() ||
-            ! $tasks->every(fn (Task $task): bool => $task->fixedCostTotal() > 0)
-        ) {
-            return (float) self::DEFAULT_DAILY_FIXED_COST;
-        }
-
-        return (float) $tasks->sum(
-            fn (Task $task): int => $task->fixedCostTotal()
-        );
-    }
-
-    /**
-     * @param  Collection<int, Task>  $tasks
      * @return array{total: float, uses_task_master: bool}
      */
-    private function variableCostFor(Collection $tasks, mixed $fallbackVariableCost): array
+    private function fixedCostDataFor(Collection $tasks): array
     {
         if (
-            $tasks->isNotEmpty() &&
-            $tasks->every(fn (Task $task): bool => $task->variableCostTotal() > 0)
+            $tasks->isNotEmpty()
+            && $tasks->every(fn (Task $task): bool => $task->fixedCostTotal() > 0)
         ) {
             return [
                 'total' => (float) $tasks->sum(
-                    fn (Task $task): int => $task->variableCostTotal()
+                    fn (Task $task): int => $task->fixedCostTotal()
                 ),
                 'uses_task_master' => true,
             ];
         }
 
         return [
-            'total' => $this->numericValue($fallbackVariableCost) ?? 0.0,
+            'total' => (float) self::DEFAULT_DAILY_FIXED_COST,
             'uses_task_master' => false,
         ];
+    }
+
+    /**
+     * @param  Collection<int, Task>  $tasks
+     * @return Collection<int, float>
+     */
+    private function plannedFixedCostsByTask(
+        Collection $tasks,
+        float $totalFixedCost,
+        int $totalEstimatedMinutes,
+        bool $usesTaskMasterFixedCost,
+    ): Collection {
+        if ($tasks->isEmpty()) {
+            return collect();
+        }
+
+        if ($usesTaskMasterFixedCost) {
+            return $tasks->mapWithKeys(
+                fn (Task $task): array => [$task->id => (float) $task->fixedCostTotal()]
+            );
+        }
+
+        $allocationUnits = $totalEstimatedMinutes > 0
+            ? $totalEstimatedMinutes
+            : $tasks->count();
+        $cumulativeFixedCost = 0.0;
+        $lastTaskIndex = $tasks->count() - 1;
+
+        return $tasks
+            ->values()
+            ->mapWithKeys(function (Task $task, int $index) use (
+                $allocationUnits,
+                $lastTaskIndex,
+                $totalEstimatedMinutes,
+                $totalFixedCost,
+                &$cumulativeFixedCost,
+            ): array {
+                $allocationWeight = $totalEstimatedMinutes > 0
+                    ? (int) $task->time_require
+                    : 1;
+                $allocatedFixedCost = $index === $lastTaskIndex
+                    ? $totalFixedCost - $cumulativeFixedCost
+                    : ($allocationWeight / $allocationUnits) * $totalFixedCost;
+                $cumulativeFixedCost += $allocatedFixedCost;
+
+                return [$task->id => $allocatedFixedCost];
+            });
     }
 
     /**
