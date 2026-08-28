@@ -20,6 +20,8 @@ class Task extends Model
 
     private const EMPTY_COST_BREAKDOWN = '{"man":0,"machine":0,"method":0,"material":0}';
 
+    private const FIXED_COST_CONFIGURED_KEY = '_configured';
+
     protected $fillable = [
         'uuid',
         'task_category_id',
@@ -88,6 +90,13 @@ class Task extends Model
         return self::costTotal($this->fixed_cost);
     }
 
+    public function hasConfiguredFixedCost(): bool
+    {
+        $fixedCost = is_array($this->fixed_cost) ? $this->fixed_cost : [];
+
+        return ($fixedCost[self::FIXED_COST_CONFIGURED_KEY] ?? null) === true;
+    }
+
     public function variableCostTotal(): int
     {
         return self::costTotal($this->variable_cost);
@@ -105,6 +114,17 @@ class Task extends Model
             'machine' => self::normalizeCostValue($cost['machine'] ?? 0),
             'method' => self::normalizeCostValue($cost['method'] ?? 0),
             'material' => self::normalizeCostValue($cost['material'] ?? 0),
+        ];
+    }
+
+    /**
+     * @return array{man: int, machine: int, method: int, material: int, _configured: bool}
+     */
+    public static function configuredFixedCostBreakdown(mixed $cost): array
+    {
+        return [
+            ...self::normalizeCostBreakdown($cost),
+            self::FIXED_COST_CONFIGURED_KEY => true,
         ];
     }
 

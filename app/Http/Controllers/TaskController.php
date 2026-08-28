@@ -125,7 +125,7 @@ class TaskController extends Controller
      */
     private function taskPayload(array $payload): array
     {
-        $fixedCost = Task::normalizeCostBreakdown($payload['fixed_cost']);
+        $fixedCost = Task::configuredFixedCostBreakdown($payload['fixed_cost']);
         $variableCost = Task::normalizeCostBreakdown($payload['variable_cost']);
 
         return [

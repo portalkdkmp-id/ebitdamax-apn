@@ -170,7 +170,7 @@ class KdkmpFinancialMatrixService
     {
         if (
             $tasks->isNotEmpty()
-            && $tasks->every(fn (Task $task): bool => $task->fixedCostTotal() > 0)
+            && $tasks->every(fn (Task $task): bool => $task->hasConfiguredFixedCost())
         ) {
             return [
                 'total' => (float) $tasks->sum(
