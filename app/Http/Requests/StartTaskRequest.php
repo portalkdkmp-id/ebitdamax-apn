@@ -10,6 +10,7 @@ use App\Models\TaskAdditionalField;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\File;
+use Illuminate\Validation\Validator;
 
 class StartTaskRequest extends FormRequest
 {
@@ -52,6 +53,7 @@ class StartTaskRequest extends FormRequest
 
         if ($this->user()?->isKdkmpManager()) {
             $rules['member_allocations'] = ['required', 'array'];
+            $rules['manager_self_assigned'] = ['required', 'boolean'];
 
             foreach (EbitdamaxKdkmp::OPERATIONAL_ATTENDANCE_ROLES as $key => $label) {
                 $rules["member_allocations.{$key}"] = [
@@ -62,6 +64,7 @@ class StartTaskRequest extends FormRequest
             }
         } else {
             $rules['member_allocations'] = ['prohibited'];
+            $rules['manager_self_assigned'] = ['prohibited'];
         }
 
         return $rules;
@@ -77,6 +80,40 @@ class StartTaskRequest extends FormRequest
         return EbitdamaxKdkmp::normalizeOperationalAttendance(
             is_array($allocations) ? $allocations : null,
         );
+    }
+
+    public function managerSelfAssigned(): bool
+    {
+        return $this->user()?->isKdkmpManager() === true
+            && $this->boolean('manager_self_assigned');
+    }
+
+    /**
+     * @return array<int, callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            if ($validator->errors()->isNotEmpty() || ! $this->user()?->isKdkmpManager()) {
+                return;
+            }
+
+            $totalAllocations = array_sum($this->memberAllocations());
+
+            if (! $this->managerSelfAssigned() && $totalAllocations === 0) {
+                $validator->errors()->add(
+                    'member_allocations',
+                    'Alokasikan minimal satu anggota atau centang bahwa Manager KDKMP yang mengerjakan.',
+                );
+            }
+
+            if ($this->managerSelfAssigned() && $totalAllocations > 0) {
+                $validator->errors()->add(
+                    'manager_self_assigned',
+                    'Alokasi anggota harus bernilai 0 saat Manager KDKMP mengerjakan sendiri.',
+                );
+            }
+        }];
     }
 
     /** @return array<string, string> */

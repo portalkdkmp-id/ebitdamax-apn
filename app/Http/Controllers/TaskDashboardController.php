@@ -374,6 +374,7 @@ class TaskDashboardController extends Controller
             'started_at' => $report->started_at?->toIso8601String(),
             'finished_at' => $report->finished_at?->toIso8601String(),
             'duration_minutes' => $report->duration_minutes,
+            'manager_self_assigned' => $report->manager_self_assigned,
             'status_label' => $report->status->label(),
             'timing_status' => $isOnTime ? 'on_time' : 'late',
             'timing_label' => $isOnTime ? 'Tepat Waktu' : 'Terlambat',

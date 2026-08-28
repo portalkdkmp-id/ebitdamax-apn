@@ -18,6 +18,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -86,6 +87,7 @@ type TaskActionFormData = {
     finished_photo: File | null;
     documents: File[];
     member_allocations?: KdkmpOperationalAttendance;
+    manager_self_assigned?: boolean;
     values: Record<string, AdditionalFieldValue>;
 };
 
@@ -374,6 +376,11 @@ export default function TaskDashboardIndex({
     const [startTask, setStartTask] = useState<DashboardTask | null>(null);
     const [finishTask, setFinishTask] = useState<DashboardTask | null>(null);
     const taskGroups = useMemo(() => {
+        const orderedTasks = [...tasks].sort(
+            (left, right) =>
+                Number(right.status === 'in_progress') -
+                Number(left.status === 'in_progress'),
+        );
         const groups = new Map<
             number,
             {
@@ -382,7 +389,7 @@ export default function TaskDashboardIndex({
             }
         >();
 
-        tasks.forEach((task) => {
+        orderedTasks.forEach((task) => {
             const group = groups.get(task.task_category.id);
 
             if (group) {
@@ -686,12 +693,19 @@ function TaskActionDialog({
         member_allocations: operationalAttendance
             ? emptyKdkmpOperationalAttendance()
             : undefined,
+        manager_self_assigned:
+            photoField === 'started_photo' && operationalAttendance
+                ? false
+                : undefined,
         values: {},
     });
     const shouldShowMemberAllocations =
-        operationalAttendance !== undefined && operationalAttendance !== null;
+        photoField === 'started_photo' &&
+        operationalAttendance !== undefined &&
+        operationalAttendance !== null;
     const mustSaveOperationalAttendance =
         shouldShowMemberAllocations && !operationalAttendance.is_saved;
+    const managerSelfAssigned = data.manager_self_assigned === true;
     const memberAllocationValidationErrors: Partial<
         Record<KdkmpOperationalAttendanceKey, string>
     > = {};
@@ -710,6 +724,18 @@ function TaskActionDialog({
 
     const hasMemberAllocationValidationErrors =
         Object.keys(memberAllocationValidationErrors).length > 0;
+    const totalMemberAllocation = kdkmpOperationalAttendanceRoles.reduce(
+        (total, role) => total + (data.member_allocations?.[role.key] ?? 0),
+        0,
+    );
+    const hasMemberAllocation = totalMemberAllocation > 0;
+    const memberAllocationRequirementError =
+        shouldShowMemberAllocations &&
+        !mustSaveOperationalAttendance &&
+        !managerSelfAssigned &&
+        !hasMemberAllocation
+            ? 'Alokasikan minimal satu anggota atau centang bahwa Anda mengerjakan task ini sendiri.'
+            : null;
     const documentError =
         documentSelectionError ??
         errors.documents ??
@@ -1280,109 +1306,167 @@ function TaskActionDialog({
                                     terlebih dahulu.
                                 </p>
                             ) : (
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    {kdkmpOperationalAttendanceRoles.map(
-                                        (role) => {
-                                            const currentAllocation =
-                                                data.member_allocations?.[
-                                                    role.key
-                                                ] ?? 0;
-                                            const totalAttendance =
-                                                operationalAttendance.values[
-                                                    role.key
-                                                ];
-                                            const allocated =
-                                                operationalAttendance.allocated[
-                                                    role.key
-                                                ];
-                                            const available =
-                                                operationalAttendance.available[
-                                                    role.key
-                                                ];
-                                            const allocationError =
-                                                memberAllocationValidationErrors[
-                                                    role.key
-                                                ] ??
-                                                errors[
-                                                    `member_allocations.${role.key}`
-                                                ];
+                                <>
+                                    <label className="flex cursor-pointer items-start gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
+                                        <Checkbox
+                                            checked={managerSelfAssigned}
+                                            onCheckedChange={(checked) => {
+                                                const isSelfAssigned =
+                                                    checked === true;
 
-                                            return (
-                                                <div
-                                                    key={role.key}
-                                                    className="space-y-2"
-                                                >
-                                                    <Label
-                                                        htmlFor={`member-allocation-${photoField}-${role.key}`}
+                                                setData(
+                                                    'manager_self_assigned',
+                                                    isSelfAssigned,
+                                                );
+
+                                                if (isSelfAssigned) {
+                                                    setData(
+                                                        'member_allocations',
+                                                        emptyKdkmpOperationalAttendance(),
+                                                    );
+                                                }
+                                            }}
+                                        />
+                                        <span>
+                                            <span className="font-medium text-foreground">
+                                                Saya (Manager KDKMP) yang
+                                                mengerjakan
+                                            </span>
+                                            <span className="mt-1 block text-xs text-muted-foreground">
+                                                Pilih jika tidak ada anggota
+                                                yang dialokasikan untuk task
+                                                ini.
+                                            </span>
+                                        </span>
+                                    </label>
+
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        {kdkmpOperationalAttendanceRoles.map(
+                                            (role) => {
+                                                const currentAllocation =
+                                                    data.member_allocations?.[
+                                                        role.key
+                                                    ] ?? 0;
+                                                const totalAttendance =
+                                                    operationalAttendance
+                                                        .values[role.key];
+                                                const allocated =
+                                                    operationalAttendance
+                                                        .allocated[role.key];
+                                                const available =
+                                                    operationalAttendance
+                                                        .available[role.key];
+                                                const allocationError =
+                                                    memberAllocationValidationErrors[
+                                                        role.key
+                                                    ] ??
+                                                    errors[
+                                                        `member_allocations.${role.key}`
+                                                    ];
+
+                                                return (
+                                                    <div
+                                                        key={role.key}
+                                                        className="space-y-2"
                                                     >
-                                                        {role.label}
-                                                    </Label>
-                                                    <Input
-                                                        id={`member-allocation-${photoField}-${role.key}`}
-                                                        type="number"
-                                                        inputMode="numeric"
-                                                        min="0"
-                                                        step="1"
-                                                        value={
-                                                            currentAllocation
-                                                        }
-                                                        aria-invalid={Boolean(
-                                                            allocationError,
-                                                        )}
-                                                        onChange={(event) => {
-                                                            const value =
-                                                                Math.max(
-                                                                    0,
-                                                                    Math.floor(
-                                                                        Number(
-                                                                            event
-                                                                                .target
-                                                                                .value,
-                                                                        ) || 0,
-                                                                    ),
-                                                                );
+                                                        <Label
+                                                            htmlFor={`member-allocation-${photoField}-${role.key}`}
+                                                        >
+                                                            {role.label}
+                                                        </Label>
+                                                        <Input
+                                                            id={`member-allocation-${photoField}-${role.key}`}
+                                                            type="number"
+                                                            inputMode="numeric"
+                                                            min="0"
+                                                            step="1"
+                                                            disabled={
+                                                                managerSelfAssigned
+                                                            }
+                                                            value={
+                                                                currentAllocation
+                                                            }
+                                                            aria-invalid={Boolean(
+                                                                allocationError,
+                                                            )}
+                                                            onChange={(
+                                                                event,
+                                                            ) => {
+                                                                const value =
+                                                                    Math.max(
+                                                                        0,
+                                                                        Math.floor(
+                                                                            Number(
+                                                                                event
+                                                                                    .target
+                                                                                    .value,
+                                                                            ) ||
+                                                                                0,
+                                                                        ),
+                                                                    );
 
-                                                            setData(
-                                                                'member_allocations',
-                                                                {
-                                                                    ...(data.member_allocations ??
-                                                                        emptyKdkmpOperationalAttendance()),
-                                                                    [role.key]:
-                                                                        value,
-                                                                },
-                                                            );
-                                                        }}
-                                                    />
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Hadir: {totalAttendance}{' '}
-                                                        · Sedang dialokasikan:{' '}
-                                                        {allocated} · Sisa
-                                                        tersedia: {available}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Sisa setelah alokasi
-                                                        ini:{' '}
-                                                        {Math.max(
-                                                            0,
-                                                            available -
-                                                                currentAllocation,
-                                                        )}
-                                                    </p>
-                                                    {allocationError && (
-                                                        <p className="text-sm text-destructive">
-                                                            {allocationError}
+                                                                setData(
+                                                                    'manager_self_assigned',
+                                                                    false,
+                                                                );
+                                                                setData(
+                                                                    'member_allocations',
+                                                                    {
+                                                                        ...(data.member_allocations ??
+                                                                            emptyKdkmpOperationalAttendance()),
+                                                                        [role.key]:
+                                                                            value,
+                                                                    },
+                                                                );
+                                                            }}
+                                                        />
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Hadir:{' '}
+                                                            {totalAttendance} ·
+                                                            Sedang dialokasikan:{' '}
+                                                            {allocated} · Sisa
+                                                            tersedia:{' '}
+                                                            {available}
                                                         </p>
-                                                    )}
-                                                </div>
-                                            );
-                                        },
-                                    )}
-                                </div>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Sisa setelah alokasi
+                                                            ini:{' '}
+                                                            {Math.max(
+                                                                0,
+                                                                available -
+                                                                    currentAllocation,
+                                                            )}
+                                                        </p>
+                                                        {allocationError && (
+                                                            <p className="text-sm text-destructive">
+                                                                {
+                                                                    allocationError
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                );
+                                            },
+                                        )}
+                                    </div>
+                                </>
+                            )}
+
+                            {memberAllocationRequirementError && (
+                                <p className="text-sm text-destructive">
+                                    {memberAllocationRequirementError}
+                                </p>
                             )}
 
                             {errors.member_allocations && (
                                 <p className="text-sm text-destructive">
                                     {errors.member_allocations}
+                                </p>
+                            )}
+
+                            {errors.manager_self_assigned && (
+                                <p className="text-sm text-destructive">
+                                    {errors.manager_self_assigned}
                                 </p>
                             )}
                         </div>
@@ -1435,7 +1519,8 @@ function TaskActionDialog({
                         disabled={
                             processing ||
                             mustSaveOperationalAttendance ||
-                            hasMemberAllocationValidationErrors
+                            hasMemberAllocationValidationErrors ||
+                            memberAllocationRequirementError !== null
                         }
                         onClick={handleSubmit}
                     >

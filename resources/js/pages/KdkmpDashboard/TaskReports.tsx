@@ -42,6 +42,7 @@ type CompletedTaskReport = {
     started_at: string | null;
     finished_at: string | null;
     duration_minutes: number | null;
+    manager_self_assigned: boolean;
     status_label: string;
     photos: TaskReportPhoto[];
     documents: TaskReportDocument[];
@@ -345,6 +346,12 @@ export default function KdkmpDashboardTaskReports({
                                             PIC: {role.name}
                                         </Badge>
                                     ))}
+                                    {selectedReport.manager_self_assigned && (
+                                        <Badge variant="outline">
+                                            Dikerjakan sendiri oleh Manager
+                                            KDKMP
+                                        </Badge>
+                                    )}
                                 </div>
                             </section>
 

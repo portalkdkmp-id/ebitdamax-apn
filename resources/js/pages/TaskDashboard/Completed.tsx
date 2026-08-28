@@ -54,6 +54,7 @@ type CompletedTaskReport = {
     started_at: string | null;
     finished_at: string | null;
     duration_minutes: number | null;
+    manager_self_assigned: boolean;
     status_label: string;
     timing_status: 'on_time' | 'late';
     timing_label: string;
@@ -218,6 +219,11 @@ function CompletedReportCard({
                         <p className="text-sm text-muted-foreground">
                             {report.task.task_category.name}
                         </p>
+                        {report.manager_self_assigned && (
+                            <Badge variant="outline" className="mt-2">
+                                Dikerjakan sendiri oleh Manager KDKMP
+                            </Badge>
+                        )}
                     </div>
                 </div>
                 <Badge

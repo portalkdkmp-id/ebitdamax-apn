@@ -31,7 +31,12 @@ class TaskReport extends Model
         'finished_at',
         'duration_minutes',
         'member_allocations',
+        'manager_self_assigned',
         'status',
+    ];
+
+    protected $attributes = [
+        'manager_self_assigned' => false,
     ];
 
     protected $casts = [
@@ -41,6 +46,7 @@ class TaskReport extends Model
         'finished_documents' => 'array',
         'duration_minutes' => 'integer',
         'member_allocations' => 'array',
+        'manager_self_assigned' => 'boolean',
         'status' => TaskReportStatus::class,
     ];
 

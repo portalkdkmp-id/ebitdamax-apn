@@ -83,6 +83,7 @@ class TaskReportController extends Controller
                     businessDate: $businessDate,
                     exceptTaskReportId: $report?->id,
                 );
+                $managerSelfAssigned = $request->managerSelfAssigned();
 
                 if (! $report) {
                     $report = TaskReport::query()->create([
@@ -90,6 +91,7 @@ class TaskReportController extends Controller
                         'user_id' => $request->user()->id,
                         'period_key' => $periodKey,
                         'member_allocations' => $memberAllocations,
+                        'manager_self_assigned' => $managerSelfAssigned,
                         'started_at' => now(),
                         'status' => TaskReportStatus::InProgress,
                     ]);
@@ -122,6 +124,8 @@ class TaskReportController extends Controller
                 if ($memberAllocations !== null) {
                     $reportPayload['member_allocations'] = $memberAllocations;
                 }
+
+                $reportPayload['manager_self_assigned'] = $managerSelfAssigned;
 
                 $report->update($reportPayload);
 
