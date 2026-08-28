@@ -270,7 +270,9 @@ class KdkmpDashboardController extends Controller
         $selectedTaskIds = collect($request->validated('selected_task_ids', []))
             ->map(fn (mixed $taskId): int => (int) $taskId)
             ->unique()
-            ->values()
+            ->values();
+        $selectedTaskIds = $this->taskSelection
+            ->expandSelectedTaskIdsToBmcBundles($user, $selectedTaskIds)
             ->all();
 
         DB::transaction(function () use ($businessDate, $selectedTaskIds, $user): void {

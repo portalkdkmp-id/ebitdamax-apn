@@ -136,6 +136,7 @@ function KdkmpTaskSelectionForm({
                 bmcStatusPosition(left.bmcStatus) -
                 bmcStatusPosition(right.bmcStatus),
         );
+    const selectedTaskIds = new Set(data.selected_task_ids);
 
     const toggleTask = (taskId: number, isChecked: boolean) => {
         setData(
@@ -144,6 +145,19 @@ function KdkmpTaskSelectionForm({
                 ? [...new Set([...data.selected_task_ids, taskId])]
                 : data.selected_task_ids.filter(
                       (selectedTaskId) => selectedTaskId !== taskId,
+                  ),
+        );
+    };
+
+    const toggleBmcBundle = (taskIds: number[], isChecked: boolean) => {
+        const taskIdLookup = new Set(taskIds);
+
+        setData(
+            'selected_task_ids',
+            isChecked
+                ? [...new Set([...data.selected_task_ids, ...taskIds])]
+                : data.selected_task_ids.filter(
+                      (taskId) => !taskIdLookup.has(taskId),
                   ),
         );
     };
@@ -163,11 +177,12 @@ function KdkmpTaskSelectionForm({
                     <div>
                         <CardTitle className="flex items-center gap-2">
                             <ListChecks className="size-5 text-primary" />
-                            Pilih Task Hari Ini
+                            Pilih Bundle BMC Hari Ini
                         </CardTitle>
                         <CardDescription className="mt-1">
-                            Task wajib selalu dijalankan. Pilih task tambahan
-                            sesuai kondisi operasional KDKMP hari ini.
+                            Task wajib selalu dijalankan. Untuk task tambahan,
+                            setiap poin BMC yang dipilih akan menjalankan
+                            seluruh task di dalam bundle tersebut.
                         </CardDescription>
                     </div>
                     <Badge variant="outline">
@@ -183,50 +198,100 @@ function KdkmpTaskSelectionForm({
                 ) : (
                     <form onSubmit={submit} className="space-y-4">
                         <div className="space-y-5">
-                            {taskGroups.map((group) => (
-                                <section
-                                    key={group.bmcStatus}
-                                    className="overflow-hidden rounded-xl border bg-muted/10"
-                                >
-                                    <header className="flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-3">
-                                        <div>
-                                            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                                                Poin BMC
-                                            </p>
-                                            <h3 className="mt-0.5 font-semibold text-foreground">
-                                                {group.bmcStatusLabel}
-                                            </h3>
-                                        </div>
-                                        <Badge variant="secondary">
-                                            {group.tasks.length} task
-                                        </Badge>
-                                    </header>
-                                    <div className="space-y-3 p-3 sm:p-4">
-                                        {group.tasks.map((task) => {
-                                            const isChecked =
-                                                task.is_mandatory ||
-                                                data.selected_task_ids.includes(
-                                                    task.id,
-                                                );
-                                            const isDisabled =
-                                                task.is_mandatory ||
-                                                task.is_locked;
+                            {taskGroups.map((group) => {
+                                const isUnmappedGroup =
+                                    group.bmcStatus === 'belum_dipetakan';
+                                const optionalTasks = group.tasks.filter(
+                                    (task) => !task.is_mandatory,
+                                );
+                                const optionalTaskIds = optionalTasks.map(
+                                    (task) => task.id,
+                                );
+                                const selectedOptionalTaskCount =
+                                    optionalTaskIds.filter((taskId) =>
+                                        selectedTaskIds.has(taskId),
+                                    ).length;
+                                const isBundleSelected =
+                                    optionalTaskIds.length > 0 &&
+                                    selectedOptionalTaskCount ===
+                                        optionalTaskIds.length;
+                                const isBundlePartiallySelected =
+                                    selectedOptionalTaskCount > 0 &&
+                                    !isBundleSelected;
+                                const isBundleLocked = optionalTasks.some(
+                                    (task) => task.is_locked,
+                                );
 
-                                            return (
-                                                <label
-                                                    key={task.id}
-                                                    className="flex items-start gap-3 rounded-lg border bg-background p-4 transition-colors hover:bg-muted/30"
-                                                >
-                                                    <Checkbox
-                                                        checked={isChecked}
-                                                        disabled={isDisabled}
-                                                        onCheckedChange={(checked) =>
-                                                            toggleTask(
-                                                                task.id,
-                                                                checked === true,
-                                                            )
-                                                        }
-                                                    />
+                                return (
+                                    <section
+                                        key={group.bmcStatus}
+                                        className="overflow-hidden rounded-xl border bg-muted/10"
+                                    >
+                                        <header className="flex flex-col gap-3 border-b bg-background/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <div>
+                                                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                                    {isUnmappedGroup
+                                                        ? 'Task tambahan'
+                                                        : 'Bundle poin BMC'}
+                                                </p>
+                                                <h3 className="mt-0.5 font-semibold text-foreground">
+                                                    {group.bmcStatusLabel}
+                                                </h3>
+                                                {isUnmappedGroup && (
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        Task ini belum memiliki
+                                                        poin BMC dan tetap dipilih
+                                                        satu per satu.
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <Badge variant="secondary">
+                                                    {group.tasks.length} task
+                                                </Badge>
+                                                {!isUnmappedGroup &&
+                                                    (optionalTaskIds.length ===
+                                                    0 ? (
+                                                        <Badge variant="outline">
+                                                            Seluruh task wajib
+                                                        </Badge>
+                                                    ) : (
+                                                        <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground has-[[data-disabled]]:cursor-not-allowed has-[[data-disabled]]:opacity-60">
+                                                            <Checkbox
+                                                                checked={
+                                                                    isBundleSelected
+                                                                        ? true
+                                                                        : isBundlePartiallySelected
+                                                                          ? 'indeterminate'
+                                                                          : false
+                                                                }
+                                                                disabled={
+                                                                    isBundleLocked
+                                                                }
+                                                                onCheckedChange={(
+                                                                    checked,
+                                                                ) =>
+                                                                    toggleBmcBundle(
+                                                                        optionalTaskIds,
+                                                                        checked ===
+                                                                            true,
+                                                                    )
+                                                                }
+                                                            />
+                                                            Jalankan bundle
+                                                        </label>
+                                                    ))}
+                                            </div>
+                                        </header>
+                                        <div className="space-y-3 p-3 sm:p-4">
+                                            {group.tasks.map((task) => {
+                                                const isChecked =
+                                                    task.is_mandatory ||
+                                                    selectedTaskIds.has(task.id);
+                                                const isDisabled =
+                                                    task.is_mandatory ||
+                                                    task.is_locked;
+                                                const taskContent = (
                                                     <span className="min-w-0 flex-1">
                                                         <span className="flex flex-wrap items-center gap-2">
                                                             <span className="font-medium text-foreground">
@@ -270,12 +335,60 @@ function KdkmpTaskSelectionForm({
                                                             </span>
                                                         )}
                                                     </span>
-                                                </label>
-                                            );
-                                        })}
-                                    </div>
-                                </section>
-                            ))}
+                                                );
+
+                                                if (!isUnmappedGroup) {
+                                                    return (
+                                                        <div
+                                                            key={task.id}
+                                                            className="flex items-start gap-3 rounded-lg border bg-background p-4"
+                                                        >
+                                                            <span
+                                                                className={
+                                                                    isChecked
+                                                                        ? 'mt-1 size-2.5 shrink-0 rounded-full bg-primary'
+                                                                        : 'mt-1 size-2.5 shrink-0 rounded-full border border-muted-foreground/50'
+                                                                }
+                                                            />
+                                                            {taskContent}
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <label
+                                                        key={task.id}
+                                                        className="flex items-start gap-3 rounded-lg border bg-background p-4 transition-colors hover:bg-muted/30"
+                                                    >
+                                                        <Checkbox
+                                                            checked={isChecked}
+                                                            disabled={isDisabled}
+                                                            onCheckedChange={(
+                                                                checked,
+                                                            ) =>
+                                                                toggleTask(
+                                                                    task.id,
+                                                                    checked ===
+                                                                        true,
+                                                                )
+                                                            }
+                                                        />
+                                                        {taskContent}
+                                                    </label>
+                                                );
+                                            })}
+                                            {isBundleLocked && !isUnmappedGroup && (
+                                                <p className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+                                                    <Clock3 className="size-3.5" />
+                                                    Selesaikan task yang sedang
+                                                    dikerjakan sebelum mengubah
+                                                    bundle ini.
+                                                </p>
+                                            )}
+                                        </div>
+                                    </section>
+                                );
+                            })}
                         </div>
 
                         {errors.selected_task_ids && (

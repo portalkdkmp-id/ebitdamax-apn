@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\TaskBmcStatus;
 use App\Enums\TaskReportStatus;
 use App\Models\EbitdamaxKdkmp;
 use App\Models\Task;
@@ -113,14 +114,68 @@ class KdkmpTaskSelectionService
             return collect();
         }
 
-        return Task::query()
-            ->active()
-            ->where('is_mandatory', false)
-            ->whereHas('roles', function (Builder $query) use ($user): void {
-                $query->whereKey($user->role_id);
-            })
+        return $this->selectableTasksQuery($user)
             ->pluck('id')
             ->map(fn (mixed $taskId): int => (int) $taskId);
+    }
+
+    /**
+     * Expands selected BMC points to all optional tasks under each point.
+     *
+     * Tasks that have not been mapped to a BMC point remain individually selectable.
+     * The expanded IDs are persisted as the daily selection snapshot.
+     *
+     * @param  Collection<int, int>  $selectedTaskIds
+     * @return Collection<int, int>
+     */
+    public function expandSelectedTaskIdsToBmcBundles(
+        User $user,
+        Collection $selectedTaskIds,
+    ): Collection {
+        if ($user->role_id === null) {
+            return collect();
+        }
+
+        $selectedTaskIds = $selectedTaskIds
+            ->map(fn (mixed $taskId): int => (int) $taskId)
+            ->filter(fn (int $taskId): bool => $taskId > 0)
+            ->unique()
+            ->values();
+
+        if ($selectedTaskIds->isEmpty()) {
+            return collect();
+        }
+
+        $selectedTaskIdLookup = $selectedTaskIds->flip();
+        $selectableTasks = $this->selectableTasksQuery($user)
+            ->get(['id', 'bmc_status']);
+        $selectedBmcStatuses = $selectableTasks
+            ->filter(fn (Task $task): bool => $selectedTaskIdLookup->has($task->id))
+            ->map(fn (Task $task): string => $this->bmcStatusValue($task))
+            ->reject(
+                fn (string $bmcStatus): bool => $bmcStatus === TaskBmcStatus::Unmapped->value,
+            )
+            ->unique()
+            ->values();
+        $bundleTaskIds = $selectableTasks
+            ->filter(
+                fn (Task $task): bool => $selectedBmcStatuses->contains(
+                    $this->bmcStatusValue($task),
+                ),
+            )
+            ->pluck('id');
+        $selectedUnmappedTaskIds = $selectableTasks
+            ->filter(
+                fn (Task $task): bool => $selectedTaskIdLookup->has($task->id)
+                    && $this->bmcStatusValue($task) === TaskBmcStatus::Unmapped->value,
+            )
+            ->pluck('id');
+
+        return $bundleTaskIds
+            ->merge($selectedUnmappedTaskIds)
+            ->map(fn (mixed $taskId): int => (int) $taskId)
+            ->unique()
+            ->values();
     }
 
     /**
@@ -148,6 +203,23 @@ class KdkmpTaskSelectionService
             ->whereKey($task->id)
             ->forKdkmpExecution($this->executionTaskIdsForUser($user, $businessDate))
             ->exists();
+    }
+
+    private function selectableTasksQuery(User $user): Builder
+    {
+        return Task::query()
+            ->active()
+            ->where('is_mandatory', false)
+            ->whereHas('roles', function (Builder $query) use ($user): void {
+                $query->whereKey($user->role_id);
+            });
+    }
+
+    private function bmcStatusValue(Task $task): string
+    {
+        return $task->bmc_status instanceof TaskBmcStatus
+            ? $task->bmc_status->value
+            : TaskBmcStatus::Unmapped->value;
     }
 
     private function dailySelectionKey(int $sdmKdkmpEntryId, string $businessDate): string
