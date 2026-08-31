@@ -8,6 +8,7 @@ use App\Models\SdmKdkmpEntry;
 use App\Models\User;
 use App\Services\KdkmpConsolidationService;
 use App\Services\KdkmpDashboardMetricsService;
+use App\Services\KdkmpMonthlyFinancialMatrixService;
 use App\Services\RegionalAccessService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,6 +20,7 @@ class KdkmpDashboardMonitoringController extends Controller
     public function __construct(
         private readonly KdkmpDashboardMetricsService $dashboardMetrics,
         private readonly KdkmpConsolidationService $consolidation,
+        private readonly KdkmpMonthlyFinancialMatrixService $monthlyFinancialMatrix,
         private readonly RegionalAccessService $regionalAccess,
     ) {}
 
@@ -27,27 +29,60 @@ class KdkmpDashboardMonitoringController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User, 401);
 
-        $today = CarbonImmutable::now((string) config('app.kdkmp_business_timezone'));
-        $reportDate = (string) ($request->validated('date') ?? $today->toDateString());
+        $today = CarbonImmutable::now((string) config('app.kdkmp_business_timezone'))->startOfDay();
+        $selectedMonth = $this->selectedMonth($request, $today);
+        $periodStart = CarbonImmutable::createFromFormat(
+            'Y-m',
+            $selectedMonth,
+            (string) config('app.kdkmp_business_timezone')
+        )->startOfMonth();
+        $periodEnd = $periodStart->isSameMonth($today)
+            ? $today
+            : $periodStart->endOfMonth();
         $search = trim((string) ($request->validated('search') ?? ''));
         $status = (string) ($request->validated('status') ?? 'all');
-        $regionFilters = $this->regionFilters($request);
         $regionalAccess = $this->regionalAccess->filterContext($user);
+        $regionFilters = $this->withLockedRegionFilters(
+            $this->regionFilters($request),
+            $regionalAccess['locked_filters'],
+        );
         $consolidationLevel = (string) ($request->validated('consolidation_level') ?? 'national');
 
         if (! $regionalAccess['is_national'] && $consolidationLevel === 'national') {
             $consolidationLevel = 'province';
         }
-        $selectedBusinessDate = CarbonImmutable::createFromFormat(
-            'Y-m-d',
-            $reportDate,
-            (string) config('app.kdkmp_business_timezone')
-        )->startOfDay();
 
         $baseQuery = $this->regionalAccess->accessibleManagedKdkmpQuery(
             $user,
             $regionFilters,
         );
+        $selectedKdkmp = $regionFilters['desa'] !== null
+            ? (clone $baseQuery)->first([
+                'id',
+                'nik',
+                'nama_koperasi',
+                'desa',
+                'kecamatan',
+                'kota_kabupaten',
+                'provinsi',
+            ])
+            : null;
+        $detailDate = $selectedKdkmp instanceof SdmKdkmpEntry
+            ? $this->detailDate($request, $periodStart, $periodEnd)
+            : null;
+        $reportDate = $detailDate ?? $periodEnd->toDateString();
+        $selectedBusinessDate = CarbonImmutable::createFromFormat(
+            'Y-m-d',
+            $reportDate,
+            (string) config('app.kdkmp_business_timezone')
+        )->startOfDay();
+        $monthlyFinancialMatrix = $selectedKdkmp instanceof SdmKdkmpEntry
+            ? $this->monthlyFinancialMatrix->forEntries(
+                (clone $baseQuery)->whereKey($selectedKdkmp->id),
+                $periodStart,
+                $periodEnd,
+            )
+            : null;
         $total = (clone $baseQuery)->count();
         $filled = (clone $baseQuery)
             ->whereHas('dailyEbitdaRecords', function (Builder $query) use ($reportDate): void {
@@ -137,7 +172,8 @@ class KdkmpDashboardMonitoringController extends Controller
                 'requires_review' => $requiresReview,
             ],
             'filters' => [
-                'date' => $reportDate,
+                'month' => $periodStart->format('Y-m'),
+                'detail_date' => $detailDate,
                 'search' => $search,
                 'status' => $status,
                 'consolidation_level' => $consolidationLevel,
@@ -150,7 +186,62 @@ class KdkmpDashboardMonitoringController extends Controller
                 'level' => $consolidationLevel,
                 'rows' => $consolidation,
             ],
+            'selectedKdkmp' => $selectedKdkmp instanceof SdmKdkmpEntry
+                ? [
+                    'id' => $selectedKdkmp->id,
+                    'nik' => $selectedKdkmp->nik,
+                    'name' => $selectedKdkmp->nama_koperasi,
+                    'desa' => $selectedKdkmp->desa,
+                    'kecamatan' => $selectedKdkmp->kecamatan,
+                    'kota_kabupaten' => $selectedKdkmp->kota_kabupaten,
+                    'provinsi' => $selectedKdkmp->provinsi,
+                ]
+                : null,
+            'monthlyFinancialMatrix' => $monthlyFinancialMatrix,
         ]);
+    }
+
+    private function selectedMonth(
+        MonitorEbitdamaxKdkmpRequest $request,
+        CarbonImmutable $today,
+    ): string {
+        $month = $request->validated('month');
+
+        if (is_string($month) && $month !== '') {
+            return $month;
+        }
+
+        $legacyDate = $request->validated('date');
+
+        if (is_string($legacyDate) && $legacyDate !== '') {
+            return substr($legacyDate, 0, 7);
+        }
+
+        return $today->format('Y-m');
+    }
+
+    private function detailDate(
+        MonitorEbitdamaxKdkmpRequest $request,
+        CarbonImmutable $periodStart,
+        CarbonImmutable $periodEnd,
+    ): ?string {
+        $detailDate = $request->validated('detail_date');
+
+        if (! is_string($detailDate) || $detailDate === '') {
+            return null;
+        }
+
+        $date = CarbonImmutable::createFromFormat(
+            'Y-m-d',
+            $detailDate,
+            (string) config('app.kdkmp_business_timezone')
+        )->startOfDay();
+
+        if ($date->lt($periodStart) || $date->gt($periodEnd)) {
+            return null;
+        }
+
+        return $date->toDateString();
     }
 
     /**
@@ -164,6 +255,22 @@ class KdkmpDashboardMonitoringController extends Controller
             'kecamatan' => $this->nullableString($request->validated('kecamatan')),
             'desa' => $this->nullableString($request->validated('desa')),
         ];
+    }
+
+    /**
+     * @param  array{provinsi: string|null, kota_kabupaten: string|null, kecamatan: string|null, desa: string|null}  $filters
+     * @param  array{provinsi: string|null, kota_kabupaten: string|null, kecamatan: string|null, desa: string|null}  $lockedFilters
+     * @return array{provinsi: string|null, kota_kabupaten: string|null, kecamatan: string|null, desa: string|null}
+     */
+    private function withLockedRegionFilters(array $filters, array $lockedFilters): array
+    {
+        foreach (SdmKdkmpEntry::REGION_FIELDS as $field) {
+            if ($filters[$field] === null && $lockedFilters[$field] !== null) {
+                $filters[$field] = $lockedFilters[$field];
+            }
+        }
+
+        return $filters;
     }
 
     private function nullableString(mixed $value): ?string

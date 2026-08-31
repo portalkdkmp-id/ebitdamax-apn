@@ -12,6 +12,7 @@ import {
 import type { FormEvent, ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import KdkmpMonthlyFinancialMatrixChart from '@/components/monitoring/KdkmpMonthlyFinancialMatrixChart';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -257,9 +258,11 @@ function ConsolidationRegionCard({
             </dl>
 
             <p className="mt-5 text-sm text-muted-foreground">
-                {nextLevel
-                    ? `Klik untuk melihat ${consolidationLevelLabels[nextLevel]}.`
-                    : 'Level wilayah terkecil.'}
+                {onClick
+                    ? nextLevel
+                        ? `Klik untuk melihat ${consolidationLevelLabels[nextLevel]}.`
+                        : 'Klik untuk melihat grafik KDKMP.'
+                    : 'KDKMP sedang dipilih.'}
             </p>
         </div>
     );
@@ -273,7 +276,7 @@ function ConsolidationRegionCard({
             type="button"
             onClick={onClick}
             className="h-full w-full text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-            aria-label={`Lihat ${nextLevel ? consolidationLevelLabels[nextLevel] : 'rincian'} dari ${row.label}`}
+            aria-label={`Lihat ${nextLevel ? consolidationLevelLabels[nextLevel] : 'grafik KDKMP'} dari ${row.label}`}
         >
             {content}
         </button>
@@ -288,8 +291,10 @@ export default function KdkmpDashboardMonitoring({
     filters,
     regionalAccess,
     consolidation,
+    selectedKdkmp,
+    monthlyFinancialMatrix,
 }: KdkmpMonitoringProps) {
-    const [date, setDate] = useState(filters.date);
+    const [month, setMonth] = useState(filters.month);
     const [search, setSearch] = useState(filters.search);
     const [status, setStatus] = useState<MonitoringStatus>(filters.status);
     const [provinsi, setProvinsi] = useState(
@@ -355,7 +360,8 @@ export default function KdkmpDashboardMonitoring({
         router.get(
             monitoringIndex.url(),
             {
-                date,
+                month,
+                detail_date: filters.detail_date ?? '',
                 search,
                 status,
                 consolidation_level: consolidationLevel,
@@ -401,7 +407,8 @@ export default function KdkmpDashboardMonitoring({
         router.get(
             monitoringIndex.url(),
             {
-                date,
+                month,
+                detail_date: filters.detail_date ?? '',
                 search,
                 status,
                 consolidation_level: level,
@@ -409,6 +416,24 @@ export default function KdkmpDashboardMonitoring({
                 kota_kabupaten: nextKotaKabupaten,
                 kecamatan: nextKecamatan,
                 desa: nextDesa,
+            },
+            { preserveState: true, preserveScroll: true },
+        );
+    };
+
+    const selectDetailDate = (detailDate: string) => {
+        router.get(
+            monitoringIndex.url(),
+            {
+                month,
+                detail_date: detailDate,
+                search,
+                status,
+                consolidation_level: consolidationLevel,
+                provinsi,
+                kota_kabupaten: kotaKabupaten,
+                kecamatan,
+                desa,
             },
             { preserveState: true, preserveScroll: true },
         );
@@ -474,7 +499,27 @@ export default function KdkmpDashboardMonitoring({
                 kecamatan: row.kecamatan,
                 desa: regionalAccess.locked_filters.desa ?? '',
             });
+
+            return;
         }
+
+        if (consolidation.level === 'village') {
+            visitConsolidation('village', {
+                provinsi: row.provinsi,
+                kota_kabupaten: row.kota_kabupaten,
+                kecamatan: row.kecamatan,
+                desa: row.desa,
+            });
+        }
+    };
+
+    const returnToVillageList = () => {
+        visitConsolidation('village', {
+            provinsi,
+            kota_kabupaten: kotaKabupaten,
+            kecamatan,
+            desa: '',
+        });
     };
     const visibleConsolidationLevels = regionalAccess.is_national
         ? consolidationLevelOrder
@@ -597,6 +642,18 @@ export default function KdkmpDashboardMonitoring({
                                     ))}
                             </nav>
 
+                            {filters.desa !== null &&
+                                !regionalAccess.locked_filters.desa && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={returnToVillageList}
+                                    >
+                                        Kembali ke daftar Desa
+                                    </Button>
+                                )}
+
                             {consolidation.rows.length === 0 ? (
                                 <div className="flex min-h-48 items-center justify-center rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
                                     Belum ada KDKMP pada cakupan wilayah ini.
@@ -610,7 +667,8 @@ export default function KdkmpDashboardMonitoring({
                                             row={row}
                                             onClick={
                                                 consolidation.level ===
-                                                'village'
+                                                    'village' &&
+                                                filters.desa === row.desa
                                                     ? null
                                                     : () => drillDown(row)
                                             }
@@ -874,16 +932,16 @@ export default function KdkmpDashboardMonitoring({
 
                                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[190px_220px_minmax(280px,1fr)_auto] xl:items-end">
                                     <div className="space-y-2">
-                                        <Label htmlFor="monitoring-date">
-                                            Tanggal
+                                        <Label htmlFor="monitoring-month">
+                                            Bulan Grafik
                                         </Label>
                                         <Input
-                                            id="monitoring-date"
-                                            type="date"
-                                            max={businessDate}
-                                            value={date}
+                                            id="monitoring-month"
+                                            type="month"
+                                            max={businessDate.slice(0, 7)}
+                                            value={month}
                                             onChange={(event) =>
-                                                setDate(event.target.value)
+                                                setMonth(event.target.value)
                                             }
                                         />
                                     </div>
@@ -944,187 +1002,229 @@ export default function KdkmpDashboardMonitoring({
                                 </div>
                             </form>
 
-                            <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                                Menampilkan data untuk{' '}
-                                <span className="font-medium text-foreground">
-                                    {formatDate(filters.date)}
-                                </span>
-                                .
-                            </div>
-
-                            <div className="overflow-x-auto">
-                                <Table className="min-w-[1900px]">
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>
-                                                KDKMP / Manager
-                                            </TableHead>
-                                            <TableHead>Wilayah</TableHead>
-                                            {kdkmpDashboardFields.map(
-                                                (field) => (
-                                                    <TableHead key={field.key}>
-                                                        {field.label}
-                                                    </TableHead>
-                                                ),
-                                            )}
-                                            <TableHead>Status</TableHead>
-                                            <TableHead className="text-right">
-                                                Aksi
-                                            </TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {entries.data.length === 0 && (
-                                            <TableRow>
-                                                <TableCell
-                                                    colSpan={
-                                                        kdkmpDashboardFields.length +
-                                                        4
-                                                    }
-                                                    className="py-10 text-center text-muted-foreground"
-                                                >
-                                                    Tidak ada data yang sesuai
-                                                    dengan filter.
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                        {entries.data.map((entry) => (
-                                            <TableRow key={entry.id}>
-                                                <TableCell>
-                                                    <p className="font-medium">
-                                                        {entry.name}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        NIK {entry.nik ?? '-'}
-                                                    </p>
-                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                        {entry.manager?.email ??
-                                                            'Akun manager belum tersedia'}
-                                                    </p>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <p>
-                                                        {entry.desa ?? '-'},{' '}
-                                                        {entry.kecamatan ?? '-'}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {entry.kota_kabupaten ??
-                                                            '-'}
-                                                        ,{' '}
-                                                        {entry.provinsi ?? '-'}
-                                                    </p>
-                                                </TableCell>
-                                                {kdkmpDashboardFields.map(
-                                                    (field) => (
-                                                        <TableCell
-                                                            key={field.key}
-                                                            className="tabular-nums"
-                                                        >
-                                                            {formatManualValue(
-                                                                entry
-                                                                    .daily_entry?.[
-                                                                    field.key
-                                                                ],
-                                                                field.isRupiah ===
-                                                                    true,
-                                                            )}
-                                                        </TableCell>
-                                                    ),
-                                                )}
-                                                <TableCell>
-                                                    <StatusBadge
-                                                        entry={
-                                                            entry.daily_entry
-                                                        }
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            disabled={
-                                                                !entry.manager
-                                                            }
-                                                            onClick={() => {
-                                                                if (
-                                                                    !entry.manager
-                                                                ) {
-                                                                    return;
-                                                                }
-
-                                                                if (
-                                                                    entry
-                                                                        .metrics
-                                                                        .task_completion_rate <
-                                                                    100
-                                                                ) {
-                                                                    toast.error(
-                                                                        'Task belum selesai semua atau belum ada.',
-                                                                    );
-                                                                    return;
-                                                                }
-
-                                                                router.get(
-                                                                    monitoringTasks.url(
-                                                                        {
-                                                                            kdkmpEntry:
-                                                                                entry.id,
-                                                                            date: filters.date,
-                                                                        },
-                                                                    ),
-                                                                );
-                                                            }}
-                                                        >
-                                                            Lihat Task
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-
-                            <div className="flex flex-col gap-3 border-t pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-                                <p>
-                                    Menampilkan {entries.from ?? 0}-
-                                    {entries.to ?? 0} dari {entries.total} KDKMP
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    {entries.links.map((link) => (
-                                        <Button
-                                            key={`${link.label}-${link.url}`}
-                                            type="button"
-                                            size="sm"
-                                            variant={
-                                                link.active
-                                                    ? 'default'
-                                                    : 'outline'
-                                            }
-                                            disabled={!link.url}
-                                            onClick={() => {
-                                                if (link.url) {
-                                                    router.get(
-                                                        link.url,
-                                                        {},
-                                                        {
-                                                            preserveScroll: true,
-                                                            preserveState: true,
-                                                        },
-                                                    );
-                                                }
-                                            }}
-                                        >
-                                            <span
-                                                dangerouslySetInnerHTML={{
-                                                    __html: link.label,
-                                                }}
-                                            />
-                                        </Button>
-                                    ))}
+                            {selectedKdkmp && monthlyFinancialMatrix ? (
+                                <KdkmpMonthlyFinancialMatrixChart
+                                    kdkmp={selectedKdkmp}
+                                    matrix={monthlyFinancialMatrix}
+                                    onDateClick={selectDetailDate}
+                                />
+                            ) : (
+                                <div className="rounded-lg border border-dashed bg-muted/10 px-5 py-8 text-center text-sm text-muted-foreground">
+                                    Lanjutkan Pohon EBITDA sampai memilih Desa
+                                    untuk melihat grafik KDKMP.
                                 </div>
-                            </div>
+                            )}
+
+                            {selectedKdkmp && filters.detail_date ? (
+                                <>
+                                    <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                                        Menampilkan rincian KDKMP untuk{' '}
+                                        <span className="font-medium text-foreground">
+                                            {formatDate(filters.detail_date)}
+                                        </span>
+                                        .
+                                    </div>
+
+                                    <div className="overflow-x-auto">
+                                        <Table className="min-w-[1900px]">
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>
+                                                        KDKMP / Manager
+                                                    </TableHead>
+                                                    <TableHead>
+                                                        Wilayah
+                                                    </TableHead>
+                                                    {kdkmpDashboardFields.map(
+                                                        (field) => (
+                                                            <TableHead
+                                                                key={field.key}
+                                                            >
+                                                                {field.label}
+                                                            </TableHead>
+                                                        ),
+                                                    )}
+                                                    <TableHead>
+                                                        Status
+                                                    </TableHead>
+                                                    <TableHead className="text-right">
+                                                        Aksi
+                                                    </TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {entries.data.length === 0 && (
+                                                    <TableRow>
+                                                        <TableCell
+                                                            colSpan={
+                                                                kdkmpDashboardFields.length +
+                                                                4
+                                                            }
+                                                            className="py-10 text-center text-muted-foreground"
+                                                        >
+                                                            Tidak ada data yang
+                                                            sesuai dengan
+                                                            filter.
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                                {entries.data.map((entry) => (
+                                                    <TableRow key={entry.id}>
+                                                        <TableCell>
+                                                            <p className="font-medium">
+                                                                {entry.name}
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                NIK{' '}
+                                                                {entry.nik ??
+                                                                    '-'}
+                                                            </p>
+                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                {entry.manager
+                                                                    ?.email ??
+                                                                    'Akun manager belum tersedia'}
+                                                            </p>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <p>
+                                                                {entry.desa ??
+                                                                    '-'}
+                                                                ,{' '}
+                                                                {entry.kecamatan ??
+                                                                    '-'}
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {entry.kota_kabupaten ??
+                                                                    '-'}
+                                                                ,{' '}
+                                                                {entry.provinsi ??
+                                                                    '-'}
+                                                            </p>
+                                                        </TableCell>
+                                                        {kdkmpDashboardFields.map(
+                                                            (field) => (
+                                                                <TableCell
+                                                                    key={
+                                                                        field.key
+                                                                    }
+                                                                    className="tabular-nums"
+                                                                >
+                                                                    {formatManualValue(
+                                                                        entry
+                                                                            .daily_entry?.[
+                                                                            field
+                                                                                .key
+                                                                        ],
+                                                                        field.isRupiah ===
+                                                                            true,
+                                                                    )}
+                                                                </TableCell>
+                                                            ),
+                                                        )}
+                                                        <TableCell>
+                                                            <StatusBadge
+                                                                entry={
+                                                                    entry.daily_entry
+                                                                }
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <div className="flex justify-end gap-2">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    disabled={
+                                                                        !entry.manager
+                                                                    }
+                                                                    onClick={() => {
+                                                                        if (
+                                                                            !entry.manager
+                                                                        ) {
+                                                                            return;
+                                                                        }
+
+                                                                        if (
+                                                                            entry
+                                                                                .metrics
+                                                                                .task_completion_rate <
+                                                                            100
+                                                                        ) {
+                                                                            toast.error(
+                                                                                'Task belum selesai semua atau belum ada.',
+                                                                            );
+                                                                            return;
+                                                                        }
+
+                                                                        router.get(
+                                                                            monitoringTasks.url(
+                                                                                {
+                                                                                    kdkmpEntry:
+                                                                                        entry.id,
+                                                                                    date:
+                                                                                        filters.detail_date ??
+                                                                                        '',
+                                                                                },
+                                                                            ),
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    Lihat Task
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+
+                                    <div className="flex flex-col gap-3 border-t pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                                        <p>
+                                            Menampilkan {entries.from ?? 0}-
+                                            {entries.to ?? 0} dari{' '}
+                                            {entries.total} KDKMP
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {entries.links.map((link) => (
+                                                <Button
+                                                    key={`${link.label}-${link.url}`}
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={
+                                                        link.active
+                                                            ? 'default'
+                                                            : 'outline'
+                                                    }
+                                                    disabled={!link.url}
+                                                    onClick={() => {
+                                                        if (link.url) {
+                                                            router.get(
+                                                                link.url,
+                                                                {},
+                                                                {
+                                                                    preserveScroll: true,
+                                                                    preserveState: true,
+                                                                },
+                                                            );
+                                                        }
+                                                    }}
+                                                >
+                                                    <span
+                                                        dangerouslySetInnerHTML={{
+                                                            __html: link.label,
+                                                        }}
+                                                    />
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            ) : selectedKdkmp ? (
+                                <div className="rounded-lg border border-dashed bg-muted/10 px-5 py-8 text-center text-sm text-muted-foreground">
+                                    Klik salah satu tanggal pada grafik untuk
+                                    melihat rincian KDKMP per hari.
+                                </div>
+                            ) : null}
                         </CardContent>
                     </Card>
                 </div>

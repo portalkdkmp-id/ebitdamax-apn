@@ -25,6 +25,19 @@ class MonitorEbitdamaxKdkmpRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'month' => [
+                'nullable',
+                'date_format:Y-m',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    $currentMonth = Carbon::now(
+                        (string) config('app.kdkmp_business_timezone')
+                    )->format('Y-m');
+
+                    if (is_string($value) && $value > $currentMonth) {
+                        $fail('Bulan monitoring tidak boleh melewati bulan berjalan.');
+                    }
+                },
+            ],
             'date' => [
                 'nullable',
                 'date_format:Y-m-d',
@@ -34,6 +47,18 @@ class MonitorEbitdamaxKdkmpRequest extends FormRequest
 
                     if (is_string($value) && $value > $today) {
                         $fail('Tanggal monitoring tidak boleh melewati hari ini.');
+                    }
+                },
+            ],
+            'detail_date' => [
+                'nullable',
+                'date_format:Y-m-d',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    $today = Carbon::now((string) config('app.kdkmp_business_timezone'))
+                        ->toDateString();
+
+                    if (is_string($value) && $value > $today) {
+                        $fail('Tanggal rincian tidak boleh melewati hari ini.');
                     }
                 },
             ],

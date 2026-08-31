@@ -44,14 +44,14 @@ export type KdkmpComputedValues = Pick<
 };
 
 export type KdkmpDailyEntry = KdkmpDashboardFields & {
-        id: number;
-        report_date: string;
-        is_complete: boolean;
-        plan_revenue_requires_review: boolean;
-        operational_attendance: KdkmpOperationalAttendance;
-        operational_attendance_saved_at: string | null;
-        updated_at: string | null;
-    };
+    id: number;
+    report_date: string;
+    is_complete: boolean;
+    plan_revenue_requires_review: boolean;
+    operational_attendance: KdkmpOperationalAttendance;
+    operational_attendance_saved_at: string | null;
+    updated_at: string | null;
+};
 
 export type KdkmpFinancialMatrixPoint = {
     process: number;
@@ -82,6 +82,23 @@ export type KdkmpFinancialMatrix = {
     plan_ebitda: number | null;
     actual_ebitda: number | null;
     points: KdkmpFinancialMatrixPoint[];
+};
+
+export type KdkmpMonthlyFinancialMatrixPoint = {
+    date: string;
+    plan_cost: number;
+    actual_cost: number;
+    cumulative_plan_cost: number;
+    cumulative_actual_cost: number;
+    plan_revenue: number;
+    actual_revenue: number;
+};
+
+export type KdkmpMonthlyFinancialMatrix = {
+    start_date: string;
+    end_date: string;
+    has_data: boolean;
+    points: KdkmpMonthlyFinancialMatrixPoint[];
 };
 
 export type KdkmpRegionFilters = {
@@ -157,6 +174,8 @@ export type KdkmpMonitoringProps = {
         level: KdkmpConsolidationLevel;
         rows: KdkmpConsolidationRow[];
     };
+    selectedKdkmp: KdkmpIdentity | null;
+    monthlyFinancialMatrix: KdkmpMonthlyFinancialMatrix | null;
     entries: PaginatedResponse<KdkmpMonitoringEntry>;
     summary: {
         total: number;
@@ -165,7 +184,8 @@ export type KdkmpMonitoringProps = {
         requires_review: number;
     };
     filters: {
-        date: string;
+        month: string;
+        detail_date: string | null;
         search: string;
         status: 'all' | 'complete' | 'not_filled' | 'requires_review';
         consolidation_level: KdkmpConsolidationLevel;

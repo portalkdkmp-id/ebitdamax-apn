@@ -12,7 +12,7 @@ use Illuminate\Support\Collection;
 
 class KdkmpFinancialMatrixService
 {
-    private const DEFAULT_DAILY_FIXED_COST = 9_235_467;
+    public const DEFAULT_DAILY_FIXED_COST = 9_235_467;
 
     public function __construct(
         private readonly KdkmpTaskSelectionService $taskSelection,
