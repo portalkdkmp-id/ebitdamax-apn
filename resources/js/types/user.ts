@@ -14,6 +14,12 @@ export type UserRegionalAssignment = {
     kecamatan: string | null;
 };
 
+export type ManagerSkDocument = {
+    name: string;
+    size: number;
+    preview_url: string;
+};
+
 export type UserRegionOption = {
     provinsi: string;
     kota_kabupaten: string;
@@ -32,6 +38,7 @@ export type UserItem = {
     updated_at: string | null;
     role: UserRole | null;
     regional_assignments: UserRegionalAssignment[];
+    manager_sk_document: ManagerSkDocument | null;
 };
 
 export type UserFilters = {

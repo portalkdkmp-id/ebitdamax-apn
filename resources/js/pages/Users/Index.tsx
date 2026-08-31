@@ -2,12 +2,14 @@ import { Head, router, useForm } from '@inertiajs/react';
 import {
     Eye,
     EyeOff,
+    FileText,
     Mail,
     Pencil,
     Plus,
     Search,
     ShieldCheck,
     Trash2,
+    Upload,
     UserRound,
 } from 'lucide-react';
 import type { FormEvent } from 'react';
@@ -47,6 +49,7 @@ import {
     store as storeUser,
     update as updateUser,
 } from '@/routes/users';
+import { store as storeManagerSkDocument } from '@/routes/users/manager-sk-document';
 import type {
     UserFilters,
     UserItem,
@@ -77,6 +80,10 @@ type UserFormData = {
     password: string;
     password_confirmation: string;
     regional_assignments: RegionalAssignmentForm[];
+};
+
+type ManagerSkDocumentFormData = {
+    manager_sk_document: File | null;
 };
 
 const defaultForm: UserFormData = {
@@ -141,12 +148,26 @@ export default function UsersIndex({
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
         useForm<UserFormData>({ ...defaultForm, domain: filters.domain });
+    const {
+        data: managerSkDocumentData,
+        setData: setManagerSkDocumentData,
+        post: postManagerSkDocument,
+        processing: isUploadingManagerSkDocument,
+        errors: managerSkDocumentErrors,
+        reset: resetManagerSkDocument,
+        clearErrors: clearManagerSkDocumentErrors,
+    } = useForm<ManagerSkDocumentFormData>({
+        manager_sk_document: null,
+    });
     const selectedRole = roles.find((role) => role.id === Number(data.role_id));
     const canConfigureRegionalAccess =
         filters.domain === 'kdkmp' &&
         (selectedRole?.slug === 'manager-wilayah' ||
             selectedRole?.slug === 'ebitda_kdkmp');
     const isKdkmpRole = selectedRole?.slug === 'ebitda_kdkmp';
+    const canManageManagerSkDocument =
+        selectedUser?.role?.slug === 'manager' &&
+        selectedRole?.slug === 'manager';
     const provinsiOptions = uniqueSorted(
         regionOptions.map((option) => option.provinsi),
     );
@@ -215,6 +236,8 @@ export default function UsersIndex({
         setData({ ...defaultForm, domain: filters.domain });
         setShowPassword(false);
         setShowPasswordConfirmation(false);
+        resetManagerSkDocument();
+        clearManagerSkDocumentErrors();
         setIsFormOpen(true);
     };
 
@@ -239,6 +262,8 @@ export default function UsersIndex({
         });
         setShowPassword(false);
         setShowPasswordConfirmation(false);
+        resetManagerSkDocument();
+        clearManagerSkDocumentErrors();
         setIsFormOpen(true);
     };
 
@@ -249,6 +274,8 @@ export default function UsersIndex({
         clearErrors();
         setShowPassword(false);
         setShowPasswordConfirmation(false);
+        resetManagerSkDocument();
+        clearManagerSkDocumentErrors();
     };
 
     const submit = (event: FormEvent) => {
@@ -276,6 +303,31 @@ export default function UsersIndex({
         }
 
         post(storeUser.url(), options);
+    };
+
+    const submitManagerSkDocument = () => {
+        if (!selectedUser || !canManageManagerSkDocument) {
+            return;
+        }
+
+        clearManagerSkDocumentErrors();
+
+        postManagerSkDocument(
+            storeManagerSkDocument.url(
+                selectedUser.username ?? String(selectedUser.id),
+            ),
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onSuccess: closeForm,
+                onError: (formErrors: Record<string, string>) => {
+                    toast.error(
+                        formErrors.manager_sk_document ??
+                            'Dokumen SK Manager tidak dapat disimpan.',
+                    );
+                },
+            },
+        );
     };
 
     const confirmDelete = () => {
@@ -1117,6 +1169,121 @@ export default function UsersIndex({
                                 />
                             </div>
                         </div>
+
+                        {selectedUser && selectedRole?.slug === 'manager' && (
+                            <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                                <div className="flex items-start gap-3">
+                                    <FileText className="mt-0.5 size-5 shrink-0 text-primary" />
+                                    <div>
+                                        <h3 className="font-medium text-foreground">
+                                            Dokumen SK Manager
+                                        </h3>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            Upload satu file PDF maksimal 10 MB.
+                                            Dokumen baru akan menggantikan SK
+                                            sebelumnya.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {canManageManagerSkDocument ? (
+                                    <>
+                                        {selectedUser.manager_sk_document ? (
+                                            <div className="flex flex-col gap-3 rounded-md border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-medium text-foreground">
+                                                        {
+                                                            selectedUser
+                                                                .manager_sk_document
+                                                                .name
+                                                        }
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {(
+                                                            selectedUser
+                                                                .manager_sk_document
+                                                                .size /
+                                                            1024 /
+                                                            1024
+                                                        ).toFixed(2)}{' '}
+                                                        MB
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    asChild
+                                                >
+                                                    <a
+                                                        href={
+                                                            selectedUser
+                                                                .manager_sk_document
+                                                                .preview_url
+                                                        }
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                    >
+                                                        Preview SK
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <p className="rounded-md border border-dashed bg-background p-3 text-sm text-muted-foreground">
+                                                Belum ada dokumen SK Manager.
+                                            </p>
+                                        )}
+
+                                        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="manager-sk-document">
+                                                    Upload atau ganti SK (PDF)
+                                                </Label>
+                                                <Input
+                                                    id="manager-sk-document"
+                                                    type="file"
+                                                    accept="application/pdf,.pdf"
+                                                    onChange={(event) =>
+                                                        setManagerSkDocumentData(
+                                                            'manager_sk_document',
+                                                            event.target
+                                                                .files?.[0] ??
+                                                                null,
+                                                        )
+                                                    }
+                                                />
+                                                <FieldError
+                                                    message={
+                                                        managerSkDocumentErrors.manager_sk_document
+                                                    }
+                                                />
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                disabled={
+                                                    !managerSkDocumentData.manager_sk_document ||
+                                                    isUploadingManagerSkDocument
+                                                }
+                                                onClick={
+                                                    submitManagerSkDocument
+                                                }
+                                            >
+                                                <Upload className="size-4" />
+                                                {isUploadingManagerSkDocument
+                                                    ? 'Mengunggah...'
+                                                    : 'Simpan SK'}
+                                            </Button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <p className="rounded-md border border-dashed bg-background p-3 text-sm text-muted-foreground">
+                                        Simpan perubahan role terlebih dahulu
+                                        sebelum mengunggah dokumen SK Manager.
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         <DialogFooter>
                             <Button

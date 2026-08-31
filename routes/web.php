@@ -12,6 +12,7 @@ use App\Http\Controllers\KdkmpDashboardMonitoringController;
 use App\Http\Controllers\KdkmpDashboardTaskController;
 use App\Http\Controllers\LmsKdkmpController;
 use App\Http\Controllers\LumbungChatController;
+use App\Http\Controllers\ManagerSkDocumentController;
 use App\Http\Controllers\MeetingActionItemController;
 use App\Http\Controllers\MeetingMinuteController;
 use App\Http\Controllers\MonitoringDashboardController;
@@ -76,6 +77,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/admin/kdkmp-dashboard/{kdkmpEntry}/tasks/{date}', [KdkmpDashboardTaskController::class, 'index'])
         ->name('admin.kdkmp-dashboard.tasks');
+
+    Route::get('/users/{user}/manager-sk-document/preview', [ManagerSkDocumentController::class, 'preview'])
+        ->name('users.manager-sk-document.preview');
 
     Route::middleware('ebitdamax.domain:apn')->group(function () {
         Route::get('/admin-dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
@@ -205,6 +209,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::resource('users', UserController::class)
             ->except(['create', 'edit', 'show']);
+
+        Route::post('/users/{user}/manager-sk-document', [ManagerSkDocumentController::class, 'store'])
+            ->name('users.manager-sk-document.store');
 
         Route::resource('task-categories', TaskCategoryController::class)
             ->except(['create', 'edit', 'show']);

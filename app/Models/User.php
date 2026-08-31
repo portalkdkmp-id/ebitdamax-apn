@@ -22,6 +22,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property int $id
  * @property int|null $role_id
  * @property int|null $sdm_kdkmp_entry_id
+ * @property array{disk: string, path: string, original_name: string, mime_type: string, size: int, uploaded_by: int, uploaded_at: string}|null $manager_sk_document
  * @property bool $has_completed_onboarding
  * @property string $name
  * @property string|null $username
@@ -35,7 +36,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['role_id', 'sdm_kdkmp_entry_id', 'name', 'username', 'email', 'password'])]
+#[Fillable(['role_id', 'sdm_kdkmp_entry_id', 'manager_sk_document', 'name', 'username', 'email', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
@@ -121,6 +122,7 @@ class User extends Authenticatable implements PasskeyUser
         return [
             'email_verified_at' => 'datetime',
             'has_completed_onboarding' => 'boolean',
+            'manager_sk_document' => 'array',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileDeleteRequest;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
+use App\Models\User;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,8 +20,13 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $user = $request->user();
+
         return Inertia::render('settings/profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
+            'managerSkDocument' => $user instanceof User
+                ? $this->managerSkDocument($user)
+                : null,
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -58,5 +64,27 @@ class ProfileController extends Controller
         $request->session()->regenerateToken();
 
         return redirect('/');
+    }
+
+    /**
+     * @return array{name: string, size: int, preview_url: string}|null
+     */
+    private function managerSkDocument(User $user): ?array
+    {
+        $document = $user->manager_sk_document;
+
+        if (
+            ! $user->isKdkmpManager()
+            || ! is_array($document)
+            || ! isset($document['original_name'], $document['size'])
+        ) {
+            return null;
+        }
+
+        return [
+            'name' => (string) $document['original_name'],
+            'size' => (int) $document['size'],
+            'preview_url' => route('users.manager-sk-document.preview', $user, absolute: false),
+        ];
     }
 }

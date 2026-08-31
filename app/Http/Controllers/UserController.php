@@ -201,6 +201,29 @@ class UserController extends Controller
                 ])
                 ->values()
                 ->all(),
+            'manager_sk_document' => $this->managerSkDocument($user),
+        ];
+    }
+
+    /**
+     * @return array{name: string, size: int, preview_url: string}|null
+     */
+    private function managerSkDocument(User $user): ?array
+    {
+        $document = $user->manager_sk_document;
+
+        if (
+            ! $user->isKdkmpManager()
+            || ! is_array($document)
+            || ! isset($document['original_name'], $document['size'])
+        ) {
+            return null;
+        }
+
+        return [
+            'name' => (string) $document['original_name'],
+            'size' => (int) $document['size'],
+            'preview_url' => route('users.manager-sk-document.preview', $user, absolute: false),
         ];
     }
 
