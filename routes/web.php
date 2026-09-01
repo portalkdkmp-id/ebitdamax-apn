@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\BusinessProcessController;
+use App\Http\Controllers\CustomerAnalysisController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardRedirectController;
 use App\Http\Controllers\EbitdaTreeController;
@@ -61,6 +62,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         '/dashboard/kdkmp/today/operational-attendance',
         [KdkmpDashboardController::class, 'saveOperationalAttendance']
     )->name('kdkmp-dashboard.operational-attendance.save');
+
+    Route::resource('customer-analyses', CustomerAnalysisController::class)
+        ->only(['index', 'store', 'update']);
 
     Route::get('/notifications', [NotificationController::class, 'index'])
         ->name('notifications.index');

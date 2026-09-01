@@ -36,6 +36,7 @@ import { dashboard } from '@/routes';
 import { index as announcementsIndex } from '@/routes/announcements';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import { index as adminKdkmpDashboardIndex } from '@/routes/admin/kdkmp-dashboard';
+import { index as customerAnalysisIndex } from '@/routes/customer-analyses';
 import { index as ebitdaTreeIndex } from '@/routes/ebitda-tree';
 import { index as ebitdaValuesIndex } from '@/routes/ebitda-values';
 import { index as importExcelIndex } from '@/routes/import-excel';
@@ -235,6 +236,11 @@ const kdkmpManagerNavItems: NavItem[] = [
         title: 'LMS KDKMP',
         href: lmsKdkmpIndex(),
         icon: GraduationCap,
+    },
+    {
+        title: 'Customer Analysis',
+        href: customerAnalysisIndex(),
+        icon: Users,
     },
 ];
 

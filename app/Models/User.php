@@ -89,6 +89,11 @@ class User extends Authenticatable implements PasskeyUser
         return $this->hasMany(PlanEbitdaMatrix::class);
     }
 
+    public function customerAnalyses(): HasMany
+    {
+        return $this->hasMany(CustomerAnalysis::class);
+    }
+
     public function isEbitdaKdkmp(): bool
     {
         return $this->role?->domain === RoleDomain::Kdkmp
