@@ -27,6 +27,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string $name
  * @property string|null $username
  * @property string $email
+ * @property string|null $lark_open_id
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string|null $two_factor_secret
@@ -37,7 +38,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $updated_at
  */
 #[Fillable(['role_id', 'sdm_kdkmp_entry_id', 'manager_sk_document', 'name', 'username', 'email', 'password'])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'lark_open_id'])]
 class User extends Authenticatable implements PasskeyUser
 {
     public const EMAIL_KDKMP_GERAI = 'kdkmp.gerai@ebitdamax.local';

@@ -11,6 +11,7 @@ use App\Http\Controllers\ExcelImportController;
 use App\Http\Controllers\KdkmpDashboardController;
 use App\Http\Controllers\KdkmpDashboardMonitoringController;
 use App\Http\Controllers\KdkmpDashboardTaskController;
+use App\Http\Controllers\LarkSsoController;
 use App\Http\Controllers\LmsKdkmpController;
 use App\Http\Controllers\LumbungChatController;
 use App\Http\Controllers\ManagerSkDocumentController;
@@ -36,6 +37,13 @@ use App\Http\Controllers\ValueChainJobdeskController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
+
+Route::middleware('guest')->group(function () {
+    Route::get('/auth/lark/redirect', [LarkSsoController::class, 'redirect'])
+        ->name('auth.lark.redirect');
+    Route::get('/auth/lark/callback', [LarkSsoController::class, 'callback'])
+        ->name('auth.lark.callback');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardRedirectController::class)->name('dashboard');

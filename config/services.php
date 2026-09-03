@@ -55,4 +55,20 @@ return [
         ),
     ],
 
+    'lark' => [
+        'enabled' => env('LARK_SSO_ENABLED', false),
+        'app_id' => env('LARK_APP_ID'),
+        'app_secret' => env('LARK_APP_SECRET'),
+        'redirect_uri' => env(
+            'LARK_REDIRECT_URI',
+            rtrim((string) env('APP_URL', 'http://localhost'), '/').'/auth/lark/callback',
+        ),
+        'base_url' => env('LARK_BASE_URL', 'https://open.larksuite.com'),
+        'authorization_url' => env(
+            'LARK_AUTHORIZATION_URL',
+            'https://accounts.larksuite.com/open-apis/authen/v1/authorize',
+        ),
+        'scopes' => env('LARK_SCOPES', 'component:user_profile contact:user.email:readonly'),
+    ],
+
 ];

@@ -27,9 +27,21 @@ export type UserRegionOption = {
     desa: string;
 };
 
+export type UserKdkmpOption = {
+    id: number;
+    nik: string | null;
+    nama_koperasi: string | null;
+    provinsi: string | null;
+    kota_kabupaten: string | null;
+    kecamatan: string | null;
+    desa: string | null;
+    assigned_manager_user_id: number | null;
+};
+
 export type UserItem = {
     id: number;
     role_id: number | null;
+    sdm_kdkmp_entry_id: number | null;
     name: string;
     username: string | null;
     email: string;
@@ -38,6 +50,7 @@ export type UserItem = {
     updated_at: string | null;
     role: UserRole | null;
     regional_assignments: UserRegionalAssignment[];
+    kdkmp: UserKdkmpOption | null;
     manager_sk_document: ManagerSkDocument | null;
 };
 

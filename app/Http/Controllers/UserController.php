@@ -7,6 +7,7 @@ use App\Enums\RoleDomain;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\Role;
+use App\Models\SdmKdkmpEntry;
 use App\Models\User;
 use App\Services\RegionalAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,7 +35,7 @@ class UserController extends Controller
         $direction = $direction === 'desc' ? 'desc' : 'asc';
 
         $users = User::query()
-            ->with(['role', 'regionalAssignments'])
+            ->with(['role', 'regionalAssignments', 'sdmKdkmpEntry'])
             ->whereHas(
                 'role',
                 fn (Builder $query): Builder => $query->where('domain', $domain->value),
@@ -73,6 +74,9 @@ class UserController extends Controller
             'roles' => $roles,
             'regionOptions' => $domain === RoleDomain::Kdkmp
                 ? $this->regionalAccess->allRegionOptions()
+                : [],
+            'kdkmpOptions' => $domain === RoleDomain::Kdkmp
+                ? $this->kdkmpOptions()
                 : [],
             'filters' => [
                 'domain' => $domain->value,
@@ -120,13 +124,20 @@ class UserController extends Controller
     }
 
     /**
-     * @param  array{domain: string, role_id: int, name: string, email: string, password?: string|null, regional_assignments?: array<int, array{scope_level: string, provinsi: string, kota_kabupaten?: string|null, kecamatan?: string|null}>}  $payload
+     * @param  array{domain: string, role_id: int, name: string, email: string, password?: string|null, sdm_kdkmp_entry_id?: int|string|null, regional_assignments?: array<int, array{scope_level: string, provinsi: string, kota_kabupaten?: string|null, kecamatan?: string|null}>}  $payload
      * @return array<string, mixed>
      */
     private function prepareUserPayload(array $payload): array
     {
+        $role = Role::query()->find($payload['role_id']);
+        $isKdkmpManager = $role?->domain === RoleDomain::Kdkmp
+            && $role->slug === Role::SLUG_KDKMP_MANAGER;
+
         $data = [
             'role_id' => $payload['role_id'],
+            'sdm_kdkmp_entry_id' => $isKdkmpManager
+                ? (int) ($payload['sdm_kdkmp_entry_id'] ?? 0)
+                : null,
             'name' => $payload['name'],
             'email' => $payload['email'],
         ];
@@ -139,7 +150,7 @@ class UserController extends Controller
     }
 
     /**
-     * @param  array{domain: string, role_id: int, name: string, email: string, password?: string|null, regional_assignments?: array<int, array{scope_level: string, provinsi: string, kota_kabupaten?: string|null, kecamatan?: string|null}>}  $payload
+     * @param  array{domain: string, role_id: int, name: string, email: string, password?: string|null, sdm_kdkmp_entry_id?: int|string|null, regional_assignments?: array<int, array{scope_level: string, provinsi: string, kota_kabupaten?: string|null, kecamatan?: string|null}>}  $payload
      */
     private function syncRegionalAssignments(User $user, array $payload): void
     {
@@ -177,6 +188,7 @@ class UserController extends Controller
         return [
             'id' => $user->id,
             'role_id' => $user->role_id,
+            'sdm_kdkmp_entry_id' => $user->sdm_kdkmp_entry_id,
             'name' => $user->name,
             'username' => $user->username,
             'email' => $user->email,
@@ -201,8 +213,48 @@ class UserController extends Controller
                 ])
                 ->values()
                 ->all(),
+            'kdkmp' => $user->sdmKdkmpEntry ? [
+                'id' => $user->sdmKdkmpEntry->id,
+                'nik' => $user->sdmKdkmpEntry->nik,
+                'nama_koperasi' => $user->sdmKdkmpEntry->nama_koperasi,
+                'provinsi' => $user->sdmKdkmpEntry->provinsi,
+                'kota_kabupaten' => $user->sdmKdkmpEntry->kota_kabupaten,
+                'kecamatan' => $user->sdmKdkmpEntry->kecamatan,
+                'desa' => $user->sdmKdkmpEntry->desa,
+                'assigned_manager_user_id' => $user->id,
+            ] : null,
             'manager_sk_document' => $this->managerSkDocument($user),
         ];
+    }
+
+    /**
+     * @return array<int, array{id: int, nik: string|null, nama_koperasi: string|null, provinsi: string|null, kota_kabupaten: string|null, kecamatan: string|null, desa: string|null, assigned_manager_user_id: int|null}>
+     */
+    private function kdkmpOptions(): array
+    {
+        return SdmKdkmpEntry::query()
+            ->with('managerUser:id,sdm_kdkmp_entry_id')
+            ->orderBy('nama_koperasi')
+            ->get([
+                'id',
+                'nik',
+                'nama_koperasi',
+                'provinsi',
+                'kota_kabupaten',
+                'kecamatan',
+                'desa',
+            ])
+            ->map(fn (SdmKdkmpEntry $entry): array => [
+                'id' => $entry->id,
+                'nik' => $entry->nik,
+                'nama_koperasi' => $entry->nama_koperasi,
+                'provinsi' => $entry->provinsi,
+                'kota_kabupaten' => $entry->kota_kabupaten,
+                'kecamatan' => $entry->kecamatan,
+                'desa' => $entry->desa,
+                'assigned_manager_user_id' => $entry->managerUser?->id,
+            ])
+            ->all();
     }
 
     /**

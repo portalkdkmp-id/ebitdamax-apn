@@ -28,6 +28,7 @@ class StoreUserRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'sdm_kdkmp_entry_id' => ['nullable', 'integer', Rule::exists('sdm_kdkmp_entries', 'id')],
             'regional_assignments' => ['nullable', 'array', 'max:25'],
             'regional_assignments.*' => ['array'],
             'regional_assignments.*.scope_level' => [
@@ -46,8 +47,49 @@ class StoreUserRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            $this->validateKdkmpManagerAssignment($validator);
             $this->validateRegionalAssignments($validator);
         }];
+    }
+
+    private function validateKdkmpManagerAssignment(Validator $validator): void
+    {
+        $role = Role::query()->find($this->input('role_id'));
+        $isKdkmpManager = $role?->domain === RoleDomain::Kdkmp
+            && $role->slug === Role::SLUG_KDKMP_MANAGER;
+        $entryId = $this->input('sdm_kdkmp_entry_id');
+
+        if (! $isKdkmpManager) {
+            if ($entryId !== null && $entryId !== '') {
+                $validator->errors()->add(
+                    'sdm_kdkmp_entry_id',
+                    'Data KDKMP hanya dapat diberikan kepada role Manager.',
+                );
+            }
+
+            return;
+        }
+
+        if ($entryId === null || $entryId === '') {
+            $validator->errors()->add(
+                'sdm_kdkmp_entry_id',
+                'Manager wajib dihubungkan ke satu data KDKMP.',
+            );
+
+            return;
+        }
+
+        $isAvailable = SdmKdkmpEntry::query()
+            ->whereKey($entryId)
+            ->whereDoesntHave('managerUser')
+            ->exists();
+
+        if (! $isAvailable) {
+            $validator->errors()->add(
+                'sdm_kdkmp_entry_id',
+                'Data KDKMP tersebut sudah terhubung ke akun Manager lain.',
+            );
+        }
     }
 
     private function validateRegionalAssignments(Validator $validator): void

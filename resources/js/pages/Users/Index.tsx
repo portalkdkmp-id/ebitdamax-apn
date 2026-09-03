@@ -13,7 +13,7 @@ import {
     UserRound,
 } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,7 @@ import { store as storeManagerSkDocument } from '@/routes/users/manager-sk-docum
 import type {
     UserFilters,
     UserItem,
+    UserKdkmpOption,
     UserPaginatedResponse,
     UserRegionOption,
     UserRole,
@@ -62,6 +63,7 @@ type Props = {
     users: UserPaginatedResponse;
     roles: UserRole[];
     regionOptions: UserRegionOption[];
+    kdkmpOptions: UserKdkmpOption[];
     filters: UserFilters;
 };
 
@@ -75,6 +77,7 @@ type RegionalAssignmentForm = {
 type UserFormData = {
     domain: 'apn' | 'kdkmp';
     role_id: string;
+    sdm_kdkmp_entry_id: string;
     name: string;
     email: string;
     password: string;
@@ -89,6 +92,7 @@ type ManagerSkDocumentFormData = {
 const defaultForm: UserFormData = {
     domain: 'apn',
     role_id: '',
+    sdm_kdkmp_entry_id: '',
     name: '',
     email: '',
     password: '',
@@ -128,6 +132,7 @@ export default function UsersIndex({
     users,
     roles,
     regionOptions,
+    kdkmpOptions,
     filters,
 }: Props) {
     const domainLabel =
@@ -139,6 +144,7 @@ export default function UsersIndex({
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirmation, setShowPasswordConfirmation] =
         useState(false);
+    const [kdkmpSearch, setKdkmpSearch] = useState('');
     const [filterForm, setFilterForm] = useState({
         search: filters.search ?? '',
         role_id: filters.role_id ? String(filters.role_id) : 'all',
@@ -165,12 +171,50 @@ export default function UsersIndex({
         (selectedRole?.slug === 'manager-wilayah' ||
             selectedRole?.slug === 'ebitda_kdkmp');
     const isKdkmpRole = selectedRole?.slug === 'ebitda_kdkmp';
+    const canAssignKdkmp =
+        filters.domain === 'kdkmp' && selectedRole?.slug === 'manager';
     const canManageManagerSkDocument =
         selectedUser?.role?.slug === 'manager' &&
         selectedRole?.slug === 'manager';
     const provinsiOptions = uniqueSorted(
         regionOptions.map((option) => option.provinsi),
     );
+    const availableKdkmpOptions = useMemo(() => {
+        const normalizedSearch = kdkmpSearch.trim().toLocaleLowerCase('id');
+
+        return kdkmpOptions
+            .filter(
+                (option) =>
+                    option.assigned_manager_user_id === null ||
+                    option.assigned_manager_user_id === selectedUser?.id,
+            )
+            .filter((option) => {
+                if (normalizedSearch === '') {
+                    return true;
+                }
+
+                return [
+                    option.nama_koperasi,
+                    option.nik,
+                    option.provinsi,
+                    option.kota_kabupaten,
+                    option.kecamatan,
+                    option.desa,
+                ].some((value) =>
+                    value
+                        ?.toLocaleLowerCase('id')
+                        .includes(normalizedSearch),
+                );
+            })
+            .slice(0, 100);
+    }, [kdkmpOptions, kdkmpSearch, selectedUser?.id]);
+
+    const selectedKdkmpOption = kdkmpOptions.find(
+        (option) => option.id === Number(data.sdm_kdkmp_entry_id),
+    );
+    const selectedKdkmpLabel = selectedKdkmpOption
+        ? `${selectedKdkmpOption.nama_koperasi ?? 'KDKMP tanpa nama'}${selectedKdkmpOption.nik ? ` (${selectedKdkmpOption.nik})` : ''}`
+        : '';
 
     const updateRegionalAssignment = (
         index: number,
@@ -236,6 +280,7 @@ export default function UsersIndex({
         setData({ ...defaultForm, domain: filters.domain });
         setShowPassword(false);
         setShowPasswordConfirmation(false);
+        setKdkmpSearch('');
         resetManagerSkDocument();
         clearManagerSkDocumentErrors();
         setIsFormOpen(true);
@@ -247,6 +292,9 @@ export default function UsersIndex({
         setData({
             domain: filters.domain,
             role_id: user.role_id ? String(user.role_id) : '',
+            sdm_kdkmp_entry_id: user.sdm_kdkmp_entry_id
+                ? String(user.sdm_kdkmp_entry_id)
+                : '',
             name: user.name,
             email: user.email,
             password: '',
@@ -262,6 +310,11 @@ export default function UsersIndex({
         });
         setShowPassword(false);
         setShowPasswordConfirmation(false);
+        setKdkmpSearch(
+            user.kdkmp
+                ? `${user.kdkmp.nama_koperasi ?? ''} ${user.kdkmp.nik ?? ''}`.trim()
+                : '',
+        );
         resetManagerSkDocument();
         clearManagerSkDocumentErrors();
         setIsFormOpen(true);
@@ -274,6 +327,7 @@ export default function UsersIndex({
         clearErrors();
         setShowPassword(false);
         setShowPasswordConfirmation(false);
+        setKdkmpSearch('');
         resetManagerSkDocument();
         clearManagerSkDocumentErrors();
     };
@@ -673,9 +727,24 @@ export default function UsersIndex({
                             <Label>Role</Label>
                             <Select
                                 value={data.role_id}
-                                onValueChange={(value) =>
-                                    setData('role_id', value)
-                                }
+                                onValueChange={(value) => {
+                                    const role = roles.find(
+                                        (item) => item.id === Number(value),
+                                    );
+
+                                    setData({
+                                        ...data,
+                                        role_id: value,
+                                        sdm_kdkmp_entry_id:
+                                            role?.slug === 'manager'
+                                                ? data.sdm_kdkmp_entry_id
+                                                : '',
+                                    });
+
+                                    if (role?.slug !== 'manager') {
+                                        setKdkmpSearch('');
+                                    }
+                                }}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Pilih role" />
@@ -693,6 +762,112 @@ export default function UsersIndex({
                             </Select>
                             <FieldError message={errors.role_id} />
                         </div>
+
+                        {canAssignKdkmp && (
+                            <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                                <div>
+                                    <h3 className="font-medium text-foreground">
+                                        Data KDKMP
+                                    </h3>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Pilih koperasi yang akan dikelola oleh
+                                        akun Manager ini.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="kdkmp-search">
+                                        Cari KDKMP
+                                    </Label>
+                                    <Input
+                                        id="kdkmp-search"
+                                        value={kdkmpSearch}
+                                        onChange={(event) =>
+                                            setKdkmpSearch(event.target.value)
+                                        }
+                                        placeholder="Nama koperasi, NIK, atau wilayah"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Data KDKMP yang dikelola</Label>
+                                    <Select
+                                        value={data.sdm_kdkmp_entry_id}
+                                        onValueChange={(value) => {
+                                            const option = kdkmpOptions.find(
+                                                (item) =>
+                                                    item.id === Number(value),
+                                            );
+
+                                            setData(
+                                                'sdm_kdkmp_entry_id',
+                                                value,
+                                            );
+                                            setKdkmpSearch(
+                                                option
+                                                    ? `${option.nama_koperasi ?? ''} ${option.nik ?? ''}`.trim()
+                                                    : '',
+                                            );
+                                        }}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Pilih data KDKMP" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {selectedKdkmpOption &&
+                                                !availableKdkmpOptions.some(
+                                                    (option) =>
+                                                        option.id ===
+                                                        selectedKdkmpOption.id,
+                                                ) && (
+                                                    <SelectItem
+                                                        value={String(
+                                                            selectedKdkmpOption.id,
+                                                        )}
+                                                    >
+                                                        {selectedKdkmpLabel}
+                                                    </SelectItem>
+                                                )}
+                                            {availableKdkmpOptions.map(
+                                                (option) => (
+                                                    <SelectItem
+                                                        key={option.id}
+                                                        value={String(option.id)}
+                                                    >
+                                                        {option.nama_koperasi ??
+                                                            'KDKMP tanpa nama'}
+                                                        {option.nik
+                                                            ? ` (${option.nik})`
+                                                            : ''}
+                                                        {' — '}
+                                                        {[
+                                                            option.desa,
+                                                            option.kecamatan,
+                                                            option.kota_kabupaten,
+                                                            option.provinsi,
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(', ')}
+                                                    </SelectItem>
+                                                ),
+                                            )}
+                                            {availableKdkmpOptions.length ===
+                                                0 && (
+                                                <p className="px-2 py-3 text-sm text-muted-foreground">
+                                                    Data KDKMP yang tersedia tidak
+                                                    ditemukan.
+                                                </p>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                    <FieldError
+                                        message={
+                                            errors.sdm_kdkmp_entry_id
+                                        }
+                                    />
+                                </div>
+                            </div>
+                        )}
 
                         {canConfigureRegionalAccess && (
                             <div className="space-y-4 rounded-lg border bg-muted/20 p-4">

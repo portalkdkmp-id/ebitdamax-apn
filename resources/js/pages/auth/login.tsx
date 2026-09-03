@@ -1,6 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
 import InputError from '@/components/input-error';
-import PasskeyVerify from '@/components/passkey-verify';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
@@ -8,20 +7,55 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { redirect as larkRedirect } from '@/routes/auth/lark';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 
 type Props = {
     status?: string;
     canResetPassword: boolean;
+    larkEnabled: boolean;
 };
 
-export default function Login({ status, canResetPassword }: Props) {
+export default function Login({
+    status,
+    canResetPassword,
+    larkEnabled,
+}: Props) {
     return (
         <>
             <Head title="Log in" />
 
-            <PasskeyVerify />
+            {larkEnabled && (
+                <>
+                    <Button
+                        asChild
+                        variant="outline"
+                        className="h-11 w-full border-slate-200 bg-white text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-[#3370ff]/40 hover:bg-[#f5f8ff] hover:text-slate-900"
+                    >
+                        <a href={larkRedirect.url()} className="relative">
+                            <img
+                                src="/Lark_Suite_logo_2022.png"
+                                alt=""
+                                aria-hidden="true"
+                                className="absolute left-4 size-6 object-contain"
+                            />
+                            Login with Lark
+                        </a>
+                    </Button>
+
+                    <div className="relative my-6">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-background px-2 text-muted-foreground">
+                                atau lanjutkan dengan email
+                            </span>
+                        </div>
+                    </div>
+                </>
+            )}
 
             <Form
                 {...store.form()}

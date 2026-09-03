@@ -6,6 +6,7 @@ use App\Enums\RegionalScopeLevel;
 use App\Enums\RoleDomain;
 use App\Models\Role;
 use App\Models\SdmKdkmpEntry;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -36,6 +37,7 @@ class UpdateUserRequest extends FormRequest
                 Rule::unique('users', 'email')->ignore($userId),
             ],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+            'sdm_kdkmp_entry_id' => ['nullable', 'integer', Rule::exists('sdm_kdkmp_entries', 'id')],
             'regional_assignments' => ['nullable', 'array', 'max:25'],
             'regional_assignments.*' => ['array'],
             'regional_assignments.*.scope_level' => [
@@ -54,8 +56,57 @@ class UpdateUserRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            $this->validateKdkmpManagerAssignment($validator);
             $this->validateRegionalAssignments($validator);
         }];
+    }
+
+    private function validateKdkmpManagerAssignment(Validator $validator): void
+    {
+        $role = Role::query()->find($this->input('role_id'));
+        $isKdkmpManager = $role?->domain === RoleDomain::Kdkmp
+            && $role->slug === Role::SLUG_KDKMP_MANAGER;
+        $entryId = $this->input('sdm_kdkmp_entry_id');
+
+        if (! $isKdkmpManager) {
+            if ($entryId !== null && $entryId !== '') {
+                $validator->errors()->add(
+                    'sdm_kdkmp_entry_id',
+                    'Data KDKMP hanya dapat diberikan kepada role Manager.',
+                );
+            }
+
+            return;
+        }
+
+        if ($entryId === null || $entryId === '') {
+            $validator->errors()->add(
+                'sdm_kdkmp_entry_id',
+                'Manager wajib dihubungkan ke satu data KDKMP.',
+            );
+
+            return;
+        }
+
+        $userId = $this->route('user')?->id;
+        $isAvailable = SdmKdkmpEntry::query()
+            ->whereKey($entryId)
+            ->where(function (Builder $query) use ($userId): void {
+                $query
+                    ->whereDoesntHave('managerUser')
+                    ->orWhereHas(
+                        'managerUser',
+                        fn (Builder $managerQuery): Builder => $managerQuery->whereKey($userId),
+                    );
+            })
+            ->exists();
+
+        if (! $isAvailable) {
+            $validator->errors()->add(
+                'sdm_kdkmp_entry_id',
+                'Data KDKMP tersebut sudah terhubung ke akun Manager lain.',
+            );
+        }
     }
 
     private function validateRegionalAssignments(Validator $validator): void
