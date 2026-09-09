@@ -71,6 +71,41 @@ class LarkSsoController extends Controller
             return $this->failedLogin($request, 'Autentikasi Lark tidak dapat diverifikasi.');
         }
 
+        return $this->completeLogin($request, $configuration, $accessToken);
+    }
+
+    public function h5(Request $request): RedirectResponse
+    {
+        $configuration = $this->configuration();
+
+        if ($configuration === null) {
+            return $this->failedLogin($request, 'Login with Lark belum dikonfigurasi.');
+        }
+
+        $code = trim((string) $request->input('code'));
+
+        if ($code === '') {
+            return $this->failedLogin($request, 'Lark tidak mengirimkan kode autentikasi.');
+        }
+
+        $accessToken = $this->exchangeAuthorizationCode(
+            $configuration,
+            $code,
+            includeRedirectUri: false,
+        );
+
+        if ($accessToken === null) {
+            return $this->failedLogin($request, 'Autentikasi Lark tidak dapat diverifikasi.');
+        }
+
+        return $this->completeLogin($request, $configuration, $accessToken);
+    }
+
+    /**
+     * @param  array{app_id: string, app_secret: string, authorization_url: string, base_url: string, redirect_uri: string, scopes: string}  $configuration
+     */
+    private function completeLogin(Request $request, array $configuration, string $accessToken): RedirectResponse
+    {
         $identity = $this->larkIdentity($configuration, $accessToken);
 
         if ($identity === null) {
@@ -95,17 +130,26 @@ class LarkSsoController extends Controller
     /**
      * @param  array{app_id: string, app_secret: string, authorization_url: string, base_url: string, redirect_uri: string, scopes: string}  $configuration
      */
-    private function exchangeAuthorizationCode(array $configuration, string $code): ?string
-    {
+    private function exchangeAuthorizationCode(
+        array $configuration,
+        string $code,
+        bool $includeRedirectUri = true,
+    ): ?string {
+        $payload = [
+            'grant_type' => 'authorization_code',
+            'code' => $code,
+            'client_id' => $configuration['app_id'],
+            'client_secret' => $configuration['app_secret'],
+        ];
+
+        if ($includeRedirectUri) {
+            $payload['redirect_uri'] = $configuration['redirect_uri'];
+        }
+
         $response = Http::acceptJson()
+            ->connectTimeout(5)
             ->timeout(15)
-            ->post($configuration['base_url'].'/open-apis/authen/v2/oauth/token', [
-                'grant_type' => 'authorization_code',
-                'code' => $code,
-                'client_id' => $configuration['app_id'],
-                'client_secret' => $configuration['app_secret'],
-                'redirect_uri' => $configuration['redirect_uri'],
-            ]);
+            ->post($configuration['base_url'].'/open-apis/authen/v2/oauth/token', $payload);
 
         if (! $this->successfulLarkResponse($response)) {
             Log::warning('Lark OAuth token exchange failed.', [
@@ -130,6 +174,7 @@ class LarkSsoController extends Controller
     {
         $response = Http::acceptJson()
             ->withToken($accessToken)
+            ->connectTimeout(5)
             ->timeout(15)
             ->get($configuration['base_url'].'/open-apis/authen/v1/user_info');
 

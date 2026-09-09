@@ -3,6 +3,7 @@
 use App\Models\User;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Http;
+use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function (): void {
     config()->set('services.lark', [
@@ -32,6 +33,60 @@ test('Lark redirect starts an authorization request with a session state', funct
         ->and($query['state'])->not->toBeEmpty();
 
     $response->assertSessionHas('lark_oauth_state.value', $query['state']);
+});
+
+test('login exposes the Lark app id for H5 auto login', function () {
+    $this->withoutVite();
+
+    $this->get(route('login'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('auth/login')
+            ->where('larkEnabled', true)
+            ->where('larkAppId', 'cli_test')
+            ->where('larkScopes', 'component:user_profile contact:user.email:readonly'));
+});
+
+test('Lark H5 login authenticates with an authorization code', function () {
+    $user = User::factory()->unverified()->create([
+        'email' => 'manager@ebitdamax.local',
+    ]);
+
+    Http::fake([
+        'https://open.larksuite.com/open-apis/authen/v2/oauth/token' => Http::response([
+            'code' => 0,
+            'access_token' => 'lark-user-access-token',
+        ]),
+        'https://open.larksuite.com/open-apis/authen/v1/user_info' => Http::response([
+            'code' => 0,
+            'data' => [
+                'open_id' => 'ou_lark_user',
+                'email' => 'MANAGER@EBITDAMAX.LOCAL',
+            ],
+        ]),
+    ]);
+
+    $response = $this->post(route('auth.lark.h5'), [
+        'code' => 'h5-authorization-code',
+    ]);
+
+    $response->assertRedirect(route('dashboard', absolute: false));
+    $this->assertAuthenticatedAs($user);
+
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://open.larksuite.com/open-apis/authen/v2/oauth/token'
+        && $request->data()['code'] === 'h5-authorization-code'
+        && ! array_key_exists('redirect_uri', $request->data()));
+});
+
+test('Lark H5 login rejects a missing authorization code', function () {
+    Http::fake();
+
+    $response = $this->post(route('auth.lark.h5'));
+
+    $response->assertRedirect(route('login', absolute: false));
+    $response->assertSessionHas('error');
+    $this->assertGuest();
+    Http::assertNothingSent();
 });
 
 test('Lark callback logs in the local user matched by email and links their open id', function () {

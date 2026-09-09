@@ -43,6 +43,9 @@ Route::middleware('guest')->group(function () {
         ->name('auth.lark.redirect');
     Route::get('/auth/lark/callback', [LarkSsoController::class, 'callback'])
         ->name('auth.lark.callback');
+    Route::post('/auth/lark/h5', [LarkSsoController::class, 'h5'])
+        ->middleware('throttle:login')
+        ->name('auth.lark.h5');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {

@@ -52,6 +52,8 @@ class FortifyServiceProvider extends ServiceProvider
             'canResetPassword' => Features::enabled(Features::resetPasswords()),
             'status' => $request->session()->get('status'),
             'larkEnabled' => (bool) config('services.lark.enabled'),
+            'larkAppId' => (string) config('services.lark.app_id'),
+            'larkScopes' => (string) config('services.lark.scopes'),
         ]));
 
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/reset-password', [

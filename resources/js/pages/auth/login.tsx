@@ -1,4 +1,5 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, router } from '@inertiajs/react';
+import { useEffect } from 'react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
@@ -7,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { redirect as larkRedirect } from '@/routes/auth/lark';
+import { h5 as larkH5, redirect as larkRedirect } from '@/routes/auth/lark';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 
@@ -15,13 +16,88 @@ type Props = {
     status?: string;
     canResetPassword: boolean;
     larkEnabled: boolean;
+    larkAppId: string;
+    larkScopes: string;
 };
+
+type LarkWindow = Window & {
+    h5sdk?: { ready: (callback: () => void) => void };
+    tt?: {
+        requestAccess?: (options: {
+            appID: string;
+            scopeList: string[];
+            success: (result: { code?: string }) => void;
+            fail: () => void;
+        }) => void;
+    };
+};
+
+const larkSdkUrl =
+    'https://lf1-cdn-tos.bytegoofy.com/goofy/lark/op/h5-js-sdk-1.5.26.js';
+const larkAutoLoginKey = 'lark-auto-login-attempted';
 
 export default function Login({
     status,
     canResetPassword,
     larkEnabled,
+    larkAppId,
+    larkScopes,
 }: Props) {
+    useEffect(() => {
+        if (
+            !larkEnabled ||
+            !larkAppId ||
+            !/(Lark|Feishu)/i.test(navigator.userAgent)
+        ) {
+            return;
+        }
+
+        const requestLogin = () => {
+            const { h5sdk, tt } = window as LarkWindow;
+
+            if (
+                !h5sdk ||
+                !tt?.requestAccess ||
+                sessionStorage.getItem(larkAutoLoginKey)
+            ) {
+                return;
+            }
+
+            sessionStorage.setItem(larkAutoLoginKey, 'true');
+            h5sdk.ready(() => {
+                tt.requestAccess?.({
+                    appID: larkAppId,
+                    scopeList: larkScopes.split(/\s+/).filter(Boolean),
+                    success: ({ code }) => {
+                        if (code) {
+                            router.post(larkH5.url(), { code });
+                        } else {
+                            sessionStorage.removeItem(larkAutoLoginKey);
+                        }
+                    },
+                    fail: () => sessionStorage.removeItem(larkAutoLoginKey),
+                });
+            });
+        };
+
+        const existingScript = document.querySelector<HTMLScriptElement>(
+            'script[data-lark-h5-sdk]',
+        );
+        const script = existingScript ?? document.createElement('script');
+
+        script.addEventListener('load', requestLogin);
+
+        if (existingScript) {
+            requestLogin();
+        } else {
+            script.src = larkSdkUrl;
+            script.dataset.larkH5Sdk = 'true';
+            document.head.appendChild(script);
+        }
+
+        return () => script.removeEventListener('load', requestLogin);
+    }, [larkAppId, larkEnabled, larkScopes]);
+
     return (
         <>
             <Head title="Log in" />
