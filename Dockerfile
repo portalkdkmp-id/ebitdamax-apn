@@ -1,5 +1,6 @@
 ARG PHP_VERSION=8.3
 ARG NODE_VERSION=22
+ARG APP_VERSION=dev
 
 FROM composer:2 AS composer-bin
 FROM node:${NODE_VERSION}-bookworm-slim AS node-bin
@@ -59,6 +60,11 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
 
 FROM php:${PHP_VERSION}-fpm-bookworm AS runtime
 WORKDIR /var/www/html
+
+ARG APP_VERSION
+
+LABEL org.opencontainers.image.title="ebitdamax-apn" \
+    org.opencontainers.image.version="${APP_VERSION}"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

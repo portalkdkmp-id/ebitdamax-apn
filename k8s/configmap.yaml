@@ -3,46 +3,63 @@ kind: ConfigMap
 metadata:
   name: ebitda-config
   namespace: ebitda
+  labels:
+    app.kubernetes.io/name: ebitdamax-apn
 data:
-  APP_NAME: "EBITDA SIDIQ"
-  APP_ENV: "production"
-  APP_DEBUG: "false"
-  APP_URL: "https://<EBITDA_PRODUCTION_DOMAIN>"
-  APP_LOCALE: "en"
-  APP_FALLBACK_LOCALE: "en"
-  APP_FAKER_LOCALE: "en_US"
-  APP_MAINTENANCE_DRIVER: "file"
-  BCRYPT_ROUNDS: "12"
-  LOG_CHANNEL: "stack"
-  LOG_STACK: "stderr"
-  LOG_DEPRECATIONS_CHANNEL: "null"
-  LOG_LEVEL: "info"
-  DB_CONNECTION: "pgsql"
-  DB_HOST: "<CLOUD_SQL_HOST>"
-  DB_PORT: "5432"
-  DB_DATABASE: "ebitdamax"
-  DB_SSLMODE: "require"
-  SESSION_DRIVER: "redis"
-  SESSION_LIFETIME: "120"
-  SESSION_ENCRYPT: "false"
-  SESSION_PATH: "/"
-  SESSION_DOMAIN: "<DOMAIN_OR_NULL>"
-  SESSION_SECURE_COOKIE: "true"
-  BROADCAST_CONNECTION: "log"
-  FILESYSTEM_DISK: "<PRODUCTION_FILESYSTEM>"
-  DOCUMENTS_DISK: "<PRODUCTION_DOCUMENTS_FILESYSTEM>"
-  QUEUE_CONNECTION: "redis"
-  CACHE_STORE: "redis"
-  CACHE_PREFIX: "ebitda_cache:"
-  REDIS_CLIENT: "phpredis"
-  REDIS_HOST: "<REDIS_SERVICE>"
-  REDIS_PORT: "6379"
-  MAIL_MAILER: "log"
-  PORTAL_PEMBANGUNAN_BASE_URL: "https://portalkdkmp.id"
-  PORTAL_PEMETAAN_BASE_URL: "https://pemetaan-lahan.portalkdkmp.id"
-  SSO_ENABLED: "true"
-  SSO_URL: "<CENTRAL_SSO_URL>"
-  SSO_CLIENT_ID: "<SSO_CLIENT_ID>"
-  SSO_REDIRECT_URI: "https://<EBITDA_PRODUCTION_DOMAIN>/oauth/callback"
-  LARAVEL_OPTIMIZE: "true"
-  LARAVEL_STORAGE_LINK: "false"
+  APP_NAME: 'EBITDAMAX APN'
+  APP_ENV: 'production'
+  APP_DEBUG: 'false'
+  APP_URL: 'https://ebitdamax-prod.dev-agrinas.id'
+  APP_LOCALE: 'en'
+  APP_FALLBACK_LOCALE: 'en'
+  APP_MAINTENANCE_DRIVER: 'cache'
+  APP_MAINTENANCE_STORE: 'redis'
+  BCRYPT_ROUNDS: '12'
+  KDKMP_BUSINESS_TIMEZONE: 'Asia/Jakarta'
+
+  LOG_CHANNEL: 'stack'
+  LOG_STACK: 'stderr'
+  LOG_DEPRECATIONS_CHANNEL: 'null'
+  LOG_LEVEL: 'info'
+
+  DB_CONNECTION: 'pgsql'
+  DB_PORT: '5432'
+  DB_DATABASE: 'ebitda'
+  DB_SSLMODE: 'require'
+
+  REDIS_CLIENT: 'phpredis'
+  REDIS_PORT: '6379'
+  REDIS_DB: '0'
+  REDIS_CACHE_DB: '1'
+  REDIS_QUEUE_RETRY_AFTER: '120'
+  CACHE_STORE: 'redis'
+  CACHE_PREFIX: 'ebitda_cache_'
+  SESSION_DRIVER: 'redis'
+  SESSION_STORE: 'redis'
+  SESSION_LIFETIME: '120'
+  SESSION_ENCRYPT: 'true'
+  SESSION_PATH: '/'
+  SESSION_DOMAIN: 'ebitdamax-prod.dev-agrinas.id'
+  SESSION_SECURE_COOKIE: 'true'
+  SESSION_HTTP_ONLY: 'true'
+  SESSION_SAME_SITE: 'lax'
+  QUEUE_CONNECTION: 'redis'
+
+  # Both Laravel local disks are backed by the GCS FUSE mount in each pod.
+  FILESYSTEM_DISK: 'local'
+  DOCUMENTS_DISK: 'local'
+
+  MAIL_MAILER: 'log'
+  BROADCAST_CONNECTION: 'log'
+  LUMBUNG_KMS_CHAT_URL: 'https://lumbung.sibisa.site/chat'
+  LMS_KDKMP_LEARNING_PATHS_URL: 'https://lms.agrinaspangan.id/learning-paths'
+  PORTAL_PEMBANGUNAN_BASE_URL: 'https://portalkdkmp.id'
+  PORTAL_PEMETAAN_BASE_URL: 'https://pemetaan-lahan.portalkdkmp.id'
+  LARK_SSO_ENABLED: 'true'
+  LARK_REDIRECT_URI: 'https://ebitdamax-prod.dev-agrinas.id/auth/lark/callback'
+  LARK_BASE_URL: 'https://open.larksuite.com'
+  LARK_AUTHORIZATION_URL: 'https://accounts.larksuite.com/open-apis/authen/v1/authorize'
+  LARK_SCOPES: 'component:user_profile contact:user.email:readonly'
+
+  LARAVEL_OPTIMIZE: 'true'
+  LARAVEL_STORAGE_LINK: 'false'
