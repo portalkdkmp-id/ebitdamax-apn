@@ -1,0 +1,190 @@
+{
+  "main": {
+    "id": "783ef03231bb7378",
+    "type": "split",
+    "children": [
+      {
+        "id": "81bb07375a4d68be",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5b827c4c3d5ddb73",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Tampilan grafik"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "86952c2ccd16c72c",
+    "type": "split",
+    "children": [
+      {
+        "id": "e53b94cadc630102",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a4519308c5e4b18e",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Penjelajah berkas"
+            }
+          },
+          {
+            "id": "6eb67ec73c14b0bf",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Penelusuran"
+            }
+          },
+          {
+            "id": "81b9e5fdae997e8c",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Penanda"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "ca35e02213325227",
+    "type": "split",
+    "children": [
+      {
+        "id": "c7ab73fa03b89769",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "ba18311fbff68c4c",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Selamat datang.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlink pada Selamat datang"
+            }
+          },
+          {
+            "id": "4a0b27d78247e715",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Selamat datang.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Tautan keluar dari Selamat datang"
+            }
+          },
+          {
+            "id": "955d0a35381ecf5a",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tag"
+            }
+          },
+          {
+            "id": "e733170fddbc2119",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Semua properti"
+            }
+          },
+          {
+            "id": "04d63186acd737a0",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Selamat datang.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Kerangka dari Selamat datang"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Buka peralih cepat": false,
+      "graph:Buka tampilan grafik": false,
+      "canvas:Buat kanvas baru": false,
+      "daily-notes:Buka catatan hari ini": false,
+      "templates:Masukkan template": false,
+      "command-palette:Buka palet perintah": false,
+      "bases:Buat basis baru": false
+    }
+  },
+  "active": "5b827c4c3d5ddb73",
+  "lastOpenFiles": [
+    "Catatan/Controllers/AnnouncementController.md",
+    "AGENTS.md",
+    "Catatan/Indeks.md",
+    "Catatan/Controllers/LumbungChatController.md",
+    "Selamat datang.md"
+  ]
+}
