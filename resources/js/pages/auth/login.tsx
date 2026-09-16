@@ -1,5 +1,6 @@
 import { Form, Head, router } from '@inertiajs/react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
@@ -17,17 +18,22 @@ type Props = {
     canResetPassword: boolean;
     larkEnabled: boolean;
     larkAppId: string;
+    larkH5RedirectUri: string;
     larkScopes: string;
 };
 
 type LarkWindow = Window & {
-    h5sdk?: { ready: (callback: () => void) => void };
+    h5sdk?: {
+        ready: (callback: () => void) => void;
+        error?: (callback: (error: unknown) => void) => void;
+    };
     tt?: {
         requestAccess?: (options: {
             appID: string;
+            redirect_uri: string;
             scopeList: string[];
             success: (result: { code?: string }) => void;
-            fail: () => void;
+            fail: (error: unknown) => void;
         }) => void;
     };
 };
@@ -41,41 +47,73 @@ export default function Login({
     canResetPassword,
     larkEnabled,
     larkAppId,
+    larkH5RedirectUri,
     larkScopes,
 }: Props) {
+    const [isH5LoggingIn, setIsH5LoggingIn] = useState(false);
+
     useEffect(() => {
         if (
             !larkEnabled ||
             !larkAppId ||
+            !larkH5RedirectUri ||
             !/(Lark|Feishu)/i.test(navigator.userAgent)
         ) {
             return;
         }
 
+        const handleH5Failure = () => {
+            sessionStorage.removeItem(larkAutoLoginKey);
+            setIsH5LoggingIn(false);
+            toast.error(
+                'Login otomatis Lark gagal. Silakan gunakan tombol Login with Lark untuk mencoba kembali.',
+            );
+        };
+
         const requestLogin = () => {
             const { h5sdk, tt } = window as LarkWindow;
 
-            if (
-                !h5sdk ||
-                !tt?.requestAccess ||
-                sessionStorage.getItem(larkAutoLoginKey)
-            ) {
+            if (sessionStorage.getItem(larkAutoLoginKey)) {
+                return;
+            }
+
+            if (!h5sdk || !tt?.requestAccess) {
+                handleH5Failure();
+
                 return;
             }
 
             sessionStorage.setItem(larkAutoLoginKey, 'true');
+            setIsH5LoggingIn(true);
+            h5sdk.error?.(handleH5Failure);
+
             h5sdk.ready(() => {
                 tt.requestAccess?.({
                     appID: larkAppId,
+                    redirect_uri: larkH5RedirectUri,
                     scopeList: larkScopes.split(/\s+/).filter(Boolean),
                     success: ({ code }) => {
                         if (code) {
-                            router.post(larkH5.url(), { code });
+                            router.post(
+                                larkH5.url(),
+                                { code },
+                                {
+                                    preserveScroll: true,
+                                    onError: handleH5Failure,
+                                    onNetworkError: handleH5Failure,
+                                    onFinish: () => {
+                                        sessionStorage.removeItem(
+                                            larkAutoLoginKey,
+                                        );
+                                        setIsH5LoggingIn(false);
+                                    },
+                                },
+                            );
                         } else {
-                            sessionStorage.removeItem(larkAutoLoginKey);
+                            handleH5Failure();
                         }
                     },
-                    fail: () => sessionStorage.removeItem(larkAutoLoginKey),
+                    fail: handleH5Failure,
                 });
             });
         };
@@ -96,7 +134,7 @@ export default function Login({
         }
 
         return () => script.removeEventListener('load', requestLogin);
-    }, [larkAppId, larkEnabled, larkScopes]);
+    }, [larkAppId, larkEnabled, larkH5RedirectUri, larkScopes]);
 
     return (
         <>
@@ -119,6 +157,12 @@ export default function Login({
                             Login with Lark
                         </a>
                     </Button>
+
+                    {isH5LoggingIn && (
+                        <p className="mt-2 text-center text-xs text-muted-foreground">
+                            Memverifikasi akun Lark…
+                        </p>
+                    )}
 
                     <div className="relative my-6">
                         <div className="absolute inset-0 flex items-center">

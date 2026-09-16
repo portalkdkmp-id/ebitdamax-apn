@@ -91,7 +91,7 @@ class LarkSsoController extends Controller
         $accessToken = $this->exchangeAuthorizationCode(
             $configuration,
             $code,
-            includeRedirectUri: false,
+            $configuration['h5_redirect_uri'],
         );
 
         if ($accessToken === null) {
@@ -102,7 +102,7 @@ class LarkSsoController extends Controller
     }
 
     /**
-     * @param  array{app_id: string, app_secret: string, authorization_url: string, base_url: string, redirect_uri: string, scopes: string}  $configuration
+     * @param  array{app_id: string, app_secret: string, authorization_url: string, base_url: string, redirect_uri: string, h5_redirect_uri: string, scopes: string}  $configuration
      */
     private function completeLogin(Request $request, array $configuration, string $accessToken): RedirectResponse
     {
@@ -128,23 +128,20 @@ class LarkSsoController extends Controller
     }
 
     /**
-     * @param  array{app_id: string, app_secret: string, authorization_url: string, base_url: string, redirect_uri: string, scopes: string}  $configuration
+     * @param  array{app_id: string, app_secret: string, authorization_url: string, base_url: string, redirect_uri: string, h5_redirect_uri: string, scopes: string}  $configuration
      */
     private function exchangeAuthorizationCode(
         array $configuration,
         string $code,
-        bool $includeRedirectUri = true,
+        ?string $redirectUri = null,
     ): ?string {
         $payload = [
             'grant_type' => 'authorization_code',
             'code' => $code,
             'client_id' => $configuration['app_id'],
             'client_secret' => $configuration['app_secret'],
+            'redirect_uri' => $redirectUri ?? $configuration['redirect_uri'],
         ];
-
-        if ($includeRedirectUri) {
-            $payload['redirect_uri'] = $configuration['redirect_uri'];
-        }
 
         $response = Http::acceptJson()
             ->connectTimeout(5)
@@ -167,7 +164,7 @@ class LarkSsoController extends Controller
     }
 
     /**
-     * @param  array{app_id: string, app_secret: string, authorization_url: string, base_url: string, redirect_uri: string, scopes: string}  $configuration
+     * @param  array{app_id: string, app_secret: string, authorization_url: string, base_url: string, redirect_uri: string, h5_redirect_uri: string, scopes: string}  $configuration
      * @return array{open_id: string, email: string}|null
      */
     private function larkIdentity(array $configuration, string $accessToken): ?array
@@ -271,7 +268,7 @@ class LarkSsoController extends Controller
     }
 
     /**
-     * @return array{app_id: string, app_secret: string, authorization_url: string, base_url: string, redirect_uri: string, scopes: string}|null
+     * @return array{app_id: string, app_secret: string, authorization_url: string, base_url: string, redirect_uri: string, h5_redirect_uri: string, scopes: string}|null
      */
     private function configuration(): ?array
     {
@@ -284,6 +281,7 @@ class LarkSsoController extends Controller
         $appId = trim((string) ($lark['app_id'] ?? ''));
         $appSecret = trim((string) ($lark['app_secret'] ?? ''));
         $redirectUri = trim((string) ($lark['redirect_uri'] ?? ''));
+        $h5RedirectUri = trim((string) ($lark['h5_redirect_uri'] ?? ''));
         $baseUrl = rtrim(trim((string) ($lark['base_url'] ?? '')), '/');
         $authorizationUrl = trim((string) ($lark['authorization_url'] ?? ''));
         $scopes = trim((string) ($lark['scopes'] ?? ''));
@@ -292,6 +290,7 @@ class LarkSsoController extends Controller
             $appId === ''
             || $appSecret === ''
             || $redirectUri === ''
+            || $h5RedirectUri === ''
             || $baseUrl === ''
             || $authorizationUrl === ''
             || $scopes === ''
@@ -305,6 +304,7 @@ class LarkSsoController extends Controller
             'authorization_url' => $authorizationUrl,
             'base_url' => $baseUrl,
             'redirect_uri' => $redirectUri,
+            'h5_redirect_uri' => $h5RedirectUri,
             'scopes' => $scopes,
         ];
     }

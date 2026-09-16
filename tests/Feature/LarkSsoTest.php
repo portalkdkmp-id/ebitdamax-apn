@@ -11,6 +11,7 @@ beforeEach(function (): void {
         'app_id' => 'cli_test',
         'app_secret' => 'test-secret',
         'redirect_uri' => 'https://ebitdamax.example.test/auth/lark/callback',
+        'h5_redirect_uri' => 'https://ebitdamax.example.test/login',
         'base_url' => 'https://open.larksuite.com',
         'authorization_url' => 'https://accounts.larksuite.com/open-apis/authen/v1/authorize',
         'scopes' => 'component:user_profile contact:user.email:readonly',
@@ -44,6 +45,7 @@ test('login exposes the Lark app id for H5 auto login', function () {
             ->component('auth/login')
             ->where('larkEnabled', true)
             ->where('larkAppId', 'cli_test')
+            ->where('larkH5RedirectUri', 'https://ebitdamax.example.test/login')
             ->where('larkScopes', 'component:user_profile contact:user.email:readonly'));
 });
 
@@ -75,7 +77,7 @@ test('Lark H5 login authenticates with an authorization code', function () {
 
     Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://open.larksuite.com/open-apis/authen/v2/oauth/token'
         && $request->data()['code'] === 'h5-authorization-code'
-        && ! array_key_exists('redirect_uri', $request->data()));
+        && $request->data()['redirect_uri'] === 'https://ebitdamax.example.test/login');
 });
 
 test('Lark H5 login rejects a missing authorization code', function () {

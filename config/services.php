@@ -63,12 +63,16 @@ return [
             'LARK_REDIRECT_URI',
             rtrim((string) env('APP_URL', 'http://localhost'), '/').'/auth/lark/callback',
         ),
+        'h5_redirect_uri' => env(
+            'LARK_H5_REDIRECT_URI',
+            rtrim((string) env('APP_URL', 'http://localhost'), '/').'/login',
+        ),
         'base_url' => env('LARK_BASE_URL', 'https://open.larksuite.com'),
         'authorization_url' => env(
             'LARK_AUTHORIZATION_URL',
             'https://accounts.larksuite.com/open-apis/authen/v1/authorize',
         ),
-        'scopes' => env('LARK_SCOPES', 'component:user_profile contact:user.email:readonly'),
+        'scopes' => env('LARK_SCOPES', 'contact:user.email:readonly'),
     ],
 
 ];

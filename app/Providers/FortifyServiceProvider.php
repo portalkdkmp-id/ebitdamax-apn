@@ -53,6 +53,7 @@ class FortifyServiceProvider extends ServiceProvider
             'status' => $request->session()->get('status'),
             'larkEnabled' => (bool) config('services.lark.enabled'),
             'larkAppId' => (string) config('services.lark.app_id'),
+            'larkH5RedirectUri' => (string) config('services.lark.h5_redirect_uri'),
             'larkScopes' => (string) config('services.lark.scopes'),
         ]));
 
