@@ -178,7 +178,7 @@ export default function Login({
             )}
 
             <Form
-                {...store.form()}
+                action={store()}
                 resetOnSuccess={['password']}
                 className="flex flex-col gap-6"
             >
