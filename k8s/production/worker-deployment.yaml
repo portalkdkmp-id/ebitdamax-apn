@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ebitda-worker
+  namespace: ebitda
+  labels:
+    app.kubernetes.io/name: ebitdamax-apn
+    app.kubernetes.io/component: worker
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ebitdamax-apn
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ebitdamax-apn
+        app.kubernetes.io/component: worker
+      annotations:
+        gke-gcsfuse/volumes: 'true'
+    spec:
+      serviceAccountName: ebitda
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: APP_IMAGE
+          imagePullPolicy: IfNotPresent
+          args:
+            - php
+            - artisan
+            - queue:work
+            - redis
+            - --sleep=3
+            - --tries=3
+            - --timeout=90
+            - --max-time=3600
+            - --no-interaction
+          envFrom:
+            - configMapRef:
+                name: ebitda-config
+            - secretRef:
+                name: ebitda-secret
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '256Mi'
+            limits:
+              cpu: '750m'
+              memory: '768Mi'
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: uploads
+              mountPath: /var/www/html/storage/app/private
+            - name: redis-ca
+              mountPath: /etc/ssl/redis
+              readOnly: true
+      volumes:
+        - name: redis-ca
+          configMap:
+            name: ebitda-redis-ca
+        - name: uploads
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            readOnly: false
+            volumeAttributes:
+              bucketName: dev-agrinas-apn-prod-ebitda-assets
+              mountOptions: 'implicit-dirs'

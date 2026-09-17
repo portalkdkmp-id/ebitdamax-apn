@@ -1,0 +1,288 @@
+name: deploy-prod-gke
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Optional image tag. Defaults to Git tag name or short commit SHA."
+        required: false
+        type: string
+      run_migrations:
+        description: "Run php artisan migrate --force before rollout."
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: ebitdamax-apn-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GAR_LOCATION: asia-southeast2
+  GAR_REPOSITORY: company-docker-prod
+  IMAGE_NAME: ebitdamax-apn
+  K8S_NAMESPACE: ebitda
+
+jobs:
+  deploy:
+    name: Build and deploy production to GKE
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: production
+      url: https://ebitda-prod.dev-agrinas.id
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate production configuration
+        shell: bash
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GKE_CLUSTER: ${{ vars.GKE_CLUSTER_PROD }}
+          GKE_LOCATION: ${{ vars.GKE_LOCATION }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "Production deployment must run from the main branch." >&2
+            exit 1
+          fi
+
+          required_values=(
+            GCP_PROJECT_ID GKE_CLUSTER GKE_LOCATION
+            GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT
+          )
+
+          for variable in "${required_values[@]}"; do
+            if [ -z "${!variable:-}" ]; then
+              echo "Missing production variable or secret: ${variable}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Resolve version tag
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          input_version="${{ inputs.version }}"
+
+          if [ -n "$input_version" ]; then
+            version="$input_version"
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME}"
+          else
+            version="$(git rev-parse --short=7 HEAD)"
+          fi
+
+          if ! printf '%s' "$version" | grep -Eq '^[a-z0-9][a-z0-9.-]{0,39}$'; then
+            echo "Version must be a lowercase Docker/Kubernetes-compatible tag (max 40 characters): $version" >&2
+            exit 1
+          fi
+
+          image_uri="${GAR_LOCATION}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${GAR_REPOSITORY}/${IMAGE_NAME}:${version}"
+          sha_uri="${GAR_LOCATION}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${GAR_REPOSITORY}/${IMAGE_NAME}:${GITHUB_SHA}"
+
+          {
+            echo "version=${version}"
+            echo "uri=${image_uri}"
+            echo "sha_uri=${sha_uri}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Resolved image: ${image_uri}"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          install_components: gke-gcloud-auth-plugin
+
+      - name: Configure Docker for Artifact Registry
+        shell: bash
+        run: gcloud auth configure-docker "${GAR_LOCATION}-docker.pkg.dev" --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push production image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.image.outputs.uri }}
+            ${{ steps.image.outputs.sha_uri }}
+          build-args: |
+            APP_VERSION=${{ steps.image.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Get GKE credentials
+        shell: bash
+        env:
+          USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
+        run: |
+          gcloud container clusters get-credentials "${{ vars.GKE_CLUSTER_PROD }}" \
+            --location "${{ vars.GKE_LOCATION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}"
+
+      - name: Verify foundation and apply production resources
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          kubectl get namespace "$K8S_NAMESPACE" >/dev/null
+          kubectl get serviceaccount ebitda --namespace "$K8S_NAMESPACE" >/dev/null
+          kubectl apply -f k8s/production/configmap.yaml
+          kubectl apply -f k8s/production/redis-ca-configmap.yaml
+          kubectl apply -f k8s/production/service.yaml
+          kubectl apply -f k8s/production/health-check-policy.yaml
+          kubectl apply -f k8s/production/http-route.yaml
+
+      - name: Validate application Secret
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          secret_name="ebitda-secret"
+          kubectl get secret "$secret_name" --namespace "$K8S_NAMESPACE" >/dev/null
+
+          required_keys=(
+            APP_KEY
+            DB_HOST
+            DB_USERNAME
+            DB_PASSWORD
+            REDIS_HOST
+            REDIS_PASSWORD
+            PORTAL_PEMBANGUNAN_SARPRAS_TOKEN
+            LARK_APP_ID
+            LARK_APP_SECRET
+          )
+
+          for key in "${required_keys[@]}"; do
+            value="$(kubectl get secret "$secret_name" --namespace "$K8S_NAMESPACE" \
+              --output="jsonpath={.data.${key}}")"
+
+            if [ -z "$value" ]; then
+              echo "Secret $secret_name is missing a non-empty $key key." >&2
+              exit 1
+            fi
+          done
+
+      - name: Render Kubernetes workloads
+        shell: bash
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
+          IMAGE_TAG: ${{ steps.image.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$RUNNER_TEMP/ebitda-k8s"
+
+          for manifest in deployment worker-deployment scheduler-cronjob migration-job; do
+            sed \
+              -e "s|APP_IMAGE|${IMAGE_URI}|g" \
+              -e "s|IMAGE_TAG|${IMAGE_TAG}|g" \
+              "k8s/production/${manifest}.yaml" > "$RUNNER_TEMP/ebitda-k8s/${manifest}.yaml"
+          done
+
+      - name: Run database migrations
+        if: ${{ inputs.run_migrations }}
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ steps.image.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          job_name="ebitda-migrate-${IMAGE_TAG}"
+          manifest="$RUNNER_TEMP/ebitda-k8s/migration-job.yaml"
+
+          kubectl delete job "$job_name" --namespace "$K8S_NAMESPACE" \
+            --ignore-not-found --wait=true
+          kubectl apply -f "$manifest"
+
+          completed=false
+          for _ in $(seq 1 120); do
+            if [ "$(kubectl get job "$job_name" --namespace "$K8S_NAMESPACE" \
+              --output='jsonpath={.status.conditions[?(@.type=="Complete")].status}')" = "True" ]; then
+              completed=true
+              break
+            fi
+
+            if [ "$(kubectl get job "$job_name" --namespace "$K8S_NAMESPACE" \
+              --output='jsonpath={.status.conditions[?(@.type=="Failed")].status}')" = "True" ]; then
+              break
+            fi
+
+            sleep 5
+          done
+
+          if [ "$completed" != true ]; then
+            echo "Migration failed or timed out. Diagnostics follow." >&2
+            kubectl describe job "$job_name" --namespace "$K8S_NAMESPACE" || true
+            kubectl get pods --namespace "$K8S_NAMESPACE" \
+              --selector="job-name=${job_name}" --output=wide || true
+            kubectl logs "job/${job_name}" --namespace "$K8S_NAMESPACE" \
+              --all-containers=true --tail=-1 || true
+            exit 1
+          fi
+
+          kubectl logs "job/${job_name}" --namespace "$K8S_NAMESPACE" \
+            --all-containers=true --tail=-1
+
+      - name: Deploy application workloads
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          kubectl apply -f "$RUNNER_TEMP/ebitda-k8s/deployment.yaml"
+          kubectl apply -f "$RUNNER_TEMP/ebitda-k8s/worker-deployment.yaml"
+          kubectl apply -f "$RUNNER_TEMP/ebitda-k8s/scheduler-cronjob.yaml"
+          kubectl apply -f k8s/production/hpa.yaml
+
+      - name: Wait for rollout
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          kubectl rollout status deployment/ebitda \
+            --namespace "$K8S_NAMESPACE" --timeout=10m
+          kubectl rollout status deployment/ebitda-worker \
+            --namespace "$K8S_NAMESPACE" --timeout=10m
+          kubectl get pods,service,hpa,httproute,healthcheckpolicy \
+            --namespace "$K8S_NAMESPACE" --output=wide
+
+      - name: Show diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          kubectl get all --namespace "$K8S_NAMESPACE" --output=wide || true
+          kubectl get events --namespace "$K8S_NAMESPACE" \
+            --sort-by='.lastTimestamp' | tail -n 80 || true
+          kubectl describe deployment/ebitda \
+            --namespace "$K8S_NAMESPACE" || true
+          kubectl describe deployment/ebitda-worker \
+            --namespace "$K8S_NAMESPACE" || true
+          kubectl logs deployment/ebitda --namespace "$K8S_NAMESPACE" \
+            --all-containers=true --tail=200 || true
+          kubectl logs deployment/ebitda-worker --namespace "$K8S_NAMESPACE" \
+            --all-containers=true --tail=200 || true

@@ -4,14 +4,15 @@ metadata:
   name: ebitda
   namespace: ebitda
   labels:
-    app.kubernetes.io/name: ebitda
+    app.kubernetes.io/name: ebitdamax-apn
     app.kubernetes.io/component: web
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: ebitda
+    app.kubernetes.io/name: ebitdamax-apn
     app.kubernetes.io/component: web
   ports:
     - name: http
       port: 80
       targetPort: http
+      protocol: TCP

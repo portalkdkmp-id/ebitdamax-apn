@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ebitda-config
+  namespace: ebitda
+  labels:
+    app.kubernetes.io/name: ebitda
+data:
+  APP_NAME: 'EBITDAMAX APN'
+  APP_ENV: 'production'
+  APP_DEBUG: 'true'
+  APP_URL: 'https://ebitda-prod.dev-agrinas.id'
+  APP_LOCALE: 'en'
+  APP_FALLBACK_LOCALE: 'en'
+  APP_MAINTENANCE_DRIVER: 'cache'
+  APP_MAINTENANCE_STORE: 'redis'
+  BCRYPT_ROUNDS: '12'
+  KDKMP_BUSINESS_TIMEZONE: 'Asia/Jakarta'
+
+  LOG_CHANNEL: 'stack'
+  LOG_STACK: 'stderr'
+  LOG_DEPRECATIONS_CHANNEL: 'null'
+  LOG_LEVEL: 'info'
+
+  DB_CONNECTION: 'pgsql'
+  DB_PORT: '5432'
+  DB_DATABASE: 'ebitda'
+
+  REDIS_CLIENT: 'phpredis'
+  REDIS_SCHEME: 'tls'
+  REDIS_PORT: '6378'
+  REDIS_CA_FILE: '/etc/ssl/redis/ca.pem'
+  REDIS_VERIFY_PEER: 'true'
+  REDIS_VERIFY_PEER_NAME: 'true'
+  REDIS_DB: '0'
+  REDIS_CACHE_DB: '1'
+  REDIS_QUEUE_RETRY_AFTER: '120'
+  CACHE_STORE: 'redis'
+  CACHE_PREFIX: 'ebitda_cache_'
+  SESSION_DRIVER: 'redis'
+  SESSION_STORE: 'redis'
+  SESSION_LIFETIME: '120'
+  SESSION_ENCRYPT: 'true'
+  SESSION_PATH: '/'
+  SESSION_DOMAIN: 'ebitda-prod.dev-agrinas.id'
+  SESSION_SECURE_COOKIE: 'true'
+  SESSION_HTTP_ONLY: 'true'
+  SESSION_SAME_SITE: 'lax'
+  QUEUE_CONNECTION: 'redis'
+
+  # Both Laravel local disks are backed by the GCS FUSE mount in each pod.
+  FILESYSTEM_DISK: 'local'
+  DOCUMENTS_DISK: 'local'
+
+  MAIL_MAILER: 'log'
+  BROADCAST_CONNECTION: 'log'
+  LUMBUNG_KMS_CHAT_URL: 'https://lumbung.sibisa.site/chat'
+  LMS_KDKMP_LEARNING_PATHS_URL: 'https://lms.agrinaspangan.id/learning-paths'
+  PORTAL_PEMBANGUNAN_BASE_URL: 'https://portalkdkmp.id'
+  PORTAL_PEMETAAN_BASE_URL: 'https://pemetaan-lahan.portalkdkmp.id'
+  LARK_SSO_ENABLED: 'true'
+  LARK_REDIRECT_URL: 'https://ebitda-prod.dev-agrinas.id/auth/lark/callback'
+  LARK_BASE_URL: 'https://open.larksuite.com'
+  LARK_AUTHORIZATION_URL: 'https://accounts.larksuite.com/open-apis/authen/v1/authorize'
+  LARK_SCOPES: 'component:user_profile contact:user.email:readonly'
+
+  LARAVEL_OPTIMIZE: 'true'
+  LARAVEL_STORAGE_LINK: 'false'
