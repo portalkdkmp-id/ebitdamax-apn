@@ -171,7 +171,7 @@ function KdkmpTaskSelectionForm({
     };
 
     return (
-        <Card>
+        <Card data-tour="daily-bmc-selection">
             <CardHeader className="border-b">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -240,8 +240,8 @@ function KdkmpTaskSelectionForm({
                                                 {isUnmappedGroup && (
                                                     <p className="mt-1 text-xs text-muted-foreground">
                                                         Task ini belum memiliki
-                                                        poin BMC dan tetap dipilih
-                                                        satu per satu.
+                                                        poin BMC dan tetap
+                                                        dipilih satu per satu.
                                                     </p>
                                                 )}
                                             </div>
@@ -287,7 +287,9 @@ function KdkmpTaskSelectionForm({
                                             {group.tasks.map((task) => {
                                                 const isChecked =
                                                     task.is_mandatory ||
-                                                    selectedTaskIds.has(task.id);
+                                                    selectedTaskIds.has(
+                                                        task.id,
+                                                    );
                                                 const isDisabled =
                                                     task.is_mandatory ||
                                                     task.is_locked;
@@ -310,7 +312,8 @@ function KdkmpTaskSelectionForm({
                                                             </Badge>
                                                             {task.is_locked && (
                                                                 <Badge variant="secondary">
-                                                                    Sedang dikerjakan
+                                                                    Sedang
+                                                                    dikerjakan
                                                                 </Badge>
                                                             )}
                                                         </span>
@@ -320,18 +323,25 @@ function KdkmpTaskSelectionForm({
                                                             {task.execution_time &&
                                                                 ` · ${task.execution_time}`}
                                                             {' · '}
-                                                            {task.time_require} menit
+                                                            {
+                                                                task.time_require
+                                                            }{' '}
+                                                            menit
                                                         </span>
                                                         {task.description && (
                                                             <span className="mt-2 line-clamp-2 block text-sm text-muted-foreground">
-                                                                {task.description}
+                                                                {
+                                                                    task.description
+                                                                }
                                                             </span>
                                                         )}
                                                         {task.is_locked && (
                                                             <span className="mt-2 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
                                                                 <Clock3 className="size-3.5" />
-                                                                Selesaikan task ini sebelum
-                                                                mengubah pilihannya.
+                                                                Selesaikan task
+                                                                ini sebelum
+                                                                mengubah
+                                                                pilihannya.
                                                             </span>
                                                         )}
                                                     </span>
@@ -362,7 +372,9 @@ function KdkmpTaskSelectionForm({
                                                     >
                                                         <Checkbox
                                                             checked={isChecked}
-                                                            disabled={isDisabled}
+                                                            disabled={
+                                                                isDisabled
+                                                            }
                                                             onCheckedChange={(
                                                                 checked,
                                                             ) =>
@@ -377,14 +389,16 @@ function KdkmpTaskSelectionForm({
                                                     </label>
                                                 );
                                             })}
-                                            {isBundleLocked && !isUnmappedGroup && (
-                                                <p className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
-                                                    <Clock3 className="size-3.5" />
-                                                    Selesaikan task yang sedang
-                                                    dikerjakan sebelum mengubah
-                                                    bundle ini.
-                                                </p>
-                                            )}
+                                            {isBundleLocked &&
+                                                !isUnmappedGroup && (
+                                                    <p className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+                                                        <Clock3 className="size-3.5" />
+                                                        Selesaikan task yang
+                                                        sedang dikerjakan
+                                                        sebelum mengubah bundle
+                                                        ini.
+                                                    </p>
+                                                )}
                                         </div>
                                     </section>
                                 );
@@ -398,7 +412,11 @@ function KdkmpTaskSelectionForm({
                         )}
 
                         <div className="flex justify-end">
-                            <Button type="submit" disabled={processing}>
+                            <Button
+                                type="submit"
+                                data-tour="daily-save-task-selection"
+                                disabled={processing}
+                            >
                                 {processing
                                     ? 'Menyimpan...'
                                     : 'Simpan Pilihan Task'}

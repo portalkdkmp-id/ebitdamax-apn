@@ -282,10 +282,7 @@ export default function KdkmpDashboardDailyInputForm({
         const planRevenue = Number(data.plan_revenue);
         const targetRevenue = Number(computedValues.target_revenue);
 
-        if (
-            Number.isFinite(planRevenue) &&
-            planRevenue < targetRevenue
-        ) {
+        if (Number.isFinite(planRevenue) && planRevenue < targetRevenue) {
             setShowLowPlanRevenueConfirmation(true);
 
             return;
@@ -325,7 +322,17 @@ export default function KdkmpDashboardDailyInputForm({
         );
 
         return (
-            <div key={field.key} className="space-y-2">
+            <div
+                key={field.key}
+                className="space-y-2"
+                data-tour={
+                    field.key === 'plan_revenue'
+                        ? 'daily-plan-revenue'
+                        : field.key === 'variable_cost'
+                          ? 'daily-variable-cost'
+                          : undefined
+                }
+            >
                 <Label htmlFor={field.isDisabled ? undefined : field.key}>
                     {field.label}
                 </Label>
@@ -394,9 +401,7 @@ export default function KdkmpDashboardDailyInputForm({
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>
-                                            Pendapatan Manual
-                                        </Label>
+                                        <Label>Pendapatan Manual</Label>
                                         <p className="py-2 text-sm font-semibold text-foreground tabular-nums">
                                             {formatManualValue(
                                                 actualRevenue,
@@ -410,7 +415,6 @@ export default function KdkmpDashboardDailyInputForm({
                                         </p>
                                     </div>
                                 </div>
-
                             </section>
 
                             <section className="space-y-5 rounded-lg border bg-muted/20 p-4">
@@ -444,7 +448,10 @@ export default function KdkmpDashboardDailyInputForm({
                             </section>
                         </div>
 
-                        <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                        <section
+                            className="space-y-4 rounded-lg border bg-muted/20 p-4"
+                            data-tour="daily-operational-attendance"
+                        >
                             <div>
                                 <h2 className="font-semibold text-foreground">
                                     Kinerja Operasional
@@ -544,6 +551,7 @@ export default function KdkmpDashboardDailyInputForm({
                                     </p>
                                     <Button
                                         type="button"
+                                        data-tour="daily-save-attendance"
                                         onClick={saveOperationalAttendance}
                                         disabled={isSavingAttendance}
                                     >
@@ -561,7 +569,11 @@ export default function KdkmpDashboardDailyInputForm({
                                 Plan Revenue diisi manual. Nilai 0 tetap
                                 dianggap sebagai data valid.
                             </p>
-                            <Button type="submit" disabled={processing}>
+                            <Button
+                                type="submit"
+                                data-tour="daily-save-report"
+                                disabled={processing}
+                            >
                                 <Save className="size-4" />
                                 {processing
                                     ? 'Menyimpan...'
@@ -585,10 +597,7 @@ export default function KdkmpDashboardDailyInputForm({
                         <DialogDescription>
                             Plan Revenue yang dimasukkan adalah{' '}
                             <span className="font-semibold text-foreground">
-                                {formatManualValue(
-                                    data.plan_revenue,
-                                    true,
-                                )}
+                                {formatManualValue(data.plan_revenue, true)}
                             </span>
                             , lebih rendah dari Target Revenue{' '}
                             <span className="font-semibold text-foreground">

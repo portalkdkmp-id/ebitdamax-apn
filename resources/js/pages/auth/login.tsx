@@ -230,7 +230,7 @@ export default function Login({
                                     name="remember"
                                     tabIndex={3}
                                 />
-                                <Label htmlFor="remember">Ingat Kukuh</Label>
+                                <Label htmlFor="remember">Ingat Saya</Label>
                             </div>
 
                             <Button
