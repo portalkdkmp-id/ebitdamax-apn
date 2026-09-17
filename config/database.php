@@ -155,6 +155,7 @@ return [
 
         'default' => [
             'url' => env('REDIS_URL'),
+            'scheme' => env('REDIS_SCHEME', 'tcp'),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
@@ -164,10 +165,18 @@ return [
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
             'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
+            'context' => [
+                'stream' => [
+                    'cafile' => env('REDIS_CA_FILE'),
+                    'verify_peer' => env('REDIS_VERIFY_PEER', true),
+                    'verify_peer_name' => env('REDIS_VERIFY_PEER_NAME', true),
+                ],
+            ],
         ],
 
         'cache' => [
             'url' => env('REDIS_URL'),
+            'scheme' => env('REDIS_SCHEME', 'tcp'),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
@@ -177,6 +186,13 @@ return [
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
             'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
+            'context' => [
+                'stream' => [
+                    'cafile' => env('REDIS_CA_FILE'),
+                    'verify_peer' => env('REDIS_VERIFY_PEER', true),
+                    'verify_peer_name' => env('REDIS_VERIFY_PEER_NAME', true),
+                ],
+            ],
         ],
 
     ],

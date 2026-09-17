@@ -24,6 +24,8 @@ yarn-error.log
 /auth.json
 /gha-creds-*.json
 /gha-kubeconfig-*
+/k8s/staging/secret.yaml
+/k8s/production/secret.yaml
 /.fleet
 /.idea
 /.nova

@@ -4,7 +4,7 @@ metadata:
   name: ebitda
   namespace: ebitda
   labels:
-    app.kubernetes.io/name: ebitdamax-apn
+    app.kubernetes.io/name: ebitda
     app.kubernetes.io/component: web
 spec:
   replicas: 2
@@ -18,12 +18,12 @@ spec:
       maxSurge: 0
   selector:
     matchLabels:
-      app.kubernetes.io/name: ebitdamax-apn
+      app.kubernetes.io/name: ebitda
       app.kubernetes.io/component: web
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ebitdamax-apn
+        app.kubernetes.io/name: ebitda
         app.kubernetes.io/component: web
       annotations:
         gke-gcsfuse/volumes: 'true'
@@ -59,14 +59,14 @@ spec:
             failureThreshold: 24
           readinessProbe:
             httpGet:
-              path: /health
+              path: /up
               port: http
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /health
+              path: /up
               port: http
             periodSeconds: 20
             timeoutSeconds: 3
@@ -86,11 +86,17 @@ spec:
           volumeMounts:
             - name: uploads
               mountPath: /var/www/html/storage/app/private
+            - name: redis-ca
+              mountPath: /etc/ssl/redis
+              readOnly: true
       volumes:
+        - name: redis-ca
+          configMap:
+            name: ebitda-redis-ca
         - name: uploads
           csi:
             driver: gcsfuse.csi.storage.gke.io
             readOnly: false
             volumeAttributes:
-              bucketName: apn-prod-ebitda-assets
+              bucketName: dev-agrinas-apn-prod-ebitda-assets
               mountOptions: 'implicit-dirs'

@@ -57,3 +57,11 @@ spec:
                 capabilities:
                   drop:
                     - ALL
+              volumeMounts:
+                - name: redis-ca
+                  mountPath: /etc/ssl/redis
+                  readOnly: true
+          volumes:
+            - name: redis-ca
+              configMap:
+                name: ebitda-redis-ca

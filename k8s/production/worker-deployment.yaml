@@ -69,11 +69,17 @@ spec:
           volumeMounts:
             - name: uploads
               mountPath: /var/www/html/storage/app/private
+            - name: redis-ca
+              mountPath: /etc/ssl/redis
+              readOnly: true
       volumes:
+        - name: redis-ca
+          configMap:
+            name: ebitda-redis-ca
         - name: uploads
           csi:
             driver: gcsfuse.csi.storage.gke.io
             readOnly: false
             volumeAttributes:
-              bucketName: apn-prod-ebitda-assets
+              bucketName: dev-agrinas-apn-prod-ebitda-assets
               mountOptions: 'implicit-dirs'

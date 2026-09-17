@@ -19,10 +19,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - ebitdamax-prod.dev-agrinas.id
+        - ebitdamax-apn.dev-agrinas.id
       secretName: ebitda-tls
   rules:
-    - host: ebitdamax-prod.dev-agrinas.id
+    - host: ebitdamax-apn.dev-agrinas.id
       http:
         paths:
           - path: /

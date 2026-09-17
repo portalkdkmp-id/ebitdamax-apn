@@ -4,3 +4,4 @@ metadata:
   name: ebitda
   labels:
     app.kubernetes.io/name: ebitdamax-apn
+    environment: staging
