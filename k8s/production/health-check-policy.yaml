@@ -19,7 +19,7 @@ spec:
       httpHealthCheck:
         portSpecification: USE_FIXED_PORT
         port: 8080
-        requestPath: /up
+        requestPath: /health
   targetRef:
     group: ""
     kind: Service

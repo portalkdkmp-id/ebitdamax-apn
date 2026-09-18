@@ -54,21 +54,21 @@ spec:
                 name: ebitda-secret
           startupProbe:
             httpGet:
-              path: /up
+              path: /health
               port: http
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 24
           readinessProbe:
             httpGet:
-              path: /up
+              path: /health
               port: http
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /up
+              path: /health
               port: http
             periodSeconds: 20
             timeoutSeconds: 3
