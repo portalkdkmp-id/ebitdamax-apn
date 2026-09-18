@@ -20,9 +20,6 @@ class PlanEbitdaMatrix extends Model
 
     protected $fillable = [
         'user_id',
-        'business_process_id',
-        'unit_cost_assumption_id',
-        'revenue_plan_id',
         'code',
         'name',
         'source_sheet',
@@ -31,21 +28,6 @@ class PlanEbitdaMatrix extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function businessProcess(): BelongsTo
-    {
-        return $this->belongsTo(BusinessProcess::class);
-    }
-
-    public function unitCostAssumption(): BelongsTo
-    {
-        return $this->belongsTo(UnitCostAssumption::class);
-    }
-
-    public function revenuePlan(): BelongsTo
-    {
-        return $this->belongsTo(RevenuePlan::class);
     }
 
     public function processes(): HasMany

@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AnnouncementController;
-use App\Http\Controllers\BusinessProcessController;
 use App\Http\Controllers\CustomerAnalysisController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardRedirectController;
@@ -23,7 +22,6 @@ use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OrganizationCalculationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\PlanEbitdaMatrixController;
-use App\Http\Controllers\RevenuePlanController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SdmKdkmpEntryController;
 use App\Http\Controllers\TaskCategoryController;
@@ -31,7 +29,6 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDashboardController;
 use App\Http\Controllers\TaskReportController;
 use App\Http\Controllers\TaskReportDocumentController;
-use App\Http\Controllers\UnitCostAssumptionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValueChainJobdeskController;
 use Illuminate\Support\Facades\Route;
@@ -163,27 +160,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::resource('meeting-minutes', MeetingMinuteController::class)
         ->except(['create', 'edit', 'show']);
-
-    Route::get('/business-processes/kdkmp-gerai', [BusinessProcessController::class, 'kdkmpGerai'])
-        ->name('business-processes.kdkmp-gerai.index');
-    Route::post('/business-processes/kdkmp-gerai', [BusinessProcessController::class, 'store'])
-        ->name('business-processes.kdkmp-gerai.store');
-    Route::put('/business-processes/kdkmp-gerai/{businessProcess}', [BusinessProcessController::class, 'update'])
-        ->name('business-processes.kdkmp-gerai.update');
-
-    Route::get('/unit-cost-assumptions/kdkmp-gerai', [UnitCostAssumptionController::class, 'kdkmpGerai'])
-        ->name('unit-cost-assumptions.kdkmp-gerai.index');
-    Route::post('/unit-cost-assumptions/kdkmp-gerai', [UnitCostAssumptionController::class, 'store'])
-        ->name('unit-cost-assumptions.kdkmp-gerai.store');
-    Route::put('/unit-cost-assumptions/kdkmp-gerai/{unitCostAssumption}', [UnitCostAssumptionController::class, 'update'])
-        ->name('unit-cost-assumptions.kdkmp-gerai.update');
-
-    Route::get('/revenue-plans/kdkmp-gerai', [RevenuePlanController::class, 'kdkmpGerai'])
-        ->name('revenue-plans.kdkmp-gerai.index');
-    Route::post('/revenue-plans/kdkmp-gerai', [RevenuePlanController::class, 'store'])
-        ->name('revenue-plans.kdkmp-gerai.store');
-    Route::put('/revenue-plans/kdkmp-gerai/{revenuePlan}', [RevenuePlanController::class, 'update'])
-        ->name('revenue-plans.kdkmp-gerai.update');
 
     Route::get('/plan-ebitda-matrices/kdkmp-gerai', [PlanEbitdaMatrixController::class, 'kdkmpGerai'])
         ->name('plan-ebitda-matrices.kdkmp-gerai.index');

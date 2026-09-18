@@ -31,10 +31,3 @@ export type PlanEbitdaMatrix = {
     processes: PlanEbitdaMatrixProcess[];
     rows: PlanEbitdaMatrixRow[];
 };
-
-export type PlanEbitdaMatrixDependencies = {
-    businessProcess: boolean;
-    unitCostAssumption: boolean;
-    revenuePlan: boolean;
-    complete: boolean;
-};

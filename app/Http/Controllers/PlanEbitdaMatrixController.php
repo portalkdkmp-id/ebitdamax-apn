@@ -5,17 +5,12 @@ namespace App\Http\Controllers;
 use App\Actions\ResolveEbitdaKdkmpDataOwnerAction;
 use App\Actions\SavePlanEbitdaMatrixAction;
 use App\Http\Requests\SavePlanEbitdaMatrixRequest;
-use App\Models\BusinessProcess;
-use App\Models\BusinessProcessStep;
 use App\Models\PlanEbitdaMatrix;
 use App\Models\PlanEbitdaMatrixProcess;
 use App\Models\PlanEbitdaMatrixRow;
-use App\Models\RevenuePlan;
-use App\Models\UnitCostAssumption;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -38,23 +33,6 @@ class PlanEbitdaMatrixController extends Controller
         );
         $owner = $ownerContext['owner'];
 
-        $businessProcess = BusinessProcess::query()
-            ->with('steps')
-            ->whereBelongsTo($owner)
-            ->where('code', BusinessProcess::CODE_KDKMP_GERAI)
-            ->first();
-        $unitCostAssumption = UnitCostAssumption::query()
-            ->whereBelongsTo($owner)
-            ->where('code', UnitCostAssumption::CODE_KDKMP_GERAI)
-            ->first();
-        $revenuePlan = RevenuePlan::query()
-            ->whereBelongsTo($owner)
-            ->where('code', RevenuePlan::CODE_KDKMP_GERAI)
-            ->first();
-        $dependenciesComplete = $businessProcess !== null
-            && $unitCostAssumption !== null
-            && $revenuePlan !== null;
-
         $matrix = PlanEbitdaMatrix::query()
             ->with(['processes', 'rows'])
             ->whereBelongsTo($owner)
@@ -66,20 +44,11 @@ class PlanEbitdaMatrixController extends Controller
         }
 
         return Inertia::render('PlanEbitdaMatrices/KdkmpGerai', [
-            'matrix' => $matrix === null
-                ? $this->template($businessProcess?->steps)
-                : $this->transformMatrix($matrix),
+            'matrix' => $matrix === null ? $this->template() : $this->transformMatrix($matrix),
             'can' => [
                 'create' => $matrix === null
-                    && $dependenciesComplete
                     && Gate::allows('create', PlanEbitdaMatrix::class),
                 'update' => $matrix !== null && Gate::allows('update', $matrix),
-            ],
-            'dependencies' => [
-                'businessProcess' => $businessProcess !== null,
-                'unitCostAssumption' => $unitCostAssumption !== null,
-                'revenuePlan' => $revenuePlan !== null,
-                'complete' => $dependenciesComplete,
             ],
             'dataOwner' => $ownerContext['dataOwner'],
             'dataOwnerOptions' => $ownerContext['dataOwnerOptions'],
@@ -164,22 +133,9 @@ class PlanEbitdaMatrixController extends Controller
         ];
     }
 
-    /**
-     * @param  Collection<int, BusinessProcessStep>|null  $ownerSteps
-     * @return array<string, mixed>
-     */
-    private function template(?Collection $ownerSteps): array
+    /** @return array<string, mixed> */
+    private function template(): array
     {
-        $steps = $ownerSteps;
-
-        if ($steps === null || $steps->isEmpty()) {
-            $steps = BusinessProcess::query()
-                ->whereHas('user', fn ($query) => $query->where('email', User::EMAIL_KDKMP_GERAI))
-                ->where('code', BusinessProcess::CODE_KDKMP_GERAI)
-                ->first()?->steps()
-                ->get();
-        }
-
         $data = require database_path('seeders/data/kdkmp_gerai_plan_ebitda_matrix.php');
 
         return [
@@ -187,14 +143,14 @@ class PlanEbitdaMatrixController extends Controller
             'code' => PlanEbitdaMatrix::CODE_KDKMP_GERAI,
             'name' => 'EBITDA MATRIX RENCANA',
             'source_sheet' => '4. PLAN EBITDA MATRIX',
-            'processes' => ($steps ?? collect())
-                ->map(fn (BusinessProcessStep $step): array => [
+            'processes' => collect($data['processes'])
+                ->map(fn (array $process): array => [
                     'id' => null,
-                    'sequence' => $step->sequence,
-                    'process_group' => $step->process_group,
-                    'detail_process' => $step->detail_process,
+                    'sequence' => $process['sequence'],
+                    'process_group' => $process['process_group'],
+                    'detail_process' => $process['detail_process'],
                     'unit_name' => null,
-                    'pic' => $step->pic,
+                    'pic' => $process['pic'],
                 ])
                 ->values()
                 ->all(),

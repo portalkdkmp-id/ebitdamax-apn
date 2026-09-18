@@ -15,7 +15,6 @@ class PlanEbitdaMatrixRow extends Model
 
     protected $fillable = [
         'plan_ebitda_matrix_id',
-        'unit_cost_assumption_row_id',
         'section_code',
         'sort_order',
         'row_type',
@@ -31,11 +30,6 @@ class PlanEbitdaMatrixRow extends Model
     public function planEbitdaMatrix(): BelongsTo
     {
         return $this->belongsTo(PlanEbitdaMatrix::class);
-    }
-
-    public function unitCostAssumptionRow(): BelongsTo
-    {
-        return $this->belongsTo(UnitCostAssumptionRow::class);
     }
 
     /** @return array<string, string> */

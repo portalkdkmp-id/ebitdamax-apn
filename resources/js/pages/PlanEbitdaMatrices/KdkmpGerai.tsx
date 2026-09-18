@@ -1,7 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { Pencil, Plus } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { EbitdaKdkmpDataOwnerPanel } from '@/components/ebitda-kdkmp-data-owner';
 import type { EbitdaKdkmpDataOwner } from '@/components/ebitda-kdkmp-data-owner';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,6 @@ import {
 } from '@/routes/plan-ebitda-matrices/kdkmp-gerai';
 import type {
     PlanEbitdaMatrix,
-    PlanEbitdaMatrixDependencies,
     PlanEbitdaMatrixProcess,
     PlanEbitdaMatrixRow,
 } from '@/types/plan-ebitda-matrix';
@@ -33,7 +32,6 @@ type Props = {
         create: boolean;
         update: boolean;
     };
-    dependencies: PlanEbitdaMatrixDependencies;
     dataOwner: EbitdaKdkmpDataOwner;
     dataOwnerOptions: EbitdaKdkmpDataOwner[];
     canSelectDataOwner: boolean;
@@ -95,16 +93,6 @@ function sectionSpans(rows: PlanEbitdaMatrixRow[]): Map<string, number> {
 
         return spans;
     }, new Map<string, number>());
-}
-
-function missingDependencies(
-    dependencies: PlanEbitdaMatrixDependencies,
-): string[] {
-    return [
-        !dependencies.businessProcess ? 'Business Process' : null,
-        !dependencies.unitCostAssumption ? 'Unit Cost Assumption' : null,
-        !dependencies.revenuePlan ? 'Rencana Pendapatan' : null,
-    ].filter((dependency): dependency is string => dependency !== null);
 }
 
 function ProcessHeader({
@@ -249,7 +237,6 @@ function MatrixBody({ rows }: { rows: PlanEbitdaMatrixRow[] }) {
 export default function KdkmpGeraiPlanEbitdaMatrix({
     matrix,
     can,
-    dependencies,
     dataOwner,
     dataOwnerOptions,
     canSelectDataOwner,
@@ -258,10 +245,6 @@ export default function KdkmpGeraiPlanEbitdaMatrix({
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
         useForm<MatrixFormData>(formDataFrom(matrix));
     const isPersisted = matrix.id !== null;
-    const missing = useMemo(
-        () => missingDependencies(dependencies),
-        [dependencies],
-    );
 
     const openForm = () => {
         clearErrors();
@@ -376,14 +359,6 @@ export default function KdkmpGeraiPlanEbitdaMatrix({
                         )}
                     </div>
                 </div>
-
-                {!dependencies.complete && (
-                    <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-                        Lengkapi data {missing.join(', ')} terlebih dahulu
-                        sebelum membuat Plan EBITDA Matrix. Template tetap
-                        ditampilkan sebagai pratinjau.
-                    </div>
-                )}
 
                 <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
                     <div className="overflow-x-auto">

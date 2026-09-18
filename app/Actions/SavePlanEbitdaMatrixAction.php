@@ -2,14 +2,10 @@
 
 namespace App\Actions;
 
-use App\Models\BusinessProcess;
 use App\Models\PlanEbitdaMatrix;
-use App\Models\RevenuePlan;
-use App\Models\UnitCostAssumption;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class SavePlanEbitdaMatrixAction
 {
@@ -21,24 +17,6 @@ class SavePlanEbitdaMatrixAction
     ): PlanEbitdaMatrix {
         return DB::transaction(function () use ($owner, $planEbitdaMatrix, $data): PlanEbitdaMatrix {
             $owner = User::query()->lockForUpdate()->findOrFail($owner->id);
-            $businessProcess = BusinessProcess::query()
-                ->whereBelongsTo($owner)
-                ->where('code', BusinessProcess::CODE_KDKMP_GERAI)
-                ->first();
-            $unitCostAssumption = UnitCostAssumption::query()
-                ->whereBelongsTo($owner)
-                ->where('code', UnitCostAssumption::CODE_KDKMP_GERAI)
-                ->first();
-            $revenuePlan = RevenuePlan::query()
-                ->whereBelongsTo($owner)
-                ->where('code', RevenuePlan::CODE_KDKMP_GERAI)
-                ->first();
-
-            if ($businessProcess === null || $unitCostAssumption === null || $revenuePlan === null) {
-                throw ValidationException::withMessages([
-                    'form' => 'Lengkapi Business Process, Unit Cost Assumption, dan Rencana Pendapatan terlebih dahulu.',
-                ]);
-            }
 
             if ($planEbitdaMatrix === null) {
                 if (PlanEbitdaMatrix::query()
@@ -63,23 +41,13 @@ class SavePlanEbitdaMatrixAction
                     ->findOrFail($planEbitdaMatrix->id);
             }
 
-            $planEbitdaMatrix->fill([
-                ...Arr::only($data, ['name']),
-                'business_process_id' => $businessProcess->id,
-                'unit_cost_assumption_id' => $unitCostAssumption->id,
-                'revenue_plan_id' => $revenuePlan->id,
-            ]);
+            $planEbitdaMatrix->fill(Arr::only($data, ['name']));
             $planEbitdaMatrix->save();
-
-            $steps = $businessProcess->steps()->get()->keyBy('sequence');
 
             foreach ($data['processes'] as $process) {
                 $planEbitdaMatrix->processes()->updateOrCreate(
                     ['sequence' => $process['sequence']],
-                    [
-                        ...$process,
-                        'business_process_step_id' => $steps->get($process['sequence'])?->id,
-                    ]
+                    $process
                 );
             }
 
