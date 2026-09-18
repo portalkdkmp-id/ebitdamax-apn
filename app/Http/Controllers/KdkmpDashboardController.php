@@ -7,16 +7,19 @@ use App\Http\Requests\SaveEbitdamaxKdkmpRequest;
 use App\Http\Requests\SaveOperationalAttendanceRequest;
 use App\Http\Requests\UpdateKdkmpTaskSelectionRequest;
 use App\Http\Requests\ViewKdkmpDashboardRequest;
+use App\Http\Requests\ViewKdkmpPosRevenueRequest;
 use App\Models\EbitdamaxKdkmp;
 use App\Models\SdmKdkmpEntry;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\KdkmpActualVariableCostService;
 use App\Services\KdkmpDashboardMetricsService;
+use App\Services\KdkmpExternalRevenueService;
 use App\Services\KdkmpFinancialMatrixService;
 use App\Services\KdkmpOperationalAllocationService;
 use App\Services\KdkmpTaskSelectionService;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +34,7 @@ class KdkmpDashboardController extends Controller
         private readonly SyncKdkmpActualVariableCostAction $syncActualVariableCost,
         private readonly KdkmpActualVariableCostService $actualVariableCost,
         private readonly KdkmpDashboardMetricsService $dashboardMetrics,
+        private readonly KdkmpExternalRevenueService $externalRevenue,
         private readonly KdkmpFinancialMatrixService $financialMatrix,
         private readonly KdkmpOperationalAllocationService $operationalAllocation,
         private readonly KdkmpTaskSelectionService $taskSelection,
@@ -205,6 +209,31 @@ class KdkmpDashboardController extends Controller
         };
 
         return back()->with('success', $message);
+    }
+
+    public function posRevenue(ViewKdkmpPosRevenueRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        $businessDate = $this->businessDate();
+        $timezone = (string) config('app.kdkmp_business_timezone');
+        $startDateValue = (string) ($request->validated('start_date') ?? $businessDate->toDateString());
+        $endDateValue = (string) ($request->validated('end_date') ?? $startDateValue);
+        $startDate = CarbonImmutable::createFromFormat('Y-m-d', $startDateValue, $timezone)->startOfDay();
+        $endDate = CarbonImmutable::createFromFormat('Y-m-d', $endDateValue, $timezone)->startOfDay();
+        $nik = $user->sdmKdkmpEntry?->nik;
+
+        if (! is_string($nik) || $nik === '') {
+            return response()->json([
+                'status' => 'error',
+                'revenue' => null,
+                'message' => 'Akun Anda belum terhubung ke data KDKMP.',
+                'fetched_at' => null,
+            ]);
+        }
+
+        return response()->json($this->externalRevenue->revenueFor($nik, $startDate, $endDate));
     }
 
     public function saveOperationalAttendance(

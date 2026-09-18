@@ -48,6 +48,17 @@ return [
         'chat_url' => env('LUMBUNG_KMS_CHAT_URL', 'https://lumbung.sibisa.site/chat'),
     ],
 
+    'kdkmp_external' => [
+        'base_url' => env(
+            'KDKMP_EXTERNAL_BASE_URL',
+            'https://api-external.kdkmpindonesia.co.id/kdkmp-external-api',
+        ),
+        'client_key' => env('KDKMP_EXTERNAL_CLIENT_KEY', 'partner-ebitda'),
+        'client_secret' => env('KDKMP_EXTERNAL_CLIENT_SECRET'),
+        'cache_store' => env('KDKMP_EXTERNAL_CACHE_STORE', 'redis'),
+        'cache_ttl' => (int) env('KDKMP_EXTERNAL_CACHE_TTL', 300),
+    ],
+
     'lms_kdkmp' => [
         'learning_paths_url' => env(
             'LMS_KDKMP_LEARNING_PATHS_URL',

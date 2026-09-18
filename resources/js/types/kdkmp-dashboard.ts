@@ -43,6 +43,13 @@ export type KdkmpComputedValues = Pick<
     time_compliance_rate: number;
 };
 
+export type KdkmpPosRevenue = {
+    status: 'ok' | 'error';
+    revenue: number | null;
+    message: string | null;
+    fetched_at: string | null;
+};
+
 export type KdkmpDailyEntry = KdkmpDashboardFields & {
     id: number;
     report_date: string;

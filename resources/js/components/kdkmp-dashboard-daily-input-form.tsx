@@ -1,7 +1,7 @@
-import { useForm } from '@inertiajs/react';
+import { useForm, useHttp } from '@inertiajs/react';
 import { AlertTriangle, Save } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,18 +15,24 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { formatCurrency } from '@/lib/formatters';
 import { kdkmpDashboardFields } from '@/lib/kdkmp-dashboard-fields';
 import {
     emptyKdkmpOperationalAttendance,
     kdkmpOperationalAttendanceRoles,
 } from '@/lib/kdkmp-operational-attendance';
-import { upsert } from '@/routes/kdkmp-dashboard';
+import {
+    posRevenue as posRevenueRoute,
+    upsert,
+} from '@/routes/kdkmp-dashboard';
 import { save as saveOperationalAttendanceRoute } from '@/routes/kdkmp-dashboard/operational-attendance';
 import type {
     KdkmpComputedValues,
     KdkmpDailyEntry,
     KdkmpDashboardFields,
     KdkmpOperationalAttendance,
+    KdkmpPosRevenue,
 } from '@/types/kdkmp-dashboard';
 
 type DailyForm = {
@@ -39,6 +45,7 @@ type OperationalAttendanceForm = {
 };
 
 type Props = {
+    businessDate: string;
     todayEntry: KdkmpDailyEntry | null;
     computedValues: KdkmpComputedValues;
 };
@@ -47,7 +54,6 @@ const ACTUAL_EBITDA_MARGIN_FIXED_COST = 9_235_467;
 const TASK_COMPLETION_WEIGHT = 55;
 const TIME_COMPLIANCE_WEIGHT = 30;
 const REVENUE_WEIGHT = 15;
-const POS_ACTUAL_REVENUE = '0';
 
 function inputValue(value: string | null | undefined): string {
     return value ?? '';
@@ -246,6 +252,7 @@ function formatManualValue(value: string | null, isRupiah: boolean): string {
 }
 
 export default function KdkmpDashboardDailyInputForm({
+    businessDate,
     todayEntry,
     computedValues,
 }: Props) {
@@ -264,6 +271,67 @@ export default function KdkmpDashboardDailyInputForm({
     const [showLowPlanRevenueConfirmation, setShowLowPlanRevenueConfirmation] =
         useState(false);
     const actualRevenue = inputValue(todayEntry?.actual_revenue) || '0';
+    const [posStartDate, setPosStartDate] = useState(businessDate);
+    const [posEndDate, setPosEndDate] = useState(businessDate);
+    const [posRevenue, setPosRevenue] = useState<KdkmpPosRevenue | null>(null);
+    const { get: getPosRevenue, processing: isFetchingPosRevenue } = useHttp(
+        {},
+    );
+    const isPosDateRangeValid =
+        posStartDate !== '' && posEndDate !== '' && posStartDate <= posEndDate;
+
+    const fetchPosRevenue = useCallback(
+        (startDate: string, endDate: string): void => {
+            getPosRevenue(
+                posRevenueRoute.url({
+                    query: { start_date: startDate, end_date: endDate },
+                }),
+                {
+                    onSuccess: (response) => {
+                        setPosRevenue(response as KdkmpPosRevenue);
+                    },
+                    onError: () => {
+                        setPosRevenue({
+                            status: 'error',
+                            revenue: null,
+                            message: 'Gagal memuat data pendapatan POS.',
+                            fetched_at: null,
+                        });
+                    },
+                    onHttpException: () => {
+                        setPosRevenue({
+                            status: 'error',
+                            revenue: null,
+                            message: 'Sistem POS KDKMP menolak permintaan.',
+                            fetched_at: null,
+                        });
+                    },
+                    onNetworkError: () => {
+                        setPosRevenue({
+                            status: 'error',
+                            revenue: null,
+                            message:
+                                'Tidak dapat terhubung ke sistem POS KDKMP.',
+                            fetched_at: null,
+                        });
+                    },
+                },
+            );
+        },
+        [getPosRevenue],
+    );
+
+    useEffect(() => {
+        if (!isPosDateRangeValid) {
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            fetchPosRevenue(posStartDate, posEndDate);
+        }, 400);
+
+        return () => window.clearTimeout(timer);
+    }, [fetchPosRevenue, isPosDateRangeValid, posEndDate, posStartDate]);
 
     const save = () => {
         setShowLowPlanRevenueConfirmation(false);
@@ -387,17 +455,96 @@ export default function KdkmpDashboardDailyInputForm({
                                     {revenueFields.map(renderDashboardField)}
                                     <div className="space-y-2">
                                         <Label>Pendapatan POS</Label>
-                                        <p className="py-2 text-sm font-semibold text-foreground tabular-nums">
-                                            {formatManualValue(
-                                                POS_ACTUAL_REVENUE,
-                                                true,
-                                            )}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            Nilai otomatis dari POS. Integrasi
-                                            POS belum tersedia sehingga saat ini
-                                            bernilai Rp0.
-                                        </p>
+                                        {isFetchingPosRevenue &&
+                                        posRevenue === null ? (
+                                            <Skeleton className="mt-2 h-6 w-36" />
+                                        ) : (
+                                            <p className="py-2 text-sm font-semibold text-foreground tabular-nums">
+                                                {posRevenue?.status === 'ok' &&
+                                                posRevenue.revenue !== null
+                                                    ? formatCurrency(
+                                                          posRevenue.revenue,
+                                                      )
+                                                    : '-'}
+                                            </p>
+                                        )}
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1.5">
+                                                <Label
+                                                    htmlFor="pos-start-date"
+                                                    className="text-xs font-normal text-muted-foreground"
+                                                >
+                                                    Dari tanggal
+                                                </Label>
+                                                <Input
+                                                    id="pos-start-date"
+                                                    type="date"
+                                                    value={posStartDate}
+                                                    max={businessDate}
+                                                    onChange={(event) =>
+                                                        setPosStartDate(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label
+                                                    htmlFor="pos-end-date"
+                                                    className="text-xs font-normal text-muted-foreground"
+                                                >
+                                                    Sampai tanggal
+                                                </Label>
+                                                <Input
+                                                    id="pos-end-date"
+                                                    type="date"
+                                                    value={posEndDate}
+                                                    min={posStartDate}
+                                                    max={businessDate}
+                                                    onChange={(event) =>
+                                                        setPosEndDate(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
+                                        {!isPosDateRangeValid ? (
+                                            <p className="text-xs text-destructive">
+                                                Tanggal akhir harus sama atau
+                                                setelah tanggal awal.
+                                            </p>
+                                        ) : posRevenue?.status === 'error' ? (
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="text-xs text-destructive">
+                                                    {posRevenue.message ??
+                                                        'Gagal mengambil data pendapatan POS.'}
+                                                </p>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-7 px-2 text-xs"
+                                                    disabled={
+                                                        isFetchingPosRevenue
+                                                    }
+                                                    onClick={() =>
+                                                        fetchPosRevenue(
+                                                            posStartDate,
+                                                            posEndDate,
+                                                        )
+                                                    }
+                                                >
+                                                    Coba lagi
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">
+                                                {isFetchingPosRevenue
+                                                    ? 'Memuat data POS...'
+                                                    : 'Nilai otomatis dari POS KDKMP. Ubah rentang tanggal untuk melihat periode lain.'}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="space-y-2">
