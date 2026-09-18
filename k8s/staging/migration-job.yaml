@@ -19,6 +19,8 @@ spec:
         app.kubernetes.io/version: IMAGE_TAG
     spec:
       serviceAccountName: ebitda
+      nodeSelector:
+              workload: app
       restartPolicy: Never
       securityContext:
         runAsNonRoot: true

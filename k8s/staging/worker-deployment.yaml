@@ -27,6 +27,8 @@ spec:
         gke-gcsfuse/volumes: 'true'
     spec:
       serviceAccountName: ebitda
+      nodeSelector:
+              workload: app
       terminationGracePeriodSeconds: 120
       securityContext:
         runAsNonRoot: true
