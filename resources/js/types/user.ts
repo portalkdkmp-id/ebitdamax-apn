@@ -45,6 +45,7 @@ export type UserItem = {
     name: string;
     username: string | null;
     email: string;
+    is_lark_linked: boolean;
     email_verified_at: string | null;
     created_at: string | null;
     updated_at: string | null;
@@ -58,6 +59,7 @@ export type UserFilters = {
     domain: RoleDomain;
     search: string;
     role_id: number | null;
+    lark_status: 'all' | 'linked' | 'unlinked';
     sort: string;
     direction: 'asc' | 'desc';
 };

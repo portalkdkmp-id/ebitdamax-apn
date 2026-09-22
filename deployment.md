@@ -22,6 +22,14 @@ bcmath ctype curl fileinfo json mbstring openssl pdo pdo_pgsql
 tokenizer xml
 ```
 
+Ekstensi PHP yang disarankan (untuk cache Redis integrasi POS KDKMP):
+
+```
+php8.3-redis
+```
+
+Redis server juga disarankan berjalan di server yang sama (`apt install redis-server`). Integrasi POS memakai store `kdkmp_external` yang mencoba Redis lebih dulu lalu otomatis fallback ke cache database bila Redis tidak tersedia atau ekstensinya belum terpasang, sehingga fitur tetap berjalan tanpa Redis.
+
 ---
 
 ## 1. Clone & Siapkan Project
@@ -69,6 +77,11 @@ CACHE_STORE=database
 
 # Token API eksternal
 PORTAL_PEMBANGUNAN_SARPRAS_TOKEN=<isi-token-anda>
+
+# Integrasi POS KDKMP
+KDKMP_EXTERNAL_CLIENT_SECRET=<isi-client-secret-anda>
+# "kdkmp_external" = Redis dulu, fallback database. Set "redis" untuk memaksa Redis saja.
+KDKMP_EXTERNAL_CACHE_STORE=kdkmp_external
 ```
 
 > **Penting:** Jika menggunakan MySQL/MariaDB, buat database kosong terlebih dahulu, lalu jalankan `php artisan migrate` di langkah 4.

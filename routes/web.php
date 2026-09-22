@@ -204,6 +204,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('users', UserController::class)
             ->except(['create', 'edit', 'show']);
 
+        Route::delete('/users/{user}/lark-identity', [UserController::class, 'destroyLarkIdentity'])
+            ->name('users.lark-identity.destroy');
+
         Route::post('/users/{user}/manager-sk-document', [ManagerSkDocumentController::class, 'store'])
             ->name('users.manager-sk-document.store');
 

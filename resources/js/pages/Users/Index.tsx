@@ -6,6 +6,7 @@ import {
     Mail,
     Pencil,
     Plus,
+    RefreshCw,
     Search,
     ShieldCheck,
     Trash2,
@@ -49,6 +50,7 @@ import {
     store as storeUser,
     update as updateUser,
 } from '@/routes/users';
+import { destroy as destroyLarkIdentity } from '@/routes/users/lark-identity';
 import { store as storeManagerSkDocument } from '@/routes/users/manager-sk-document';
 import type {
     UserFilters,
@@ -140,6 +142,9 @@ export default function UsersIndex({
     const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
     const [detailUser, setDetailUser] = useState<UserItem | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<UserItem | null>(null);
+    const [larkResetTarget, setLarkResetTarget] = useState<UserItem | null>(
+        null,
+    );
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirmation, setShowPasswordConfirmation] =
@@ -148,6 +153,7 @@ export default function UsersIndex({
     const [filterForm, setFilterForm] = useState({
         search: filters.search ?? '',
         role_id: filters.role_id ? String(filters.role_id) : 'all',
+        lark_status: filters.lark_status ?? 'all',
         sort: filters.sort ?? 'name',
         direction: filters.direction ?? 'asc',
     });
@@ -201,9 +207,7 @@ export default function UsersIndex({
                     option.kecamatan,
                     option.desa,
                 ].some((value) =>
-                    value
-                        ?.toLocaleLowerCase('id')
-                        .includes(normalizedSearch),
+                    value?.toLocaleLowerCase('id').includes(normalizedSearch),
                 );
             })
             .slice(0, 100);
@@ -262,6 +266,10 @@ export default function UsersIndex({
                     filterForm.role_id === 'all'
                         ? undefined
                         : filterForm.role_id,
+                lark_status:
+                    filterForm.lark_status === 'all'
+                        ? undefined
+                        : filterForm.lark_status,
                 sort: filterForm.sort,
                 direction: filterForm.direction,
                 domain: filters.domain,
@@ -400,6 +408,23 @@ export default function UsersIndex({
         );
     };
 
+    const confirmLarkReset = () => {
+        if (!larkResetTarget) {
+            return;
+        }
+
+        router.delete(
+            destroyLarkIdentity.url(
+                larkResetTarget.username ?? String(larkResetTarget.id),
+                { query: { domain: filters.domain } },
+            ),
+            {
+                preserveScroll: true,
+                onSuccess: () => setLarkResetTarget(null),
+            },
+        );
+    };
+
     return (
         <>
             <Head title={`User ${domainLabel}`} />
@@ -430,7 +455,7 @@ export default function UsersIndex({
                         <CardContent className="p-5">
                             <form
                                 onSubmit={submitFilters}
-                                className="grid gap-4 lg:grid-cols-[1fr_220px_160px_160px_auto]"
+                                className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_180px_160px_160px_auto]"
                             >
                                 <div className="space-y-2">
                                     <Label>Search</Label>
@@ -476,6 +501,37 @@ export default function UsersIndex({
                                                     {role.name}
                                                 </SelectItem>
                                             ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>SSO Lark</Label>
+                                    <Select
+                                        value={filterForm.lark_status}
+                                        onValueChange={(value) =>
+                                            setFilterForm((current) => ({
+                                                ...current,
+                                                lark_status: value as
+                                                    | 'all'
+                                                    | 'linked'
+                                                    | 'unlinked',
+                                            }))
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Status SSO Lark" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">
+                                                Semua status
+                                            </SelectItem>
+                                            <SelectItem value="linked">
+                                                Terhubung
+                                            </SelectItem>
+                                            <SelectItem value="unlinked">
+                                                Belum terhubung
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -572,7 +628,10 @@ export default function UsersIndex({
                                         <TableHead className="p-4">
                                             Email
                                         </TableHead>
-                                        <TableHead className="w-[260px] p-4 text-right">
+                                        <TableHead className="p-4">
+                                            SSO Lark
+                                        </TableHead>
+                                        <TableHead className="w-[360px] p-4 text-right">
                                             Aksi
                                         </TableHead>
                                     </TableRow>
@@ -581,7 +640,7 @@ export default function UsersIndex({
                                     {users.data.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={4}
+                                                colSpan={5}
                                                 className="p-8 text-center text-muted-foreground"
                                             >
                                                 Data user belum tersedia.
@@ -632,6 +691,19 @@ export default function UsersIndex({
                                                 </div>
                                             </TableCell>
                                             <TableCell className="p-4">
+                                                <Badge
+                                                    variant={
+                                                        user.is_lark_linked
+                                                            ? 'default'
+                                                            : 'outline'
+                                                    }
+                                                >
+                                                    {user.is_lark_linked
+                                                        ? 'Terhubung'
+                                                        : 'Belum terhubung'}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="p-4">
                                                 <div className="flex justify-end gap-2">
                                                     <Button
                                                         type="button"
@@ -654,6 +726,22 @@ export default function UsersIndex({
                                                     >
                                                         <Pencil className="size-4" />
                                                         Edit
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={
+                                                            !user.is_lark_linked
+                                                        }
+                                                        onClick={() =>
+                                                            setLarkResetTarget(
+                                                                user,
+                                                            )
+                                                        }
+                                                    >
+                                                        <RefreshCw className="size-4" />
+                                                        Reset Lark
                                                     </Button>
                                                     <Button
                                                         type="button"
@@ -832,7 +920,9 @@ export default function UsersIndex({
                                                 (option) => (
                                                     <SelectItem
                                                         key={option.id}
-                                                        value={String(option.id)}
+                                                        value={String(
+                                                            option.id,
+                                                        )}
                                                     >
                                                         {option.nama_koperasi ??
                                                             'KDKMP tanpa nama'}
@@ -854,16 +944,14 @@ export default function UsersIndex({
                                             {availableKdkmpOptions.length ===
                                                 0 && (
                                                 <p className="px-2 py-3 text-sm text-muted-foreground">
-                                                    Data KDKMP yang tersedia tidak
-                                                    ditemukan.
+                                                    Data KDKMP yang tersedia
+                                                    tidak ditemukan.
                                                 </p>
                                             )}
                                         </SelectContent>
                                     </Select>
                                     <FieldError
-                                        message={
-                                            errors.sdm_kdkmp_entry_id
-                                        }
+                                        message={errors.sdm_kdkmp_entry_id}
                                     />
                                 </div>
                             </div>
@@ -1554,8 +1642,54 @@ export default function UsersIndex({
                                     </div>
                                 )}
                             </div>
+                            <div className="rounded-lg border bg-background p-4">
+                                <p className="text-sm text-muted-foreground">
+                                    SSO Lark
+                                </p>
+                                <div className="mt-2">
+                                    <Badge
+                                        variant={
+                                            detailUser.is_lark_linked
+                                                ? 'default'
+                                                : 'outline'
+                                        }
+                                    >
+                                        {detailUser.is_lark_linked
+                                            ? 'Terhubung'
+                                            : 'Belum terhubung'}
+                                    </Badge>
+                                </div>
+                            </div>
                         </div>
                     )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={larkResetTarget !== null}
+                onOpenChange={(open) => !open && setLarkResetTarget(null)}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Reset koneksi Lark</DialogTitle>
+                        <DialogDescription>
+                            Koneksi Lark untuk {larkResetTarget?.name} akan
+                            dilepas. User perlu login dengan Lark kembali untuk
+                            menghubungkan akun.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setLarkResetTarget(null)}
+                        >
+                            Batal
+                        </Button>
+                        <Button type="button" onClick={confirmLarkReset}>
+                            Reset Lark
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 

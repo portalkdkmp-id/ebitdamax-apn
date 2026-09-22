@@ -28,9 +28,13 @@ class UserController extends Controller
         $domain = $this->requestedDomain($request);
         $search = trim((string) $request->input('search', ''));
         $roleId = $request->input('role_id');
+        $larkStatus = (string) $request->input('lark_status', 'all');
         $sort = (string) $request->input('sort', 'name');
         $direction = (string) $request->input('direction', 'asc');
 
+        $larkStatus = in_array($larkStatus, ['all', 'linked', 'unlinked'], true)
+            ? $larkStatus
+            : 'all';
         $sort = in_array($sort, ['name', 'email', 'created_at'], true) ? $sort : 'name';
         $direction = $direction === 'desc' ? 'desc' : 'asc';
 
@@ -41,6 +45,8 @@ class UserController extends Controller
                 fn (Builder $query): Builder => $query->where('domain', $domain->value),
             )
             ->when($roleId, fn ($query) => $query->where('role_id', $roleId))
+            ->when($larkStatus === 'linked', fn (Builder $query): Builder => $query->whereNotNull('lark_open_id'))
+            ->when($larkStatus === 'unlinked', fn (Builder $query): Builder => $query->whereNull('lark_open_id'))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery
@@ -53,7 +59,7 @@ class UserController extends Controller
             ->orderBy('id')
             ->paginate(15)
             ->through(fn (User $user): array => $this->transformUser($user))
-            ->appends($request->only(['domain', 'search', 'role_id', 'sort', 'direction']));
+            ->appends($request->only(['domain', 'search', 'role_id', 'lark_status', 'sort', 'direction']));
 
         $roles = Role::query()
             ->where('domain', $domain->value)
@@ -82,6 +88,7 @@ class UserController extends Controller
                 'domain' => $domain->value,
                 'search' => $search,
                 'role_id' => $roleId ? (int) $roleId : null,
+                'lark_status' => $larkStatus,
                 'sort' => $sort,
                 'direction' => $direction,
             ],
@@ -121,6 +128,16 @@ class UserController extends Controller
         $user->delete();
 
         return back()->with('success', 'User berhasil dihapus.');
+    }
+
+    public function destroyLarkIdentity(Request $request, User $user): RedirectResponse
+    {
+        $this->ensureUserBelongsToDomain($user, $this->requestedDomain($request));
+
+        $user->lark_open_id = null;
+        $user->save();
+
+        return back()->with('success', 'Koneksi Lark berhasil direset.');
     }
 
     /**
@@ -192,6 +209,7 @@ class UserController extends Controller
             'name' => $user->name,
             'username' => $user->username,
             'email' => $user->email,
+            'is_lark_linked' => $user->lark_open_id !== null,
             'email_verified_at' => $user->email_verified_at?->toIso8601String(),
             'created_at' => $user->created_at?->toIso8601String(),
             'updated_at' => $user->updated_at?->toIso8601String(),

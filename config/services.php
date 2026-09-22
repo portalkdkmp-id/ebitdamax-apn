@@ -55,7 +55,7 @@ return [
         ),
         'client_key' => env('KDKMP_EXTERNAL_CLIENT_KEY', 'partner-ebitda'),
         'client_secret' => env('KDKMP_EXTERNAL_CLIENT_SECRET'),
-        'cache_store' => env('KDKMP_EXTERNAL_CACHE_STORE', 'redis'),
+        'cache_store' => env('KDKMP_EXTERNAL_CACHE_STORE', 'kdkmp_external'),
         'cache_ttl' => (int) env('KDKMP_EXTERNAL_CACHE_TTL', 300),
     ],
 

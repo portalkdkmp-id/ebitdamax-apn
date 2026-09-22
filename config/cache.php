@@ -105,6 +105,14 @@ return [
             ],
         ],
 
+        'kdkmp_external' => [
+            'driver' => 'failover',
+            'stores' => [
+                'redis',
+                'database',
+            ],
+        ],
+
     ],
 
     /*
