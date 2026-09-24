@@ -11,6 +11,7 @@ import {
     Images,
     Paperclip,
     Play,
+    RefreshCw,
     X,
 } from 'lucide-react';
 import type { ChangeEvent } from 'react';
@@ -46,14 +47,14 @@ import {
     start as startTaskRoute,
 } from '@/routes/tasks';
 import type {
+    KdkmpOperationalAttendance,
+    KdkmpOperationalAttendanceKey,
+} from '@/types/kdkmp-dashboard';
+import type {
     TaskAdditionalFieldItem,
     TaskItem,
     TaskReportDocument,
 } from '@/types/task';
-import type {
-    KdkmpOperationalAttendance,
-    KdkmpOperationalAttendanceKey,
-} from '@/types/kdkmp-dashboard';
 
 type DashboardTask = TaskItem & {
     status: 'pending' | 'in_progress' | 'completed';
@@ -91,11 +92,14 @@ type TaskActionFormData = {
     values: Record<string, AdditionalFieldValue>;
 };
 
+type CameraFacingMode = 'user' | 'environment';
+
 const MAX_DOCUMENT_COUNT = 10;
 const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024;
 const TASK_DESCRIPTION_PREVIEW_LENGTH = 150;
 const ADDITIONAL_FIELD_FILE_ACCEPT =
     '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png';
+const DEFAULT_CAMERA_FACING_MODE: CameraFacingMode = 'user';
 
 function formatFileSize(size: number): string {
     if (size < 1024) {
@@ -673,6 +677,9 @@ function TaskActionDialog({
     const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
     const [isOpeningCamera, setIsOpeningCamera] = useState(false);
     const [cameraError, setCameraError] = useState<string | null>(null);
+    const [cameraFacingMode, setCameraFacingMode] = useState<CameraFacingMode>(
+        DEFAULT_CAMERA_FACING_MODE,
+    );
     const [documentInputKey, setDocumentInputKey] = useState(0);
     const [documentSelectionError, setDocumentSelectionError] = useState<
         string | null
@@ -774,6 +781,7 @@ function TaskActionDialog({
         cameraRequestRef.current += 1;
         releaseCamera();
         setIsOpeningCamera(false);
+        setCameraFacingMode(DEFAULT_CAMERA_FACING_MODE);
     };
 
     useEffect(() => {
@@ -822,7 +830,11 @@ function TaskActionDialog({
         };
     }, []);
 
-    const openCamera = async () => {
+    const openCamera = async (
+        facingMode: CameraFacingMode = DEFAULT_CAMERA_FACING_MODE,
+        requireFacingMode = false,
+        fallbackFacingMode: CameraFacingMode | null = null,
+    ) => {
         setCameraError(null);
 
         if (!navigator.mediaDevices?.getUserMedia) {
@@ -839,12 +851,31 @@ function TaskActionDialog({
         setIsOpeningCamera(true);
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: { ideal: 'user' },
-                },
-                audio: false,
-            });
+            let usedFallback = false;
+            let stream: MediaStream;
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: requireFacingMode
+                            ? { exact: facingMode }
+                            : { ideal: facingMode },
+                    },
+                    audio: false,
+                });
+            } catch (error) {
+                if (!fallbackFacingMode) {
+                    throw error;
+                }
+
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { ideal: fallbackFacingMode },
+                    },
+                    audio: false,
+                });
+                usedFallback = true;
+            }
 
             if (cameraRequestRef.current !== requestId) {
                 stream.getTracks().forEach((track) => track.stop());
@@ -855,6 +886,28 @@ function TaskActionDialog({
             streamRef.current = stream;
             setCameraStream(stream);
             setCameraActive(true);
+            const detectedFacingMode = stream
+                .getVideoTracks()[0]
+                ?.getSettings().facingMode;
+            setCameraFacingMode(
+                detectedFacingMode === 'user' ||
+                    detectedFacingMode === 'environment'
+                    ? detectedFacingMode
+                    : usedFallback && fallbackFacingMode
+                      ? fallbackFacingMode
+                      : facingMode,
+            );
+
+            if (usedFallback) {
+                const requestedCamera =
+                    facingMode === 'environment' ? 'belakang' : 'depan';
+                const activeCamera =
+                    fallbackFacingMode === 'environment' ? 'belakang' : 'depan';
+
+                setCameraError(
+                    `Kamera ${requestedCamera} tidak tersedia. Kamera ${activeCamera} tetap digunakan.`,
+                );
+            }
         } catch (error) {
             if (cameraRequestRef.current === requestId) {
                 setCameraError(cameraAccessErrorMessage(error));
@@ -864,6 +917,13 @@ function TaskActionDialog({
                 setIsOpeningCamera(false);
             }
         }
+    };
+
+    const switchCamera = () => {
+        const nextFacingMode =
+            cameraFacingMode === 'user' ? 'environment' : 'user';
+
+        void openCamera(nextFacingMode, true, cameraFacingMode);
     };
 
     const captureCameraPhoto = async () => {
@@ -1084,6 +1144,17 @@ function TaskActionDialog({
                                         </Button>
                                         {cameraActive && (
                                             <>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={switchCamera}
+                                                    disabled={isOpeningCamera}
+                                                >
+                                                    <RefreshCw className="size-4" />
+                                                    {cameraFacingMode === 'user'
+                                                        ? 'Kamera Belakang'
+                                                        : 'Kamera Depan'}
+                                                </Button>
                                                 <Button
                                                     type="button"
                                                     onClick={() =>

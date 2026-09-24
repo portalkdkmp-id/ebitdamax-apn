@@ -120,10 +120,9 @@ class KdkmpTaskSelectionService
     }
 
     /**
-     * Expands selected BMC points to all optional tasks under each point.
+     * Expands each selected bundle to all optional tasks under its BMC point.
      *
-     * Tasks that have not been mapped to a BMC point remain individually selectable.
-     * The expanded IDs are persisted as the daily selection snapshot.
+     * The unmapped tasks are treated as the "Kategori Lainnya" bundle.
      *
      * @param  Collection<int, int>  $selectedTaskIds
      * @return Collection<int, int>
@@ -152,9 +151,6 @@ class KdkmpTaskSelectionService
         $selectedBmcStatuses = $selectableTasks
             ->filter(fn (Task $task): bool => $selectedTaskIdLookup->has($task->id))
             ->map(fn (Task $task): string => $this->bmcStatusValue($task))
-            ->reject(
-                fn (string $bmcStatus): bool => $bmcStatus === TaskBmcStatus::Unmapped->value,
-            )
             ->unique()
             ->values();
         $bundleTaskIds = $selectableTasks
@@ -164,15 +160,8 @@ class KdkmpTaskSelectionService
                 ),
             )
             ->pluck('id');
-        $selectedUnmappedTaskIds = $selectableTasks
-            ->filter(
-                fn (Task $task): bool => $selectedTaskIdLookup->has($task->id)
-                    && $this->bmcStatusValue($task) === TaskBmcStatus::Unmapped->value,
-            )
-            ->pluck('id');
 
         return $bundleTaskIds
-            ->merge($selectedUnmappedTaskIds)
             ->map(fn (mixed $taskId): int => (int) $taskId)
             ->unique()
             ->values();

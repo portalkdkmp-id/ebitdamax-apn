@@ -138,17 +138,6 @@ function KdkmpTaskSelectionForm({
         );
     const selectedTaskIds = new Set(data.selected_task_ids);
 
-    const toggleTask = (taskId: number, isChecked: boolean) => {
-        setData(
-            'selected_task_ids',
-            isChecked
-                ? [...new Set([...data.selected_task_ids, taskId])]
-                : data.selected_task_ids.filter(
-                      (selectedTaskId) => selectedTaskId !== taskId,
-                  ),
-        );
-    };
-
     const toggleBmcBundle = (taskIds: number[], isChecked: boolean) => {
         const taskIdLookup = new Set(taskIds);
 
@@ -231,17 +220,20 @@ function KdkmpTaskSelectionForm({
                                             <div>
                                                 <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                                                     {isUnmappedGroup
-                                                        ? 'Task tambahan'
+                                                        ? 'Bundle task tambahan'
                                                         : 'Bundle poin BMC'}
                                                 </p>
                                                 <h3 className="mt-0.5 font-semibold text-foreground">
-                                                    {group.bmcStatusLabel}
+                                                    {isUnmappedGroup
+                                                        ? 'Kategori Lainnya'
+                                                        : group.bmcStatusLabel}
                                                 </h3>
                                                 {isUnmappedGroup && (
                                                     <p className="mt-1 text-xs text-muted-foreground">
-                                                        Task ini belum memiliki
-                                                        poin BMC dan tetap
-                                                        dipilih satu per satu.
+                                                        Task aktif yang belum
+                                                        dipetakan ke poin BMC
+                                                        dijalankan sebagai satu
+                                                        bundle.
                                                     </p>
                                                 )}
                                             </div>
@@ -249,38 +241,37 @@ function KdkmpTaskSelectionForm({
                                                 <Badge variant="secondary">
                                                     {group.tasks.length} task
                                                 </Badge>
-                                                {!isUnmappedGroup &&
-                                                    (optionalTaskIds.length ===
-                                                    0 ? (
-                                                        <Badge variant="outline">
-                                                            Seluruh task wajib
-                                                        </Badge>
-                                                    ) : (
-                                                        <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground has-[[data-disabled]]:cursor-not-allowed has-[[data-disabled]]:opacity-60">
-                                                            <Checkbox
-                                                                checked={
-                                                                    isBundleSelected
-                                                                        ? true
-                                                                        : isBundlePartiallySelected
-                                                                          ? 'indeterminate'
-                                                                          : false
-                                                                }
-                                                                disabled={
-                                                                    isBundleLocked
-                                                                }
-                                                                onCheckedChange={(
-                                                                    checked,
-                                                                ) =>
-                                                                    toggleBmcBundle(
-                                                                        optionalTaskIds,
-                                                                        checked ===
-                                                                            true,
-                                                                    )
-                                                                }
-                                                            />
-                                                            Jalankan bundle
-                                                        </label>
-                                                    ))}
+                                                {optionalTaskIds.length ===
+                                                0 ? (
+                                                    <Badge variant="outline">
+                                                        Seluruh task wajib
+                                                    </Badge>
+                                                ) : (
+                                                    <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground has-[[data-disabled]]:cursor-not-allowed has-[[data-disabled]]:opacity-60">
+                                                        <Checkbox
+                                                            checked={
+                                                                isBundleSelected
+                                                                    ? true
+                                                                    : isBundlePartiallySelected
+                                                                      ? 'indeterminate'
+                                                                      : false
+                                                            }
+                                                            disabled={
+                                                                isBundleLocked
+                                                            }
+                                                            onCheckedChange={(
+                                                                checked,
+                                                            ) =>
+                                                                toggleBmcBundle(
+                                                                    optionalTaskIds,
+                                                                    checked ===
+                                                                        true,
+                                                                )
+                                                            }
+                                                        />
+                                                        Jalankan bundle
+                                                    </label>
+                                                )}
                                             </div>
                                         </header>
                                         <div className="space-y-3 p-3 sm:p-4">
@@ -290,9 +281,6 @@ function KdkmpTaskSelectionForm({
                                                     selectedTaskIds.has(
                                                         task.id,
                                                     );
-                                                const isDisabled =
-                                                    task.is_mandatory ||
-                                                    task.is_locked;
                                                 const taskContent = (
                                                     <span className="min-w-0 flex-1">
                                                         <span className="flex flex-wrap items-center gap-2">
@@ -347,58 +335,30 @@ function KdkmpTaskSelectionForm({
                                                     </span>
                                                 );
 
-                                                if (!isUnmappedGroup) {
-                                                    return (
-                                                        <div
-                                                            key={task.id}
-                                                            className="flex items-start gap-3 rounded-lg border bg-background p-4"
-                                                        >
-                                                            <span
-                                                                className={
-                                                                    isChecked
-                                                                        ? 'mt-1 size-2.5 shrink-0 rounded-full bg-primary'
-                                                                        : 'mt-1 size-2.5 shrink-0 rounded-full border border-muted-foreground/50'
-                                                                }
-                                                            />
-                                                            {taskContent}
-                                                        </div>
-                                                    );
-                                                }
-
                                                 return (
-                                                    <label
+                                                    <div
                                                         key={task.id}
-                                                        className="flex items-start gap-3 rounded-lg border bg-background p-4 transition-colors hover:bg-muted/30"
+                                                        className="flex items-start gap-3 rounded-lg border bg-background p-4"
                                                     >
-                                                        <Checkbox
-                                                            checked={isChecked}
-                                                            disabled={
-                                                                isDisabled
-                                                            }
-                                                            onCheckedChange={(
-                                                                checked,
-                                                            ) =>
-                                                                toggleTask(
-                                                                    task.id,
-                                                                    checked ===
-                                                                        true,
-                                                                )
+                                                        <span
+                                                            className={
+                                                                isChecked
+                                                                    ? 'mt-1 size-2.5 shrink-0 rounded-full bg-primary'
+                                                                    : 'mt-1 size-2.5 shrink-0 rounded-full border border-muted-foreground/50'
                                                             }
                                                         />
                                                         {taskContent}
-                                                    </label>
+                                                    </div>
                                                 );
                                             })}
-                                            {isBundleLocked &&
-                                                !isUnmappedGroup && (
-                                                    <p className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
-                                                        <Clock3 className="size-3.5" />
-                                                        Selesaikan task yang
-                                                        sedang dikerjakan
-                                                        sebelum mengubah bundle
-                                                        ini.
-                                                    </p>
-                                                )}
+                                            {isBundleLocked && (
+                                                <p className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+                                                    <Clock3 className="size-3.5" />
+                                                    Selesaikan task yang sedang
+                                                    dikerjakan sebelum mengubah
+                                                    bundle ini.
+                                                </p>
+                                            )}
                                         </div>
                                     </section>
                                 );
