@@ -27,7 +27,7 @@ const TOUR_STEPS: TourStep[] = [
         target: '[data-tour="sidebar-navigation"]',
         title: 'Navigasi aplikasi',
         description:
-            'Gunakan menu untuk membuka Dashboard KDKMP, LMS, Customer Analysis, Meeting, dan Tasks.',
+            'Gunakan menu untuk membuka Dashboard KDKMP, Customer Analysis, Meeting, dan Tasks.',
         path: '/dashboard/kdkmp',
     },
     {

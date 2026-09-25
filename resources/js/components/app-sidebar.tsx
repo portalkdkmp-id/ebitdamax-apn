@@ -9,10 +9,8 @@ import {
     FolderCheck,
     FolderKanban,
     Gauge,
-    GraduationCap,
     LayoutDashboard,
     Megaphone,
-    MessageSquareText,
     Network,
     Radar,
     ShieldCheck,
@@ -33,15 +31,14 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { index as announcementsIndex } from '@/routes/announcements';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import { index as adminKdkmpDashboardIndex } from '@/routes/admin/kdkmp-dashboard';
+import { index as announcementsIndex } from '@/routes/announcements';
 import { index as customerAnalysisIndex } from '@/routes/customer-analyses';
 import { index as ebitdaTreeIndex } from '@/routes/ebitda-tree';
 import { index as ebitdaValuesIndex } from '@/routes/ebitda-values';
 import { index as importExcelIndex } from '@/routes/import-excel';
 import { index as kdkmpDashboardIndex } from '@/routes/kdkmp-dashboard';
-import { index as lmsKdkmpIndex } from '@/routes/lms-kdkmp';
 import { index as meetingMinutesIndex } from '@/routes/meeting-minutes';
 import { index as meetingActionItemsIndex } from '@/routes/meeting-minutes/action-items';
 import { index as monitoringIndex } from '@/routes/monitoring';
@@ -162,14 +159,6 @@ const meetingMinutesNavItems: NavItem[] = [
     },
 ];
 
-const knowledgeManagementNavItems: NavItem[] = [
-    {
-        title: 'Chat Lumbung KMS',
-        href: '/lumbung-kms/chat',
-        icon: MessageSquareText,
-    },
-];
-
 const meetingActionItemNavItems: NavItem[] = [
     {
         title: 'Action Item MoM',
@@ -231,11 +220,6 @@ const kdkmpManagerNavItems: NavItem[] = [
         href: kdkmpDashboardIndex(),
         icon: Gauge,
         tourId: 'dashboard',
-    },
-    {
-        title: 'LMS KDKMP',
-        href: lmsKdkmpIndex(),
-        icon: GraduationCap,
     },
     {
         title: 'Customer Analysis',
@@ -341,10 +325,6 @@ export function AppSidebar() {
                                 label="Komunikasi"
                             />
                         )}
-                        <NavMain
-                            items={knowledgeManagementNavItems}
-                            label="Knowledge Management"
-                        />
                         <NavMain
                             items={[
                                 ...meetingMinutesNavItems,
